@@ -1,0 +1,31 @@
+# Connect IQ build output
+bin/
+*.prg
+*.prg.debug.xml
+*.iq
+
+# Signing key — NEVER commit (used to sign the app; treat as a secret)
+developer_key
+*.der
+*.pem
+
+# BMW secrets & captured personal data — NEVER commit
+bmw_tokens.json
+bmw_tokens*.json
+bmw_data/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Local agent / tool state
+.claude/
+
+# Logs / scratch
+*.log
+
+# macOS / IDE
+.DS_Store
+.idea/
+*.iml

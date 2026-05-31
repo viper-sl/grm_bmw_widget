@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<strings>
+  <string id="AppName">BMW Status</string>
+  <string id="ClientIdLabel">BMW Client ID</string>
+  <string id="VinLabel">Vehicle VIN</string>
+  <string id="ContainerIdLabel">Container ID</string>
+  <string id="RefreshTokenLabel">Refresh Token</string>
+  <string id="TankLitresLabel">Tank Size (L)</string>
+  <string id="SetupPrompt">Setup BMW Widget</string>
+  <string id="RelinkPrompt">Re-auth needed. Open Garmin Connect.</string>
+  <string id="StaleIndicator">Data may be outdated</string>
+</strings>

@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<properties>
+  <property id="clientId" type="String"/>
+  <property id="vin" type="String"/>
+  <property id="containerId" type="String"/>
+  <property id="refreshToken" type="String"/>
+  <property id="tankLitres" type="Number">52</property>
+</properties>

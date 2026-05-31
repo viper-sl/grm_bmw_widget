@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<settings>
+  <setting propertyKey="@Properties.clientId" title="@Strings.ClientIdLabel">
+    <settingConfig type="alphaNumeric"/>
+  </setting>
+  <setting propertyKey="@Properties.vin" title="@Strings.VinLabel">
+    <settingConfig type="alphaNumeric"/>
+  </setting>
+  <setting propertyKey="@Properties.containerId" title="@Strings.ContainerIdLabel">
+    <settingConfig type="alphaNumeric"/>
+  </setting>
+  <setting propertyKey="@Properties.refreshToken" title="@Strings.RefreshTokenLabel">
+    <settingConfig type="alphaNumeric"/>
+  </setting>
+  <setting propertyKey="@Properties.tankLitres" title="@Strings.TankLitresLabel">
+    <settingConfig type="numeric" min="20" max="120"/>
+  </setting>
+</settings>

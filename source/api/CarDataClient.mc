@@ -75,6 +75,13 @@ class CarDataClient {
             Application.Storage.setValue(StorageKeys.KEY_VEHICLE_NAME, brand + " " + model);
             var drive = (data.hasKey("driveTrain") && data["driveTrain"] != null) ? data["driveTrain"] : "CONV";
             Application.Storage.setValue(StorageKeys.KEY_DRIVE_TYPE, drive);
+            // "About car" details (shown in the on-watch settings menu).
+            Application.Storage.setValue(StorageKeys.KEY_COLOUR,
+                (data.hasKey("colourDescription") && data["colourDescription"] != null) ? data["colourDescription"] : "");
+            Application.Storage.setValue(StorageKeys.KEY_BODY_TYPE,
+                (data.hasKey("bodyType") && data["bodyType"] != null) ? data["bodyType"] : "");
+            Application.Storage.setValue(StorageKeys.KEY_ENGINE,
+                (data.hasKey("engine") && data["engine"] != null) ? data["engine"] : "");
         }
         data = null;
         _callback.invoke(responseCode, null);

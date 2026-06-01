@@ -26,6 +26,12 @@ class BmwWidgetDelegate extends WatchUi.BehaviorDelegate {
         return _view.onSelect();
     }
 
+    // MENU button (long-press UP on fēnix) opens the on-watch settings menu.
+    function onMenu() {
+        WatchUi.pushView(SettingsMenu.build(), new SettingsMenuDelegate(), WatchUi.SLIDE_UP);
+        return true;
+    }
+
     function onNextPage() {
         if (_view != null) { return _view.onNextPage(); }
         return false;

@@ -8,6 +8,7 @@ using Toybox.Communications;
 using Toybox.Lang;
 using Toybox.Time;
 
+(:background)
 class TokenManager {
 
     // Holds the completion callback across the async HTTP round-trip.

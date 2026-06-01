@@ -1,7 +1,7 @@
 // Fixture dictionaries for (:debug) builds only — never compiled into (:release).
 // Values match empirical live data from BMW 218i (VIN REDACTED-VIN, 2026-05-29 session).
 // Container REDACTED-CONTAINER (v2, 21 descriptors). Mirror live API shape exactly.
-(:debug)
+(:debug :background)
 class MockData {
 
     static function telematicFixture() {

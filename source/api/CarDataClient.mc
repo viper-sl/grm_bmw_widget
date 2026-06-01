@@ -7,6 +7,7 @@ using Toybox.Communications;
 using Toybox.Lang;
 using Toybox.Time;
 
+(:background)
 class CarDataClient {
 
     static const _DATA_HOST = "https://api-cardata.bmwgroup.com";

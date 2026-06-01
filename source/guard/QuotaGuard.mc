@@ -7,6 +7,7 @@
 using Toybox.Application;
 using Toybox.Time;
 
+(:background)
 class QuotaGuard {
 
     // Returns true if a Data Fetch is permitted now.

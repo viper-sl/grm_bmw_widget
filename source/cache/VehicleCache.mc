@@ -33,6 +33,7 @@
 // Tyre pressures: already converted from kPa to bar by CarDataClient before write.
 using Toybox.Application;
 
+(:background)
 class VehicleCache {
 
     // Returns the latest Vehicle State Dictionary, or null if not yet populated.

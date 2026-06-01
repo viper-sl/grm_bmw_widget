@@ -9,6 +9,8 @@ class PageRangeFuel extends WatchUi.View {
 
     function initialize() { View.initialize(); }
 
+    function onSelect() { return false; } // no OK action on this page
+
     function isVisible() {
         var state = VehicleCache.read();
         return state != null && state.hasKey("rangeKm") && state.hasKey("fuelPercent");
@@ -34,15 +36,15 @@ class PageRangeFuel extends WatchUi.View {
         var lowFuel = (fuelPercent != null && fuelPercent < 50);
         var barColor = lowFuel ? Theme.COLOR_WARN : Theme.COLOR_ACCENT;
 
-        // Label · big value · unit (generous vertical separation to avoid collision)
-        PageChrome.drawLabel(dc, "RANGE", cy - 60);
+        // Label · big value (no standalone unit line — RANGE label implies km, and the
+        // number font is tall; a unit row here forces collisions on a 260px screen).
+        PageChrome.drawLabel(dc, "RANGE (KM)", cy - 58);
         PageChrome.drawValue(dc, (rangeKm != null) ? rangeKm.toString() : "--",
-            Graphics.FONT_NUMBER_MEDIUM, cy - 24, Theme.COLOR_TEXT);
-        PageChrome.drawUnit(dc, "km", cy + 10);
+            Graphics.FONT_NUMBER_MEDIUM, cy - 8, Theme.COLOR_TEXT);
 
         // Range bar (% of ~700 km)
         var pct = (rangeKm != null) ? (rangeKm.toFloat() / 700.0) : 0.0;
-        PageChrome.drawBar(dc, pct, cy + 30, barColor);
+        PageChrome.drawBar(dc, pct, cy + 40, barColor);
 
         // Fuel row
         var fuelStr;
@@ -62,7 +64,7 @@ class PageRangeFuel extends WatchUi.View {
             fuelColor = Theme.COLOR_MUTED;
         }
         dc.setColor(fuelColor, Theme.COLOR_BG);
-        dc.drawText(cx, cy + 50, Graphics.FONT_TINY, fuelStr,
+        dc.drawText(cx, cy + 60, Graphics.FONT_TINY, fuelStr,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         PageChrome.drawAge(dc, state);

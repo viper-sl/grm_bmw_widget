@@ -1,5 +1,10 @@
-// Glance surface — widget carousel line. Read-only from VehicleCache. No network I/O.
-// CIQ 3.4.x (fēnix 6 Pro): fonts are Graphics.FONT_*, justification is Graphics.TEXT_JUSTIFY_*.
+// Glance surface — Garmin native-widget style: BMW icon on the left, three compact
+// rows on the right.
+//   row 1:  LOCKED            653 km     (white)
+//   row 2:  ▭▭▭▭▭▭▭▭▭▭▭▭▭▭▭▭  fuel bar (red, width = fuel %)
+//   row 3:  FUEL 70%          1d ago     (fuel orange, age dimmed)
+// Low fuel (<50%): fuel cell shows "{tank-litres}L" in orange instead of "%".
+// Read-only from VehicleCache. No network I/O.
 using Toybox.Application;
 using Toybox.Graphics;
 using Toybox.Time;
@@ -13,75 +18,102 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
     }
 
     function onUpdate(dc) {
-        var state = VehicleCache.read();
-
         dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
         dc.clear();
 
         var w  = dc.getWidth();
         var h  = dc.getHeight();
-        var cy = h / 2;
+        var state = VehicleCache.read();
+
+        // NOTE: the BMW branding shows as the launcher icon the system renders in the
+        // glance carousel (launcher_icon.png was swapped to the BMW logo). Glance scope
+        // cannot resolve Rez.Drawables, so we do NOT loadResource here (it faults).
+        var textX = 4;
 
         if (state == null) {
             dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-            dc.drawText(4, cy, Graphics.FONT_TINY, "BMW — setup needed",
+            dc.drawText(textX, h / 2, Graphics.FONT_XTINY, "Press to set up",
                 Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
             return;
         }
 
-        var isStale = false;
-        if (state.hasKey("lastUpdated")) {
-            isStale = (Time.now().value() - state["lastUpdated"]) > 3600;
-        }
-        var textColor = isStale ? Theme.COLOR_MUTED : Theme.COLOR_TEXT;
+        var stale = state.hasKey("lastUpdated")
+            && (Time.now().value() - state["lastUpdated"]) > 3600;
 
-        var rangeKm = state.hasKey("rangeKm") ? state["rangeKm"] : null;
+        var font = Graphics.FONT_XTINY;
+        var lineH = dc.getFontHeight(font);
+        var barH  = 4;
+        // Total block = row1 + gap + bar + gap + row3. Center it vertically in h.
+        var gap = 4;
+        var blockH = lineH + gap + barH + gap + lineH;
+        var top = (h - blockH) / 2;
+        var row1Y = top + lineH / 2;
+        var barY  = top + lineH + gap;
+        var row3Y = barY + barH + gap + lineH / 2;
+        var rightX = w - 4;
 
-        // Range bar (bottom, full width)
-        if (rangeKm != null) {
-            var barH = 4;
-            var barY = h - barH;
-            var barW = rangeKm * w / 700;
-            if (barW > w) { barW = w; }
-            dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-            dc.fillRectangle(0, barY, w, barH);
-            dc.setColor(Theme.COLOR_ACCENT, Theme.COLOR_BG);
-            dc.fillRectangle(0, barY, barW, barH);
-        }
-
-        // Status line: lock · range · fuel
-        var lineY = cy - 6;
-        var xPos  = 4;
-        var font  = Graphics.FONT_TINY;
-
-        if (state.hasKey("doorsLocked")) {
-            var lockStr = state["doorsLocked"] ? "[L] " : "[U] ";
-            dc.setColor(state["doorsLocked"] ? Theme.COLOR_OK : Theme.COLOR_WARN, Theme.COLOR_BG);
-            dc.drawText(xPos, lineY, font, lockStr, Graphics.TEXT_JUSTIFY_LEFT);
-            xPos += dc.getTextWidthInPixels(lockStr, font);
-        }
-
-        dc.setColor(textColor, Theme.COLOR_BG);
-        var rangeStr = (rangeKm != null) ? (rangeKm.toString() + "km ") : "--km ";
-        dc.drawText(xPos, lineY, font, rangeStr, Graphics.TEXT_JUSTIFY_LEFT);
-        xPos += dc.getTextWidthInPixels(rangeStr, font);
-
+        var rangeKm     = state.hasKey("rangeKm") ? state["rangeKm"] : null;
         var fuelPercent = state.hasKey("fuelPercent") ? state["fuelPercent"] : null;
         var fuelLitres  = state.hasKey("fuelLitres")  ? state["fuelLitres"]  : null;
+
+        // ── row 1: lock state (left) + range (right) — WHITE ──
+        var topColor = stale ? Theme.COLOR_DIM : Theme.COLOR_TEXT;
+        if (state.hasKey("doorsLocked")) {
+            dc.setColor(topColor, Theme.COLOR_BG);
+            dc.drawText(textX, row1Y, font, state["doorsLocked"] ? "LOCKED" : "OPEN",
+                Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+        var rangeStr = (rangeKm != null) ? (rangeKm.toString() + " km") : "-- km";
+        dc.setColor(topColor, Theme.COLOR_BG);
+        dc.drawText(rightX, row1Y, font, rangeStr,
+            Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // ── row 2: fuel bar — fill width = fuel % of the row width ──
+        var barX = textX;
+        var barW = rightX - barX;
+        var pct = 0.0;
+        if (fuelPercent != null) {
+            pct = fuelPercent / 100.0;
+            if (pct < 0.0) { pct = 0.0; }
+            if (pct > 1.0) { pct = 1.0; }
+        }
+        dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
+        dc.fillRectangle(barX, barY, barW, barH);
+        dc.setColor(stale ? Theme.COLOR_DIM : Theme.COLOR_ACCENT, Theme.COLOR_BG);
+        dc.fillRectangle(barX, barY, (barW * pct).toNumber(), barH);
+
+        // ── row 3: fuel (left, ORANGE) + age (right, DIMMED) ──
         var fuelStr;
         if (fuelPercent != null && fuelPercent < 50 && fuelLitres != null) {
             var tank = Application.Properties.getValue("tankLitres");
             if (tank == null) { tank = 52; }
-            fuelStr = (tank - fuelLitres).toString() + "L+";
-            dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
+            var fill = tank - fuelLitres;
+            if (fill < 0) { fill = 0; }
+            fuelStr = "FUEL " + fill.toString() + "L";
         } else if (fuelPercent != null) {
-            fuelStr = fuelPercent.toString() + "%";
-            dc.setColor(textColor, Theme.COLOR_BG);
+            fuelStr = "FUEL " + fuelPercent.toString() + "%";
         } else {
-            fuelStr = "--%";
-            dc.setColor(textColor, Theme.COLOR_BG);
+            fuelStr = "FUEL --";
         }
-        dc.drawText(xPos, lineY, font, fuelStr, Graphics.TEXT_JUSTIFY_LEFT);
+        dc.setColor(stale ? Theme.COLOR_DIM : Theme.COLOR_WARN, Theme.COLOR_BG);
+        dc.drawText(textX, row3Y, font, fuelStr,
+            Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        if (state.hasKey("lastUpdated")) {
+            var ageSec = Time.now().value() - state["lastUpdated"];
+            var ageStr = _ageString(ageSec);
+            dc.setColor(stale ? Theme.COLOR_WARN : Theme.COLOR_DIM, Theme.COLOR_BG);
+            dc.drawText(rightX, row3Y, font, (stale ? "! " : "") + ageStr,
+                Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+    }
+
+    // Self-contained (glance scope only loads (:glance) classes; don't depend on PageChrome).
+    function _ageString(sec) {
+        if (sec < 60)    { return sec.toString() + "s ago"; }
+        if (sec < 3600)  { return (sec / 60).toString() + "m ago"; }
+        if (sec < 86400) { return (sec / 3600).toString() + "h ago"; }
+        return (sec / 86400).toString() + "d ago";
     }
 
 }

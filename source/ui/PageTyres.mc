@@ -6,7 +6,19 @@ using Toybox.WatchUi;
 
 class PageTyres extends WatchUi.View {
 
-    function initialize() { View.initialize(); }
+    var _showTarget;   // false = actual pressures, true = target pressures
+
+    function initialize() {
+        View.initialize();
+        _showTarget = false;
+    }
+
+    // OK/START toggles between actual and target pressures.
+    function onSelect() {
+        _showTarget = !_showTarget;
+        WatchUi.requestUpdate();
+        return true;
+    }
 
     function isVisible() {
         var state = VehicleCache.read();
@@ -24,13 +36,17 @@ class PageTyres extends WatchUi.View {
         var cy = dc.getHeight() / 2;
 
         PageChrome.drawAccent(dc);
-        PageChrome.drawHeader(dc, " · Tyres (bar)");
+        PageChrome.drawHeader(dc, null);
 
-        // 2 lines per cell → wider row gap, no overlap
+        // Label reflects which set is shown; OK toggles actual <-> target.
+        PageChrome.drawLabel(dc, _showTarget ? "TARGET (BAR)" : "TYRES (BAR)", cy - 56);
+
+        // 2x2 grid below the label. Rows far enough apart that a cell's value
+        // (drawn at y+12) clears the next row's label (drawn at y-12).
         var colL = cx - 44;
         var colR = cx + 44;
-        var row1 = cy - 24;
-        var row2 = cy + 28;
+        var row1 = cy - 16;
+        var row2 = cy + 36;
 
         _cell(dc, colL, row1, "FRONT L", state, "tyrePressureFL", "tyreTargetFL");
         _cell(dc, colR, row1, "FRONT R", state, "tyrePressureFR", "tyreTargetFR");
@@ -40,26 +56,33 @@ class PageTyres extends WatchUi.View {
         PageChrome.drawAge(dc, state);
     }
 
-    // One tyre cell: position label (muted) over value (colored green=OK / amber=LOW).
-    // Status conveyed by value color — no separate status line (saves vertical space).
+    // One tyre cell: position label over value. Showing actuals: green=OK / amber=LOW
+    // vs target. Showing targets: muted reference value.
     function _cell(dc, x, y, name, state, pKey, tKey) {
         dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-        dc.drawText(x, y - 10, Graphics.FONT_XTINY, name,
+        dc.drawText(x, y - 12, Graphics.FONT_XTINY, name,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         var actual = state.hasKey(pKey) ? state[pKey] : null;
         var target = state.hasKey(tKey) ? state[tKey] : null;
+        var value = _showTarget ? target : actual;
 
-        if (actual == null) {
+        if (value == null) {
             dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-            dc.drawText(x, y + 8, Graphics.FONT_TINY, "--",
+            dc.drawText(x, y + 12, Graphics.FONT_TINY, "--",
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             return;
         }
 
-        var low = (target != null && actual < (target - 0.2));
-        dc.setColor(low ? Theme.COLOR_WARN : Theme.COLOR_OK, Theme.COLOR_BG);
-        dc.drawText(x, y + 8, Graphics.FONT_TINY, PageChrome.oneDecimal(actual),
+        var color;
+        if (_showTarget) {
+            color = Theme.COLOR_MUTED;   // targets are reference values, not status
+        } else {
+            var low = (target != null && actual < (target - 0.2));
+            color = low ? Theme.COLOR_WARN : Theme.COLOR_OK;
+        }
+        dc.setColor(color, Theme.COLOR_BG);
+        dc.drawText(x, y + 12, Graphics.FONT_TINY, PageChrome.oneDecimal(value),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 

@@ -14,17 +14,19 @@ class PageChrome {
         dc.fillRectangle(0, 0, dc.getWidth(), 3);
     }
 
-    // "BMW 218i" header near top, tiny muted (mock: .page-hdr top:42px).
+    // "BMW 218I" header near top, tiny muted uppercase (mock: .page-hdr top:42px).
+    // Sits well above the page label to avoid overlap with RANGE/ODOMETER/etc.
     static function drawHeader(dc, suffix) {
         var name = Application.Storage.getValue(StorageKeys.KEY_VEHICLE_NAME);
         if (name == null) { name = "BMW"; }
         if (suffix != null) { name = name + suffix; }
-        dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-        dc.drawText(dc.getWidth() / 2, 58, Graphics.FONT_XTINY, name,
+        name = name.toUpper();
+        dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);   // mock .page-hdr = --text3
+        dc.drawText(dc.getWidth() / 2, 30, Graphics.FONT_XTINY, name,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
-    // Small uppercase label above the value (mock: .plbl).
+    // Small uppercase label above the value (mock: .plbl = --text2).
     static function drawLabel(dc, label, y) {
         dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
         dc.drawText(dc.getWidth() / 2, y, Graphics.FONT_XTINY, label,
@@ -64,7 +66,7 @@ class PageChrome {
         if (state == null || !state.hasKey("lastUpdated")) { return; }
         var ageSec = Time.now().value() - state["lastUpdated"];
         var str = _ageString(ageSec);
-        var color = Theme.COLOR_MUTED;
+        var color = Theme.COLOR_DIM;   // mock .page-age = --text3
         if (ageSec > 3600) {
             str = "! " + str;
             color = Theme.COLOR_WARN;

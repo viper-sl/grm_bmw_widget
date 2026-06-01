@@ -15,4 +15,10 @@
   <setting propertyKey="@Properties.tankLitres" title="@Strings.TankLitresLabel">
     <settingConfig type="numeric" min="20" max="120"/>
   </setting>
+  <setting propertyKey="@Properties.updateMode" title="@Strings.UpdateModeLabel">
+    <settingConfig type="list">
+      <listEntry value="0">@Strings.UpdateModeManual</listEntry>
+      <listEntry value="1">@Strings.UpdateModeAuto</listEntry>
+    </settingConfig>
+  </setting>
 </settings>

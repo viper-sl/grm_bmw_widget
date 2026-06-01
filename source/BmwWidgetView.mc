@@ -91,6 +91,29 @@ class BmwWidgetView extends WatchUi.View {
         return false;
     }
 
+    // START/OK pressed on a data page — route to the active page. Each page
+    // implements onSelect() returning true if it handled it (image -> refresh,
+    // tyres -> toggle target). Pages without behavior return false.
+    function onSelect() {
+        if (_pageIdx >= 0 && _pageIdx < _pages.size() && _pages[_pageIdx].isVisible()) {
+            return _pages[_pageIdx].onSelect();
+        }
+        return false;
+    }
+
+    // True when the widget is showing the setup or re-link prompt — i.e. the user
+    // should be able to launch on-device auth (START). Drives BmwWidgetDelegate.onSelect.
+    function needsAuth() {
+        var tokenState = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
+        if (tokenState != null && tokenState.equals("NEEDS_REBOOTSTRAP")) {
+            return true;
+        }
+        for (var i = 0; i < _pages.size(); i++) {
+            if (_pages[i].isVisible()) { return false; }
+        }
+        return true; // no visible pages -> setup prompt is showing
+    }
+
     // Find the first visible page index (skipping hidden pages like PageVehicle)
     function _firstVisibleIndex() {
         for (var i = 0; i < _pages.size(); i++) {
@@ -124,11 +147,11 @@ class BmwWidgetView extends WatchUi.View {
     function _drawSetupPrompt(dc) {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
-        dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-        dc.drawText(cx, cy - 16, Graphics.FONT_SMALL, "Setup BMW Widget",
+        dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
+        dc.drawText(cx, cy - 18, Graphics.FONT_SMALL, "BMW Widget",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-        dc.drawText(cx, cy + 10, Graphics.FONT_TINY, "Add credentials in app settings",
+        dc.drawText(cx, cy + 8, Graphics.FONT_TINY, "Press START to connect",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
@@ -136,10 +159,10 @@ class BmwWidgetView extends WatchUi.View {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
         dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
-        dc.drawText(cx, cy - 16, Graphics.FONT_SMALL, "Re-auth needed",
+        dc.drawText(cx, cy - 18, Graphics.FONT_SMALL, "Re-auth needed",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-        dc.drawText(cx, cy + 8, Graphics.FONT_TINY, "Open Garmin Connect",
+        dc.drawText(cx, cy + 8, Graphics.FONT_TINY, "Press START to re-pair",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 

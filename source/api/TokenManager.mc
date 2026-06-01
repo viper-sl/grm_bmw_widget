@@ -63,6 +63,9 @@ class TokenManager {
             return;
         }
 
+        // BMW's OAuth token endpoint requires application/x-www-form-urlencoded.
+        // Without an explicit Content-Type header, makeWebRequest sends the params
+        // as JSON, which BMW rejects with HTTP 400 invalid_request.
         Communications.makeWebRequest(
             "https://customer.bmwgroup.com/gcdm/oauth/token",
             {
@@ -72,6 +75,9 @@ class TokenManager {
             },
             {
                 :method       => Communications.HTTP_REQUEST_METHOD_POST,
+                :headers      => {
+                    "Content-Type" => Communications.REQUEST_CONTENT_TYPE_URL_ENCODED
+                },
                 :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON
             },
             method(:onTokenRefreshResponse)

@@ -5,4 +5,5 @@
   <property id="containerId" type="String"/>
   <property id="refreshToken" type="String"/>
   <property id="tankLitres" type="Number">52</property>
+  <property id="updateMode" type="Number">0</property><!-- 0 = manual (default), 1 = auto (every 30 min) -->
 </properties>

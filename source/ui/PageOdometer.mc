@@ -8,6 +8,8 @@ class PageOdometer extends WatchUi.View {
 
     function initialize() { View.initialize(); }
 
+    function onSelect() { return false; } // no OK action on this page
+
     function isVisible() {
         var state = VehicleCache.read();
         return state != null && state.hasKey("odometerKm");
@@ -27,10 +29,10 @@ class PageOdometer extends WatchUi.View {
         PageChrome.drawHeader(dc, null);
 
         // Odometer (primary). Number font has digits only — no comma (renders as tofu).
-        PageChrome.drawLabel(dc, "ODOMETER", cy - 58);
+        // Unit folded into the label to free vertical space (avoids number/label collision).
+        PageChrome.drawLabel(dc, "ODOMETER (KM)", cy - 58);
         PageChrome.drawValue(dc, state["odometerKm"].toString(),
-            Graphics.FONT_NUMBER_MEDIUM, cy - 22, Theme.COLOR_TEXT);
-        PageChrome.drawUnit(dc, "km", cy + 12);
+            Graphics.FONT_NUMBER_MEDIUM, cy - 8, Theme.COLOR_TEXT);
 
         // Service distance (secondary, with colored bar). FONT_TINY supports comma.
         if (state.hasKey("serviceDistanceKm")) {
@@ -38,11 +40,11 @@ class PageOdometer extends WatchUi.View {
             var svcColor = _serviceColor(svcKm);
 
             var pct = svcKm.toFloat() / 5000.0;
-            PageChrome.drawBar(dc, pct, cy + 36, svcColor);
+            PageChrome.drawBar(dc, pct, cy + 44, svcColor);
 
-            dc.setColor(svcColor, Theme.COLOR_BG);
-            dc.drawText(cx, cy + 54, Graphics.FONT_TINY,
-                _grouped(svcKm) + " km to service",
+            dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
+            dc.drawText(cx, cy + 58, Graphics.FONT_XTINY,
+                "SERVICE IN " + _short(svcKm),
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
@@ -53,6 +55,15 @@ class PageOdometer extends WatchUi.View {
         if (svcKm > 5000) { return Theme.COLOR_OK; }
         if (svcKm > 1000) { return Theme.COLOR_WARN; }
         return Theme.COLOR_ERROR;
+    }
+
+    // Compact distance: >=1000 -> "22K km" / "1.5K km"; else "850 km".
+    function _short(n) {
+        if (n < 1000) { return n.toString() + " km"; }
+        var k = n / 1000;
+        var rem = (n % 1000) / 100;   // first decimal of the thousands
+        if (rem == 0) { return k.toString() + "K km"; }
+        return k.toString() + "." + rem.toString() + "K km";
     }
 
     // Insert thousands separators: 40926 -> "40,926"

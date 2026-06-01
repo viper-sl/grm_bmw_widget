@@ -34,3 +34,6 @@ __pycache__/
 resources-livetest/
 livetest.jungle
 bin/livetest.prg
+
+# Large icon source (only used to regenerate resources/drawables icons)
+BMW.svg.png

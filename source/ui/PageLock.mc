@@ -8,6 +8,8 @@ class PageLock extends WatchUi.View {
 
     function initialize() { View.initialize(); }
 
+    function onSelect() { return false; } // no OK action on this page
+
     function isVisible() {
         var state = VehicleCache.read();
         return state != null && state.hasKey("doorsLocked");

@@ -14,13 +14,25 @@ class BmwWidgetApp extends Application.AppBase {
     }
 
     function onStart(state) {
-        // Register 40-minute background poll. Wrapped: Background APIs throw in glance scope.
+        _applyUpdateMode();
+        _seedDebugData();
+    }
+
+    // updateMode: 0 = manual (no background poll; user refreshes via OK on the image page),
+    //             1 = auto (background poll every 30 min). Default manual.
+    // Wrapped: Background APIs throw in glance scope.
+    function _applyUpdateMode() {
         try {
-            Background.registerForTemporalEvent(new Time.Duration(2400));
+            var mode = Application.Properties.getValue("updateMode");
+            if (mode != null && mode == 1) {
+                Background.registerForTemporalEvent(new Time.Duration(1800)); // 30 min
+            } else {
+                // Manual: ensure no stale temporal event keeps firing.
+                Background.deleteTemporalEvent();
+            }
         } catch (e instanceof Lang.Exception) {
             // glance scope — background registration unavailable; ignore
         }
-        _seedDebugData();
     }
 
     // Debug builds (simulator): seed a realistic Vehicle State so the UI renders without

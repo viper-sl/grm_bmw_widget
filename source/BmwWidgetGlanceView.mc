@@ -37,8 +37,10 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
             return;
         }
 
+        // "lastUpdated" is the car's last report time; parked cars report
+        // infrequently, so only flag >3 days as stale (matches PageChrome.STALE_SECONDS).
         var stale = state.hasKey("lastUpdated")
-            && (Time.now().value() - state["lastUpdated"]) > 3600;
+            && (Time.now().value() - state["lastUpdated"]) > 259200;
 
         var font = Graphics.FONT_XTINY;
         var lineH = dc.getFontHeight(font);

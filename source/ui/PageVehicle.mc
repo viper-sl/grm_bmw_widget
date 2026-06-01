@@ -124,8 +124,9 @@ class PageVehicle extends WatchUi.View {
         }
 
         // Manual-refresh affordance: hint normally, status while fetching.
+        // Sits above the age line (drawAge renders at h-44) so they never overlap.
         dc.setColor(_refreshing ? Theme.COLOR_WARN : Theme.COLOR_DIM, Theme.COLOR_BG);
-        dc.drawText(cx, dc.getHeight() - 58, Graphics.FONT_XTINY,
+        dc.drawText(cx, dc.getHeight() - 70, Graphics.FONT_XTINY,
             _refreshing ? "Refreshing…" : "OK to refresh",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 

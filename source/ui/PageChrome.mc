@@ -62,12 +62,15 @@ class PageChrome {
     }
 
     // Data-age line at the bottom (mock: .page-age). Stale → amber prefix.
+    // "lastUpdated" is the CAR's last report time (max telematic timestamp), not the
+    // fetch time — a parked car reports infrequently, so only flag >24h as stale.
+    static const STALE_SECONDS = 259200; // 3 days — parked cars routinely report 1-2d old
     static function drawAge(dc, state) {
         if (state == null || !state.hasKey("lastUpdated")) { return; }
         var ageSec = Time.now().value() - state["lastUpdated"];
         var str = _ageString(ageSec);
         var color = Theme.COLOR_DIM;   // mock .page-age = --text3
-        if (ageSec > 3600) {
+        if (ageSec > STALE_SECONDS) {
             str = "! " + str;
             color = Theme.COLOR_WARN;
         }

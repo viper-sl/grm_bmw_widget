@@ -22,11 +22,18 @@ class TokenManager {
 
         var tokenState = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
 
-        // Guard: no token or permanent auth failure — no network call
-        if (tokenState == null
-                || tokenState.equals("UNCONFIGURED")
-                || tokenState.equals("NEEDS_REBOOTSTRAP")) {
+        // Guard: permanent auth failure — no network call.
+        if (tokenState != null
+                && (tokenState.equals("UNCONFIGURED")
+                    || tokenState.equals("NEEDS_REBOOTSTRAP"))) {
             _callback.invoke(false);
+            return;
+        }
+
+        // First run: tokenState == null but a refresh token may be configured in Settings.
+        // Attempt a refresh — _refreshToken() falls back to UNCONFIGURED if creds are absent.
+        if (tokenState == null) {
+            _refreshToken();
             return;
         }
 

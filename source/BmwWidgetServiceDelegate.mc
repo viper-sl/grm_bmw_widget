@@ -31,11 +31,16 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
 
     // Phase 1: fetch vehicle name + driveType from basicData; store; exit.
     // Next temporal event will run Phase 2.
+    // On first run only a refresh token exists (in Properties) — must mint an access
+    // token via ensureValidToken BEFORE attempting basicData, or accessToken is null.
     function _runBootstrap() {
+        _tokenManager.ensureValidToken(method(:onBootstrapTokenReady));
+    }
+
+    function onBootstrapTokenReady(success as Lang.Boolean) as Void {
         var vin = Application.Properties.getValue("vin");
         var accessToken = _tokenManager.getAccessToken();
-        if (vin == null || accessToken == null) {
-            // Can't bootstrap without credentials — wait for user to configure Settings
+        if (!success || vin == null || accessToken == null) {
             Background.exit(null);
             return;
         }

@@ -29,3 +29,8 @@ __pycache__/
 .DS_Store
 .idea/
 *.iml
+
+# Live-test build (contains real BMW credentials) — NEVER commit
+resources-livetest/
+livetest.jungle
+bin/livetest.prg

@@ -143,17 +143,17 @@ function testAgeString(logger as Test.Logger) as Lang.Boolean {
 
 (:test)
 function testToken_guardStatesNoNetwork(logger as Test.Logger) as Lang.Boolean {
-    // null, UNCONFIGURED, NEEDS_REBOOTSTRAP must short-circuit to callback(false).
-    var states = [null, "UNCONFIGURED", "NEEDS_REBOOTSTRAP"];
+    // UNCONFIGURED and NEEDS_REBOOTSTRAP are permanent-failure states: short-circuit
+    // to callback(false) with no network. (null state is NOT here — on first run it
+    // legitimately attempts a refresh; see _runBootstrap first-run path.)
+    var states = ["UNCONFIGURED", "NEEDS_REBOOTSTRAP"];
     for (var i = 0; i < states.size(); i++) {
         _resetStorage();
-        if (states[i] != null) {
-            Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, states[i]);
-        }
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, states[i]);
         var cap = new _BoolCapture();
         new TokenManager().ensureValidToken(cap.method(:onResult));
         Test.assertMessage(cap.called, "callback fired");
-        Test.assertMessage(cap.value == false, "guard state -> false");
+        Test.assertMessage(cap.value == false, "permanent-failure state -> false");
     }
     return true;
 }

@@ -179,6 +179,61 @@ class CarDataClient {
     // Body shape (verified): { name, purpose, technicalDescriptors:[...] }.
     // technicalDescriptors is a FLAT array of dotted strings (not objects).
 
+    static const _CONTAINER_NAME = "grm_bmw_widget";
+
+    // List existing containers; reuse ours (match by name) if present.
+    // GET /customers/containers -> {"data":{"containers":[ {id|containerId, name, ...} ]}}.
+
+    (:release)
+    function fetchContainers(accessToken, callback) {
+        _callback = callback;
+        Communications.makeWebRequest(
+            _DATA_HOST + "/customers/containers",
+            null,
+            { :method       => Communications.HTTP_REQUEST_METHOD_GET,
+              :headers      => _buildHeaders(accessToken),
+              :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON },
+            method(:onContainersResponse)
+        );
+    }
+
+    (:debug)
+    function fetchContainers(accessToken, callback) {
+        _callback = callback;
+        onContainersResponse(200, { "data" => { "containers" => [] } });
+    }
+
+    // Returns an existing container id (ours by name, else first) or null via callback.
+    function onContainersResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
+        var cid = null;
+        if (responseCode == 200 && data != null) {
+            var d = data.hasKey("data") ? data["data"] : data;
+            var list = (d instanceof Lang.Dictionary && d.hasKey("containers")) ? d["containers"] : null;
+            if (list instanceof Lang.Array) {
+                var firstId = null;
+                for (var i = 0; i < list.size(); i++) {
+                    var c = list[i];
+                    if (c instanceof Lang.Dictionary) {
+                        var id = c.hasKey("containerId") ? c["containerId"]
+                               : (c.hasKey("id") ? c["id"] : null);
+                        if (id != null) {
+                            if (firstId == null) { firstId = id; }
+                            var nm = c["name"];
+                            if (nm != null && nm.equals(_CONTAINER_NAME)) {
+                                cid = id;              // prefer our own container
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (cid == null) { cid = firstId; }    // else reuse any existing container
+            }
+        }
+        if (cid != null) { Application.Storage.setValue(StorageKeys.KEY_CONTAINER_ID, cid); }
+        data = null;
+        _callback.invoke(responseCode, cid);
+    }
+
     (:release)
     function createContainer(accessToken, callback) {
         _callback = callback;
@@ -188,7 +243,7 @@ class CarDataClient {
         Communications.makeWebRequest(
             _DATA_HOST + "/customers/containers",
             {
-                "name"                 => "grm_bmw_widget",
+                "name"                 => _CONTAINER_NAME,
                 "purpose"              => "Garmin fenix widget status",
                 "technicalDescriptors" => _containerDescriptors()
             },

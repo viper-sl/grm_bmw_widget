@@ -50,12 +50,21 @@ class ForegroundSync {
         if (vin == null) { _finish(false); return; }
         _vin = vin;
 
-        // Step 2: container — resolve, else create.
+        // Step 2: container — use a known one, else discover existing, else create.
         _containerId = _resolveContainer();
-        if (_containerId == null) {
-            _client.createContainer(_accessToken, method(:onContainer));
-        } else {
+        if (_containerId != null) {
             onContainer(200, _containerId);
+        } else {
+            _client.fetchContainers(_accessToken, method(:onContainerList));
+        }
+    }
+
+    // Reuse an existing container if the account already has one; otherwise create it.
+    function onContainerList(responseCode as Lang.Number, containerId) as Void {
+        if (containerId != null) {
+            onContainer(200, containerId);
+        } else {
+            _client.createContainer(_accessToken, method(:onContainer));
         }
     }
 

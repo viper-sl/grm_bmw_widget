@@ -79,11 +79,19 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
 
     function onBootstrapVin(responseCode as Lang.Number, vin) as Void {
         if (vin == null) { Background.exit(null); return; }
-        // Step 2: container — use a resolved one if present, else create it.
-        if (_resolveContainer() == null) {
-            _carDataClient.createContainer(_tokenManager.getAccessToken(), method(:onBootstrapContainer));
-        } else {
+        // Step 2: container — known one, else discover existing, else create.
+        if (_resolveContainer() != null) {
             onBootstrapContainer(200, _resolveContainer());
+        } else {
+            _carDataClient.fetchContainers(_tokenManager.getAccessToken(), method(:onBootstrapContainerList));
+        }
+    }
+
+    function onBootstrapContainerList(responseCode as Lang.Number, containerId) as Void {
+        if (containerId != null) {
+            onBootstrapContainer(200, containerId);
+        } else {
+            _carDataClient.createContainer(_tokenManager.getAccessToken(), method(:onBootstrapContainer));
         }
     }
 

@@ -31,15 +31,34 @@ fi
 if [ "${1:-}" == "--device" ]; then
   OUT="bin/personal-device.prg"
   echo "Building DEVICE release build → $OUT  (target: $DEVICE)"
-  # NOTE: real-device target is "$DEVICE" (NOT the _sim variant).
+  # Matches the known-good manual command: -d fenix6pro (real target, NOT _sim) -r.
   java -jar "$SDK/bin/monkeybrains.jar" \
-    -o "$OUT" -f "$JUNGLE" -y "$KEY" -d "$DEVICE" -w -r
-  echo
+    -o "$OUT" -f "$JUNGLE" -y "$KEY" -d "$DEVICE" -r
   echo "✓ Built $OUT"
-  echo "Sideload onto the watch:"
-  echo "  1. Connect the fenix 6 Pro by USB (it mounts as a drive)."
-  echo "  2. Copy $OUT into the watch's GARMIN/APPS/ folder."
-  echo "  3. Eject, then find 'BMW Status' in the widget glance loop."
+
+  # Auto-detect a mounted Garmin device (a volume containing GARMIN/APPS) and copy.
+  DEST=""
+  for v in /Volumes/*; do
+    if [ -d "$v/GARMIN/APPS" ]; then DEST="$v/GARMIN/APPS"; break; fi
+  done
+
+  if [ -n "$DEST" ]; then
+    # Wipe stale persisted SETTINGS + DATA first. A previous install (esp. the generic
+    # no-clientId build) persists an EMPTY clientId that overrides the baked-in default,
+    # leaving the app stuck on "Press START to connect". Reinstalling the .prg alone does
+    # NOT clear this — the persisted SETTINGS/DATA must go.
+    rm -f "$DEST/SETTINGS/GRM_BMW_WIDGET.SET" 2>/dev/null && echo "  cleared stale SETTINGS"
+    rm -f "$DEST/DATA/GRM_BMW_WIDGET."* 2>/dev/null && echo "  cleared stale DATA"
+    cp -f "$OUT" "$DEST/GRM_BMW_WIDGET.PRG"
+    sync
+    echo "✓ Copied to $DEST/GRM_BMW_WIDGET.PRG"
+    echo "  Safely eject the watch, then open 'BMW Status' in the widget loop."
+  else
+    echo "⚠ No Garmin device mounted (looked for /Volumes/*/GARMIN/APPS)."
+    echo "  1. Connect the fenix 6 Pro by USB; on the watch confirm 'Mass Storage'."
+    echo "  2. Re-run, or copy manually:"
+    echo "       cp $OUT /Volumes/<GARMIN>/GARMIN/APPS/GRM_BMW_WIDGET.PRG"
+  fi
   exit 0
 fi
 

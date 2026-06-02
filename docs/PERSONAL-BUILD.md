@@ -58,6 +58,25 @@ device build is signed with your `developer_key`.
 (If the app doesn't appear, confirm the file is directly in `GARMIN/APPS/`, not a
 subfolder, and that there's free space.)
 
+### ⚠ Stuck on "Press START to connect" after install?
+
+This means the app is reading an **empty clientId** — almost always from **stale
+persisted settings** left by a previous install (especially the generic
+no-clientId build). The XML clientId default only applies on first install;
+a persisted empty value overrides it, and **reinstalling the `.prg` does NOT clear
+it**.
+
+Fix: delete the persisted SETTINGS + DATA (the build script does this automatically
+when it auto-copies, but to do it by hand):
+
+```sh
+rm /Volumes/*/GARMIN/APPS/SETTINGS/GRM_BMW_WIDGET.SET
+rm /Volumes/*/GARMIN/APPS/DATA/GRM_BMW_WIDGET.*
+```
+
+Then reinstall. Same applies to the **simulator** — wipe its store with
+`rm -rf "$TMPDIR/com.garmin.connectiq"` before loading, or it caches the empty value.
+
 ## First-run flow (cold start)
 
 1. Open the widget → "Press START to connect".

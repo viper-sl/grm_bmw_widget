@@ -13,7 +13,7 @@ class StorageKeys {
     static const KEY_BACKOFF_UNTIL    = "backoffUntil";      // Number: epoch seconds (0 = no backoff active)
     static const KEY_VEHICLE_NAME     = "vehicleName";       // String: e.g. "BMW 218i" (from basicData)
     static const KEY_DRIVE_TYPE       = "driveType";         // String: CONV / BEV / PHEV (from basicData)
-    static const KEY_COLOUR           = "colour";            // String: paint colour (basicData)
-    static const KEY_BODY_TYPE        = "bodyType";          // String: e.g. Coupe (basicData)
-    static const KEY_ENGINE           = "engine";            // String: e.g. B48C (basicData)
+    static const KEY_BASIC_DATA       = "basicData";         // Dictionary: full basicData snapshot (About car)
+    static const KEY_VIN              = "vin";               // String: auto-discovered VIN (from /mappings)
+    static const KEY_CONTAINER_ID     = "containerId";       // String: auto-created container id
 }

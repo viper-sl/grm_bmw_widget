@@ -19,6 +19,7 @@
     <settingConfig type="list">
       <listEntry value="0">@Strings.UpdateModeManual</listEntry>
       <listEntry value="1">@Strings.UpdateModeAuto</listEntry>
+      <listEntry value="2">@Strings.UpdateModeAdaptive</listEntry>
     </settingConfig>
   </setting>
 </settings>

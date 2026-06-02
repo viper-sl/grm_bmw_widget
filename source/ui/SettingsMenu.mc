@@ -8,6 +8,7 @@
 //   - Sign out      : clear stored tokens (forces setup on next use)
 //   - About car     : read-only key/value list from basicData
 using Toybox.Application;
+using Toybox.Lang;
 using Toybox.WatchUi;
 
 class SettingsMenu {
@@ -16,9 +17,8 @@ class SettingsMenu {
     static function build() {
         var menu = new WatchUi.Menu2({ :title => "Settings" });
 
-        var auto = _isAuto();
         menu.addItem(new WatchUi.MenuItem(
-            "Update Mode", auto ? "Auto · 30 min" : "Manual · button", :updateMode, null));
+            "Update Mode", modeLabel(), :updateMode, null));
 
         var tank = Application.Properties.getValue("tankLitres");
         if (tank == null) { tank = 52; }
@@ -31,9 +31,17 @@ class SettingsMenu {
         return menu;
     }
 
-    static function _isAuto() {
+    // 0 = Manual, 1 = Auto hourly, 2 = Auto adaptive.
+    static function mode() {
         var m = Application.Properties.getValue("updateMode");
-        return (m != null && m == 1);
+        return (m == null) ? 0 : m;
+    }
+
+    static function modeLabel() {
+        var m = mode();
+        if (m == 1) { return "Auto · hourly"; }
+        if (m == 2) { return "Auto · adaptive"; }
+        return "Manual · button";
     }
 
 }
@@ -49,12 +57,12 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
         var id = item.getId();
 
         if (id == :updateMode) {
-            // Toggle and persist; re-apply the background poll immediately.
-            var auto = SettingsMenu._isAuto();
-            Application.Properties.setValue("updateMode", auto ? 0 : 1);
+            // Cycle Manual -> Auto hourly -> Auto adaptive -> Manual; re-apply immediately.
+            var next = (SettingsMenu.mode() + 1) % 3;
+            Application.Properties.setValue("updateMode", next);
             var app = Application.getApp();
             app._applyUpdateMode();
-            item.setSubLabel(auto ? "Manual · button" : "Auto · 30 min");
+            item.setSubLabel(SettingsMenu.modeLabel());
             WatchUi.requestUpdate();
 
         } else if (id == :tankSize) {
@@ -89,20 +97,65 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
 
 }
 
-// Read-only "About car" key/value list from basicData.
+// Read-only "About car" key/value list — full basicData snapshot (all ~19 fields).
+// Curated, human-friendly fields first; the rest follow in catalogue order.
 class AboutMenu {
+    // Preferred fields shown first, with nicer labels. (basicData key -> label)
+    static const _PRIMARY = [
+        ["modelName",          "Model"],
+        ["series",             "Series"],
+        ["bodyType",           "Body"],
+        ["colourDescription",  "Colour"],
+        ["engine",             "Engine"],
+        ["driveTrain",         "Drive"],
+        ["propulsionType",     "Propulsion"],
+        ["numberOfDoors",      "Doors"],
+        ["steering",           "Steering"],
+        ["constructionDate",   "Built"],
+        ["countryCode",        "Country"],
+        ["hasNavi",            "Navi"],
+        ["hasSunRoof",         "Sunroof"],
+        ["headUnit",           "Head unit"],
+        ["modelKey",           "Model key"],
+        ["seriesDevt",         "Platform"],
+        ["simStatus",          "SIM"],
+        ["colourCodeRaw",      "Colour code"]
+    ];
+
     static function build() {
         var menu = new WatchUi.Menu2({ :title => "About car" });
-        _add(menu, "Model",  StorageKeys.KEY_VEHICLE_NAME);
-        _add(menu, "Colour", StorageKeys.KEY_COLOUR);
-        _add(menu, "Body",   StorageKeys.KEY_BODY_TYPE);
-        _add(menu, "Engine", StorageKeys.KEY_ENGINE);
-        _add(menu, "Drive",  StorageKeys.KEY_DRIVE_TYPE);
+        var about = Application.Storage.getValue(StorageKeys.KEY_BASIC_DATA) as Lang.Dictionary or Null;
+        if (about == null) {
+            menu.addItem(new WatchUi.MenuItem("No data yet", "Refresh to load", null, null));
+            return menu;
+        }
+        // Curated fields first (only those present).
+        for (var i = 0; i < _PRIMARY.size(); i++) {
+            var k = _PRIMARY[i][0];
+            if (about.hasKey(k)) {
+                _add(menu, _PRIMARY[i][1], about[k]);
+            }
+        }
+        // Any remaining basicData fields (except curated, brand, and the huge SA list).
+        var keys = about.keys();
+        for (var j = 0; j < keys.size(); j++) {
+            var kk = keys[j];
+            if (!kk.equals("fullSAList") && !kk.equals("brand") && !_isCurated(kk)) {
+                _add(menu, kk, about[kk]);
+            }
+        }
         return menu;
     }
-    static function _add(menu, label, key) {
-        var v = Application.Storage.getValue(key);
-        if (v == null || v.equals("")) { v = "—"; }
+
+    static function _isCurated(key) {
+        for (var i = 0; i < _PRIMARY.size(); i++) {
+            if (_PRIMARY[i][0].equals(key)) { return true; }
+        }
+        return false;
+    }
+
+    static function _add(menu, label, value) {
+        var v = (value == null || value.toString().equals("")) ? "—" : value.toString();
         menu.addItem(new WatchUi.MenuItem(label, v, null, null));
     }
 }

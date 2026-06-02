@@ -20,6 +20,14 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
     }
 
     function onTemporalEvent() {
+        // Adaptive mode (2) fires every 30 min but should only fetch at chosen hours;
+        // skip ticks that don't match the schedule to conserve quota/battery.
+        var mode = Application.Properties.getValue("updateMode");
+        if (mode != null && mode == 2 && !_adaptiveShouldFetch()) {
+            Background.exit(null);
+            return;
+        }
+
         // Phase 1: one-time bootstrap (KEY_VEHICLE_NAME absent = first run or Storage wipe)
         if (Application.Storage.getValue(StorageKeys.KEY_VEHICLE_NAME) == null) {
             _runBootstrap();
@@ -29,27 +37,81 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
         _runPollCycle();
     }
 
-    // Phase 1: fetch vehicle name + driveType from basicData; store; exit.
-    // Next temporal event will run Phase 2.
-    // On first run only a refresh token exists (in Properties) — must mint an access
-    // token via ensureValidToken BEFORE attempting basicData, or accessToken is null.
+    // Adaptive schedule: fetch overnight at 00:00, the morning ramp 06/07/08:00,
+    // then every 30 min through the active day until 22:00, plus a 23:00 top-up.
+    // (The temporal tick is 30 min, so we gate on the local hour/minute here.)
+    function _adaptiveShouldFetch() {
+        var now = System.getClockTime();
+        var h = now.hour;
+        var m = now.min;
+        // Overnight + morning ramp: only on the hour.
+        if (h == 0 || h == 6 || h == 7 || h == 8 || h == 23) {
+            return (m < 30);  // the top-of-hour tick
+        }
+        // Active day 09:00–22:00: every 30-min tick.
+        if (h >= 9 && h <= 22) {
+            return true;
+        }
+        // 01:00–05:00, 24h quiet: skip.
+        return false;
+    }
+
+    // Cold-start chain (each step exits on failure, else advances):
+    //   token -> VIN (discover if missing) -> container (create if missing) -> basicData
+    // On first run only a refresh token exists (in Properties) — mint an access token
+    // via ensureValidToken BEFORE any API call.
     function _runBootstrap() {
         _tokenManager.ensureValidToken(method(:onBootstrapTokenReady));
     }
 
     function onBootstrapTokenReady(success as Lang.Boolean) as Void {
-        var vin = Application.Properties.getValue("vin");
-        var accessToken = _tokenManager.getAccessToken();
-        if (!success || vin == null || accessToken == null) {
+        if (!success || _tokenManager.getAccessToken() == null) {
             Background.exit(null);
             return;
         }
-        _carDataClient.fetchBasicData(vin, accessToken, method(:onBootstrapComplete));
+        // Step 1: VIN — use a resolved one if present, else discover via /mappings.
+        if (_resolveVin() == null) {
+            _carDataClient.fetchMappings(_tokenManager.getAccessToken(), method(:onBootstrapVin));
+        } else {
+            onBootstrapVin(200, _resolveVin());
+        }
+    }
+
+    function onBootstrapVin(responseCode as Lang.Number, vin) as Void {
+        if (vin == null) { Background.exit(null); return; }
+        // Step 2: container — use a resolved one if present, else create it.
+        if (_resolveContainer() == null) {
+            _carDataClient.createContainer(_tokenManager.getAccessToken(), method(:onBootstrapContainer));
+        } else {
+            onBootstrapContainer(200, _resolveContainer());
+        }
+    }
+
+    function onBootstrapContainer(responseCode as Lang.Number, containerId) as Void {
+        if (containerId == null) { Background.exit(null); return; }
+        // Step 3: basicData (vehicle name + About-car snapshot).
+        _carDataClient.fetchBasicData(_resolveVin(), _tokenManager.getAccessToken(), method(:onBootstrapComplete));
     }
 
     function onBootstrapComplete(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
-        // CarDataClient.onBasicDataResponse already wrote KEY_VEHICLE_NAME + KEY_DRIVE_TYPE
+        // CarDataClient.onBasicDataResponse already wrote KEY_VEHICLE_NAME + basicData.
         Background.exit(null);
+    }
+
+    // VIN/container resolution: auto-discovered (Storage) takes precedence over a
+    // manually-entered value (Properties), so the auto path "wins" once it runs.
+    function _resolveVin() {
+        var v = Application.Storage.getValue(StorageKeys.KEY_VIN);
+        if (v == null) { v = Application.Properties.getValue("vin"); }
+        if (v != null && v.equals("")) { v = null; }
+        return v;
+    }
+
+    function _resolveContainer() {
+        var c = Application.Storage.getValue(StorageKeys.KEY_CONTAINER_ID);
+        if (c == null) { c = Application.Properties.getValue("containerId"); }
+        if (c != null && c.equals("")) { c = null; }
+        return c;
     }
 
     // Phase 2: backoff → token → quota → fetch → exit
@@ -72,8 +134,8 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
             Background.exit(null);
             return;
         }
-        var vin = Application.Properties.getValue("vin");
-        var containerId = Application.Properties.getValue("containerId");
+        var vin = _resolveVin();
+        var containerId = _resolveContainer();
         var accessToken = _tokenManager.getAccessToken();
         if (vin == null || containerId == null || accessToken == null) {
             Background.exit(null);

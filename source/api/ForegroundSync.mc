@@ -1,8 +1,14 @@
-// One-shot foreground data fetch. Used after on-device auth and for the manual
-// refresh (OK on the image page) so the user sees fresh data immediately instead
-// of waiting for the next background poll.
-// Chain: ensureValidToken -> basicData (vehicle name) -> telematicData -> VehicleCache.
-// Foreground only. The owning view passes an onDone callback to redraw / pop.
+// Foreground data sync — runs the full cold-start chain so the user sees data right
+// after pairing (and on every manual refresh), without waiting for the background poll.
+//
+// Chain (each step auto-resolves what's missing):
+//   ensureValidToken
+//   -> VIN        : Storage/Settings, else discover via /mappings
+//   -> container  : Storage/Settings, else create via POST /customers/containers
+//   -> basicData  : vehicle name + About-car snapshot
+//   -> telematic  : full vehicle state -> VehicleCache
+//
+// Foreground only. The owning view passes an onDone(success) callback.
 using Toybox.Application;
 using Toybox.Lang;
 
@@ -10,7 +16,7 @@ class ForegroundSync {
 
     var _client;
     var _token;
-    var _onDone;     // invoked (success:Boolean) when the chain finishes
+    var _onDone;
     var _vin;
     var _containerId;
     var _accessToken;
@@ -22,28 +28,46 @@ class ForegroundSync {
 
     function run(onDone) {
         _onDone = onDone;
-        // Access tokens last ~1h; the stored one is often stale by refresh time.
-        // Ensure a valid token (refreshing if needed) BEFORE fetching.
+        // Access tokens last ~1h; ensure a valid one (refresh if needed) first.
         _token.ensureValidToken(method(:onToken));
     }
 
     function onToken(success as Lang.Boolean) as Void {
         if (!success) { _finish(false); return; }
-
-        _vin         = Application.Properties.getValue("vin");
-        _containerId = Application.Properties.getValue("containerId");
         _accessToken = Application.Storage.getValue(StorageKeys.KEY_ACCESS_TOKEN);
+        if (_accessToken == null) { _finish(false); return; }
 
-        if (_vin == null || _containerId == null || _accessToken == null) {
-            _finish(false);
-            return;
+        // Step 1: VIN — resolve, else discover.
+        _vin = _resolveVin();
+        if (_vin == null) {
+            _client.fetchMappings(_accessToken, method(:onVin));
+        } else {
+            onVin(200, _vin);
         }
-        // Bootstrap first so the page header has the vehicle name.
+    }
+
+    function onVin(responseCode as Lang.Number, vin) as Void {
+        if (vin == null) { _finish(false); return; }
+        _vin = vin;
+
+        // Step 2: container — resolve, else create.
+        _containerId = _resolveContainer();
+        if (_containerId == null) {
+            _client.createContainer(_accessToken, method(:onContainer));
+        } else {
+            onContainer(200, _containerId);
+        }
+    }
+
+    function onContainer(responseCode as Lang.Number, containerId) as Void {
+        if (containerId == null) { _finish(false); return; }
+        _containerId = containerId;
+
+        // Step 3: basicData (best-effort), then telematic.
         _client.fetchBasicData(_vin, _accessToken, method(:onBasic));
     }
 
     function onBasic(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
-        // basicData is best-effort; proceed to telematic regardless.
         _client.fetchTelematicData(_vin, _containerId, _accessToken, method(:onTelematic));
     }
 
@@ -55,6 +79,21 @@ class ForegroundSync {
         } else {
             _finish(false);
         }
+    }
+
+    // Storage-first (auto-discovered) values, falling back to manual Settings.
+    function _resolveVin() {
+        var v = Application.Storage.getValue(StorageKeys.KEY_VIN);
+        if (v == null) { v = Application.Properties.getValue("vin"); }
+        if (v != null && v.equals("")) { v = null; }
+        return v;
+    }
+
+    function _resolveContainer() {
+        var c = Application.Storage.getValue(StorageKeys.KEY_CONTAINER_ID);
+        if (c == null) { c = Application.Properties.getValue("containerId"); }
+        if (c != null && c.equals("")) { c = null; }
+        return c;
     }
 
     function _finish(success) {

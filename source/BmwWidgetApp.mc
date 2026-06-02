@@ -18,14 +18,20 @@ class BmwWidgetApp extends Application.AppBase {
         _seedDebugData();
     }
 
-    // updateMode: 0 = manual (no background poll; user refreshes via OK on the image page),
-    //             1 = auto (background poll every 30 min). Default manual.
+    // updateMode: 0 = manual (no background poll; user refreshes via OK on the image page)
+    //             1 = auto hourly
+    //             2 = auto adaptive (fires every 30 min, but the ServiceDelegate only
+    //                 actually fetches at the adaptive hours — see _adaptiveShouldFetch).
+    // CIQ registerForTemporalEvent only supports a fixed interval, so adaptive gating
+    // lives in the service delegate, not here. Default manual.
     // Wrapped: Background APIs throw in glance scope.
     function _applyUpdateMode() {
         try {
             var mode = Application.Properties.getValue("updateMode");
             if (mode != null && mode == 1) {
-                Background.registerForTemporalEvent(new Time.Duration(1800)); // 30 min
+                Background.registerForTemporalEvent(new Time.Duration(3600)); // hourly
+            } else if (mode != null && mode == 2) {
+                Background.registerForTemporalEvent(new Time.Duration(1800)); // 30 min tick; gated
             } else {
                 // Manual: ensure no stale temporal event keeps firing.
                 Background.deleteTemporalEvent();

@@ -8,7 +8,8 @@
   <string id="TankLitresLabel">Tank Size (L)</string>
   <string id="UpdateModeLabel">Update Mode</string>
   <string id="UpdateModeManual">Manual (button)</string>
-  <string id="UpdateModeAuto">Auto (every 30 min)</string>
+  <string id="UpdateModeAuto">Auto (hourly)</string>
+  <string id="UpdateModeAdaptive">Auto (adaptive)</string>
   <string id="SetupPrompt">Setup BMW Widget</string>
   <string id="RelinkPrompt">Re-auth needed. Open Garmin Connect.</string>
   <string id="StaleIndicator">Data may be outdated</string>

@@ -5,6 +5,7 @@
 using Toybox.Application;
 using Toybox.Communications;
 using Toybox.Lang;
+using Toybox.PersistedContent;
 using Toybox.Time;
 
 (:background)
@@ -75,16 +76,176 @@ class CarDataClient {
             Application.Storage.setValue(StorageKeys.KEY_VEHICLE_NAME, brand + " " + model);
             var drive = (data.hasKey("driveTrain") && data["driveTrain"] != null) ? data["driveTrain"] : "CONV";
             Application.Storage.setValue(StorageKeys.KEY_DRIVE_TYPE, drive);
-            // "About car" details (shown in the on-watch settings menu).
-            Application.Storage.setValue(StorageKeys.KEY_COLOUR,
-                (data.hasKey("colourDescription") && data["colourDescription"] != null) ? data["colourDescription"] : "");
-            Application.Storage.setValue(StorageKeys.KEY_BODY_TYPE,
-                (data.hasKey("bodyType") && data["bodyType"] != null) ? data["bodyType"] : "");
-            Application.Storage.setValue(StorageKeys.KEY_ENGINE,
-                (data.hasKey("engine") && data["engine"] != null) ? data["engine"] : "");
+            // Full basicData snapshot for the on-watch "About car" key/value list.
+            // Stored as one dict (string values) so AboutMenu can render it generically.
+            var about = {};
+            var keys = data.keys();
+            for (var i = 0; i < keys.size(); i++) {
+                var k = keys[i];
+                var v = data[k];
+                if (v != null) { about[k] = v.toString(); }
+            }
+            Application.Storage.setValue(StorageKeys.KEY_BASIC_DATA, about);
         }
         data = null;
         _callback.invoke(responseCode, null);
+    }
+
+    // --- VIN discovery (GET /customers/vehicles/mappings) ---
+    // Auto-learns the user's VIN after auth so it need not be entered manually.
+
+    (:release)
+    function fetchMappings(accessToken, callback) {
+        _callback = callback;
+        Communications.makeWebRequest(
+            _DATA_HOST + "/customers/vehicles/mappings",
+            null,
+            { :method       => Communications.HTTP_REQUEST_METHOD_GET,
+              :headers      => _buildHeaders(accessToken),
+              :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON },
+            method(:onMappingsResponse)
+        );
+    }
+
+    (:debug)
+    function fetchMappings(accessToken, callback) {
+        _callback = callback;
+        onMappingsResponse(200, { "data" => [ { "vin" => "WBADEBUGVIN000001", "mappingType" => "PRIMARY" } ] });
+    }
+
+    // Picks the PRIMARY VIN (or the first) and stores it. Returns vin via callback.
+    // The /mappings body is a JSON array; makeWebRequest may surface it as the array
+    // itself or wrapped in {"data":[...]}. Handle both without instanceof/chained index.
+    // makeWebRequest may surface the /mappings JSON array as a Dictionary
+    // ({"data":[...]}), a Lang.Array, or (top-level array) a PersistedContent.Iterator.
+    // We avoid naming the Iterator type (it needs a permission) and duck-type instead.
+    function onMappingsResponse(responseCode as Lang.Number, data as Lang.Dictionary or Lang.String or PersistedContent.Iterator or Null) as Void {
+        var vin = null;
+        if (responseCode == 200 && data != null) {
+            var list = data;
+            if (data instanceof Lang.Dictionary) {
+                list = data.hasKey("data") ? data["data"] : null;
+            }
+            if (list instanceof Lang.Array) {
+                vin = _vinFromArray(list);
+            } else if (list != null) {
+                // Iterator-like: pull entries via next() without naming the type.
+                vin = _vinFromIterator(list);
+            }
+        }
+        if (vin != null) { Application.Storage.setValue(StorageKeys.KEY_VIN, vin); }
+        data = null;
+        _callback.invoke(responseCode, vin);
+    }
+
+    function _pickVin(e, firstSoFar) {
+        // returns [first, primaryOrNull] for one entry
+        if (e instanceof Lang.Dictionary && e["vin"] != null) {
+            var mt = e["mappingType"];
+            var isPrimary = (mt != null && mt.equals("PRIMARY"));
+            return [ (firstSoFar == null) ? e["vin"] : firstSoFar, isPrimary ? e["vin"] : null ];
+        }
+        return [ firstSoFar, null ];
+    }
+
+    function _vinFromArray(arr) {
+        var first = null;
+        for (var i = 0; i < arr.size(); i++) {
+            var r = _pickVin(arr[i], first);
+            first = r[0];
+            if (r[1] != null) { return r[1]; }
+        }
+        return first;
+    }
+
+    // Duck-typed iterator walk (PersistedContent.Iterator has next()).
+    function _vinFromIterator(it) {
+        var first = null;
+        try {
+            var e = it.next();
+            while (e != null) {
+                var r = _pickVin(e, first);
+                first = r[0];
+                if (r[1] != null) { return r[1]; }
+                e = it.next();
+            }
+        } catch (ex) {
+            // not iterable — give up gracefully
+        }
+        return first;
+    }
+
+    // --- Container creation (POST /customers/containers) ---
+    // Body shape (verified): { name, purpose, technicalDescriptors:[...] }.
+    // technicalDescriptors is a FLAT array of dotted strings (not objects).
+
+    (:release)
+    function createContainer(accessToken, callback) {
+        _callback = callback;
+        // JSON POST: Content-Type must be set via the REQUEST_CONTENT_TYPE_JSON enum in
+        // :headers (a raw "Content-Type" string yields -200 INVALID_HTTP_HEADER_FIELDS).
+        // CIQ then JSON-encodes the Dictionary body.
+        Communications.makeWebRequest(
+            _DATA_HOST + "/customers/containers",
+            {
+                "name"                 => "grm_bmw_widget",
+                "purpose"              => "Garmin fenix widget status",
+                "technicalDescriptors" => _containerDescriptors()
+            },
+            { :method       => Communications.HTTP_REQUEST_METHOD_POST,
+              :headers      => {
+                  "Authorization"               => "Bearer " + accessToken,
+                  "x-version"                   => "v1",
+                  "Accept"                      => "application/json",
+                  "Content-Type"                => Communications.REQUEST_CONTENT_TYPE_JSON
+              },
+              :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON },
+            method(:onCreateContainerResponse)
+        );
+    }
+
+    (:debug)
+    function createContainer(accessToken, callback) {
+        _callback = callback;
+        onCreateContainerResponse(200, { "containerId" => "DEBUGCONTAINER01" });
+    }
+
+    function onCreateContainerResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
+        var cid = null;
+        if ((responseCode == 200 || responseCode == 201) && data != null) {
+            cid = data.hasKey("containerId") ? data["containerId"]
+                : (data.hasKey("id") ? data["id"] : null);
+            if (cid != null) { Application.Storage.setValue(StorageKeys.KEY_CONTAINER_ID, cid); }
+        }
+        data = null;
+        _callback.invoke(responseCode, cid);
+    }
+
+    // The 21 descriptors the widget reads (ICE 218i, container v2).
+    static function _containerDescriptors() {
+        return [
+            "vehicle.cabin.door.lock.status",
+            "vehicle.cabin.door.row1.driver.isOpen",
+            "vehicle.cabin.door.row1.passenger.isOpen",
+            "vehicle.body.trunk.isOpen",
+            "vehicle.body.trunk.isLocked",
+            "vehicle.body.hood.isOpen",
+            "vehicle.drivetrain.lastRemainingRange",
+            "vehicle.drivetrain.fuelSystem.level",
+            "vehicle.drivetrain.fuelSystem.remainingFuel",
+            "vehicle.vehicle.travelledDistance",
+            "vehicle.status.serviceDistance.next",
+            "vehicle.cabin.infotainment.displayUnit.distance",
+            "vehicle.drivetrain.engine.isIgnitionOn",
+            "vehicle.chassis.axle.row1.wheel.left.tire.pressure",
+            "vehicle.chassis.axle.row1.wheel.right.tire.pressure",
+            "vehicle.chassis.axle.row2.wheel.left.tire.pressure",
+            "vehicle.chassis.axle.row2.wheel.right.tire.pressure",
+            "vehicle.chassis.axle.row1.wheel.left.tire.pressureTarget",
+            "vehicle.chassis.axle.row1.wheel.right.tire.pressureTarget",
+            "vehicle.chassis.axle.row2.wheel.left.tire.pressureTarget",
+            "vehicle.chassis.axle.row2.wheel.right.tire.pressureTarget"
+        ];
     }
 
     // --- Shared helpers ---

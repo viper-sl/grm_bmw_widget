@@ -9,6 +9,9 @@ class BmwWidgetView extends WatchUi.View {
 
     var _pages;
     var _pageIdx;
+    var _autoSyncStarted;   // guard: auto cold-start sync runs at most once
+    var _autoSyncFailed;    // last auto-sync attempt failed → show prompt, allow START retry
+    var _sync;
 
     function initialize() {
         View.initialize();
@@ -20,6 +23,36 @@ class BmwWidgetView extends WatchUi.View {
             new PageTyres()
         ];
         _pageIdx = _firstVisibleIndex();
+        _autoSyncStarted = false;
+        _autoSyncFailed = false;
+    }
+
+    // START on the setup prompt retries the cold-start sync after a failure.
+    function retryAutoSync() {
+        _autoSyncStarted = true;
+        _autoSyncFailed = false;
+        _sync = new ForegroundSync();
+        _sync.run(method(:onAutoSyncDone));
+        WatchUi.requestUpdate();
+    }
+
+    function onAutoSyncDone(success) {
+        // Run at most ONCE per view lifetime — do NOT reset the guard on failure, or
+        // onUpdate immediately restarts the sync (infinite loop -> OOM). On failure
+        // show the setup prompt; the user retries via START.
+        _autoSyncFailed = !success;
+        WatchUi.requestUpdate();
+    }
+
+    function _drawLoading(dc) {
+        var cx = dc.getWidth() / 2;
+        var cy = dc.getHeight() / 2;
+        dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
+        dc.drawText(cx, cy - 8, Graphics.FONT_SMALL, "Loading…",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
+        dc.drawText(cx, cy + 14, Graphics.FONT_XTINY, "fetching vehicle data",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     function onLayout(dc) {}
@@ -35,13 +68,25 @@ class BmwWidgetView extends WatchUi.View {
             return;
         }
 
-        // Empty cache or all pages invisible — show setup prompt
+        // Empty cache or all pages invisible.
         var hasVisible = false;
         for (var i = 0; i < _pages.size(); i++) {
             if (_pages[i].isVisible()) { hasVisible = true; break; }
         }
         if (!hasVisible) {
-            _drawSetupPrompt(dc);
+            var paired = (tokenState != null && tokenState.equals("NORMAL"));
+            // Paired but no data yet → auto-run the cold-start sync ONCE (discovers VIN
+            // + creates container + fetches). Never auto-retry (would loop -> OOM).
+            if (paired && !_autoSyncStarted) {
+                _autoSyncStarted = true;
+                _sync = new ForegroundSync();
+                _sync.run(method(:onAutoSyncDone));
+            }
+            if (_autoSyncStarted && !_autoSyncFailed) {
+                _drawLoading(dc);                 // in progress
+            } else {
+                _drawSetupPrompt(dc);             // not paired, or sync failed → START to (re)try
+            }
             return;
         }
 
@@ -95,23 +140,31 @@ class BmwWidgetView extends WatchUi.View {
     // implements onSelect() returning true if it handled it (image -> refresh,
     // tyres -> toggle target). Pages without behavior return false.
     function onSelect() {
+        // Paired but the cold-start sync failed → START retries the fetch (not re-pair).
+        if (_autoSyncFailed) {
+            retryAutoSync();
+            return true;
+        }
         if (_pageIdx >= 0 && _pageIdx < _pages.size() && _pages[_pageIdx].isVisible()) {
             return _pages[_pageIdx].onSelect();
         }
         return false;
     }
 
-    // True when the widget is showing the setup or re-link prompt — i.e. the user
-    // should be able to launch on-device auth (START). Drives BmwWidgetDelegate.onSelect.
+    // True when the widget should launch on-device auth on START — only when NOT
+    // already paired. If paired (a retryable sync failure), onSelect handles it.
     function needsAuth() {
         var tokenState = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
+        if (tokenState != null && tokenState.equals("NORMAL")) {
+            return false;   // paired — START retries the sync, not re-pair
+        }
         if (tokenState != null && tokenState.equals("NEEDS_REBOOTSTRAP")) {
             return true;
         }
         for (var i = 0; i < _pages.size(); i++) {
             if (_pages[i].isVisible()) { return false; }
         }
-        return true; // no visible pages -> setup prompt is showing
+        return true; // no token, no pages -> first-run setup prompt
     }
 
     // Find the first visible page index (skipping hidden pages like PageVehicle)

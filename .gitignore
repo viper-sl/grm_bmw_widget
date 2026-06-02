@@ -40,3 +40,6 @@ BMW.svg.png
 bin/personal.prg
 bin/personal-device.prg
 CIQ_LOG.*
+
+# Personal build source (real clientId) — NEVER commit
+source-personal/

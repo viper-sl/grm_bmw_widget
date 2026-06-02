@@ -49,7 +49,7 @@ class TokenManager {
 
     // POST token refresh to auth host (customer.bmwgroup.com — quota-exempt).
     function _refreshToken() {
-        var clientId = Application.Properties.getValue("clientId");
+        var clientId = Config.clientId();
 
         // Storage-first fallback: first-run uses Settings value; subsequent runs use rotated token
         var refreshToken = Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN);

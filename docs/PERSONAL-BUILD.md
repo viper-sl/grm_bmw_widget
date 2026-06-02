@@ -15,9 +15,31 @@ Only your **BMW CarData client ID**. Everything else is automatic:
 | **VIN** | Auto-discovered via `GET /customers/vehicles/mappings` after pairing |
 | **containerId** | Auto-created via `POST /customers/containers` on first run |
 
+## How the clientId is baked in
+
+The personal build puts your clientId in **source** (not just a settings default),
+so it works even when stale/empty persisted settings would otherwise override the
+XML default — which happens on a real watch where old SETTINGS can't easily be cleared.
+
+- `source/Config.mc` → `Config.clientId()` returns the Settings value if present,
+  else the baked-in `personalClientId()`.
+- `source/PersonalClientId.mc` — committed **stub** (`:stubcid`) returning `""`.
+- `source-personal/PersonalClientIdReal.mc` — **gitignored**, your real value (`:realcid`).
+- `livetest.jungle` adds `source-personal/` and excludes `:stubcid`.
+
+Regenerate the gitignored real one after changing clientId:
+```sh
+CID=$(python3 -c 'import json;print(json.load(open("bmw_tokens.json"))["client_id"])')
+mkdir -p source-personal
+cat > source-personal/PersonalClientIdReal.mc <<MC
+(:realcid :background)
+function personalClientId() { return "$CID"; }
+MC
+```
+
 ## Setup (one-time)
 
-1. Put your client ID in the gitignored override
+1. (Optional) The override properties file is also still read first; you can leave
    `resources-livetest/properties/properties.xml`:
    ```xml
    <?xml version="1.0"?>

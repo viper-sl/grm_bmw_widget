@@ -63,9 +63,9 @@ class DeviceAuthManager {
         if (_onChange != null) { _onChange.invoke(); }
     }
 
-    // Kick off the device flow. clientId comes from Settings (Properties).
+    // Kick off the device flow. clientId from Settings, else the baked-in personal value.
     function start() {
-        var clientId = Application.Properties.getValue("clientId");
+        var clientId = Config.clientId();
         if (clientId == null || clientId.equals("")) {
             _state = FAILED;
             _errMsg = "No client ID in settings";
@@ -133,7 +133,7 @@ class DeviceAuthManager {
             _notify();
             return;
         }
-        var clientId = Application.Properties.getValue("clientId");
+        var clientId = Config.clientId();
         Communications.makeWebRequest(
             _TOKEN_URL,
             {

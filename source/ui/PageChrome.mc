@@ -98,16 +98,17 @@ class PageChrome {
         }
     }
 
-    // Downward chevron at screen bottom — indicates OK/START is interactive.
+    // Rightward chevron on right edge — points toward the physical START button
+    // (Fenix 6 Pro: START is at the 3–4 o'clock position on the right bezel).
     // Only call from pages whose onSelect() returns true.
     static function drawSelectHint(dc) {
-        var cx  = dc.getWidth() / 2;
-        var tip = dc.getHeight() - 12;   // chevron tip y
-        var top = tip - 8;               // chevron arms y
+        var cy  = dc.getHeight() / 2;
+        var tip = dc.getWidth() - 10;   // chevron tip x (near right edge)
+        var arm = tip - 8;              // chevron arms x
         dc.setPenWidth(2);
         dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(cx - 8, top, cx, tip);
-        dc.drawLine(cx, tip, cx + 8, top);
+        dc.drawLine(arm, cy - 7, tip, cy);
+        dc.drawLine(tip, cy, arm, cy + 7);
     }
 
     // Format a float to 1 decimal place (Monkey C lacks printf on all types).

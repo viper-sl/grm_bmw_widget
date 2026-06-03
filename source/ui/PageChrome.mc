@@ -98,13 +98,13 @@ class PageChrome {
         }
     }
 
-    // Rightward chevron — points toward the physical START button on Fenix 6 Pro.
-    // START button sits at ~40% from top on the right bezel (between 1 and 3 o'clock).
+    // Rightward chevron strictly at 3 o'clock = START button on Fenix 6 Pro.
+    // y = screen center; tip x = screen width - 5 (right at circular edge).
     // Only call from pages whose onSelect() returns true.
     static function drawSelectHint(dc) {
-        var hy  = dc.getHeight() * 2 / 5;  // ~40% from top ≈ 104 px on 260 px screen
-        var tip = dc.getWidth() - 12;       // chevron tip x
-        var arm = tip - 10;                 // chevron arms x
+        var hy  = dc.getHeight() / 2;   // center = 3 o'clock (130 px on 260 px screen)
+        var tip = dc.getWidth() - 5;    // right at the circular screen edge
+        var arm = tip - 12;
         dc.setPenWidth(2);
         dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
         dc.drawLine(arm, hy - 8, tip, hy);

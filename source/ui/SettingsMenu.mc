@@ -133,7 +133,13 @@ class AboutMenu {
         for (var i = 0; i < _PRIMARY.size(); i++) {
             var k = _PRIMARY[i][0];
             if (about.hasKey(k)) {
-                _add(menu, _PRIMARY[i][1], about[k]);
+                var v = about[k];
+                // Strip time component from ISO timestamp: "2024-03-05T00:00:00.000+0000" → "2024-03-05"
+                if (k.equals("constructionDate") && v != null) {
+                    var t = v.indexOf("T");
+                    if (t > 0) { v = v.substring(0, t); }
+                }
+                _add(menu, _PRIMARY[i][1], v);
             }
         }
         // Any remaining basicData fields (except curated, brand, and the huge SA list).

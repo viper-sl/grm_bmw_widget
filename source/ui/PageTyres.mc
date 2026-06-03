@@ -52,6 +52,7 @@ class PageTyres extends WatchUi.View {
         _cell(dc, colR, row2, "REAR R",  state, "tyrePressureRR", "tyreTargetRR");
 
         PageChrome.drawAge(dc, state);
+        PageChrome.drawNavDots(dc);
         PageChrome.drawSelectHint(dc);
     }
 

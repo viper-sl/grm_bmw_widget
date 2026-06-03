@@ -61,6 +61,7 @@ class PageLock extends WatchUi.View {
         _cell(dc, colR, row2, "HOOD",    state, "hoodOpen");
 
         PageChrome.drawAge(dc, state);
+        PageChrome.drawNavDots(dc);
     }
 
     function _cell(dc, x, y, name, state, key) {

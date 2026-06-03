@@ -73,6 +73,7 @@ class PageVehicle extends WatchUi.View {
         }
 
         PageChrome.drawAge(dc, VehicleCache.read());
+        PageChrome.drawNavDots(dc);
         PageChrome.drawRefreshHint(dc, _refreshing);
     }
 

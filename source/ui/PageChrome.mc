@@ -135,6 +135,28 @@ class PageChrome {
         dc.drawLine(tip, hy, arm, hy + 7);
     }
 
+    // Navigation dots on left edge — reads rank/count from PageNav so dots are
+    // always evenly spaced across visible pages only (no phantom gap for hidden pages).
+    static function drawNavDots(dc) {
+        var info  = PageNav.visibleInfo();
+        var total = info[0];
+        var rank  = info[1];
+        if (total <= 1) { return; }
+        var dotR    = 3;
+        var spacing = 10;
+        var startY  = (dc.getHeight() - (total - 1) * spacing) / 2;
+        for (var i = 0; i < total; i++) {
+            var y = startY + i * spacing;
+            if (i == rank) {
+                dc.setColor(Theme.COLOR_ACCENT, Theme.COLOR_BG);
+                dc.fillCircle(8, y, dotR);
+            } else {
+                dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+                dc.drawCircle(8, y, dotR);
+            }
+        }
+    }
+
     // Format a float to 1 decimal place (Monkey C lacks printf on all types).
     static function oneDecimal(f) {
         var whole = f.toNumber();

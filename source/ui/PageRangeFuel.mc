@@ -93,6 +93,7 @@ class PageRangeFuel extends WatchUi.View {
         }
 
         PageChrome.drawAge(dc, state);
+        PageChrome.drawNavDots(dc);
         PageChrome.drawRefreshHint(dc, _refreshing);
     }
 

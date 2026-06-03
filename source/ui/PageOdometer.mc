@@ -46,6 +46,7 @@ class PageOdometer extends WatchUi.View {
         }
 
         PageChrome.drawAge(dc, state);
+        PageChrome.drawNavDots(dc);
     }
 
     function _serviceColor(svcKm) {

@@ -98,17 +98,17 @@ class PageChrome {
         }
     }
 
-    // Rightward chevron on right edge — points toward the physical START button
-    // (Fenix 6 Pro: START is at the 3–4 o'clock position on the right bezel).
+    // Rightward chevron — points toward the physical START button on Fenix 6 Pro.
+    // START button sits at ~40% from top on the right bezel (between 1 and 3 o'clock).
     // Only call from pages whose onSelect() returns true.
     static function drawSelectHint(dc) {
-        var cy  = dc.getHeight() / 2;
-        var tip = dc.getWidth() - 10;   // chevron tip x (near right edge)
-        var arm = tip - 8;              // chevron arms x
+        var hy  = dc.getHeight() * 2 / 5;  // ~40% from top ≈ 104 px on 260 px screen
+        var tip = dc.getWidth() - 12;       // chevron tip x
+        var arm = tip - 10;                 // chevron arms x
         dc.setPenWidth(2);
         dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(arm, cy - 7, tip, cy);
-        dc.drawLine(tip, cy, arm, cy + 7);
+        dc.drawLine(arm, hy - 8, tip, hy);
+        dc.drawLine(tip, hy, arm, hy + 8);
     }
 
     // Format a float to 1 decimal place (Monkey C lacks printf on all types).

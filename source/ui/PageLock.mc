@@ -1,14 +1,13 @@
 // Page: Lock overview — matches UX mock page 3.
-// Header · "SECURED/UNLOCKED" status (green/amber).
-// Between status and door grid: icon legend (closed_w left, open_w right).
-// Door grid 2x2: position label + colored dot per cell.
+// Header · "SECURED/UNLOCKED" status · ONE state icon (48×48) centered below it ·
+// 2x2 door grid with colored dots.
 using Toybox.Graphics;
 using Toybox.WatchUi;
 
 class PageLock extends WatchUi.View {
 
-    var _iconClosed;   // closed_w.png — shown in legend area between SECURED and grid
-    var _iconOpen;     // open_w.png   — shown in legend area between SECURED and grid
+    var _iconClosed;   // closed_w.png (48×48) — shown when secured
+    var _iconOpen;     // open_w.png   (48×48) — shown when unsecured
 
     function initialize() {
         View.initialize();
@@ -43,22 +42,16 @@ class PageLock extends WatchUi.View {
         dc.drawText(cx, 52, Graphics.FONT_SMALL, locked ? "SECURED" : "UNLOCKED",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // Icon legend: closed_w on left column, open_w on right column.
-        // Positioned between SECURED text (y≈52) and door grid (row1=cy+4≈134).
-        // 24×24 icons centered at (colL, 93) and (colR, 93).
-        var colL   = cx - 42;
-        var colR   = cx + 42;
-        var iconY  = 93;    // (52 + 134) / 2 rounded
-        var iconHW = 12;    // half of 24px icon = 12
-
-        if (_iconClosed != null) {
-            dc.drawBitmap(colL - iconHW, iconY - iconHW, _iconClosed);
-        }
-        if (_iconOpen != null) {
-            dc.drawBitmap(colR - iconHW, iconY - iconHW, _iconOpen);
+        // ONE state icon (48×48) centered between status text (y≈52) and grid (row1=cy+4≈134).
+        // Center icon at y=93: (52+134)/2. drawBitmap top-left so offset by half icon size (24).
+        var icon = locked ? _iconClosed : _iconOpen;
+        if (icon != null) {
+            dc.drawBitmap(cx - 24, 93 - 24, icon);
         }
 
-        // Door grid 2x2 with colored dots (green=closed, red ring=open)
+        // Door grid 2x2 with colored dots
+        var colL = cx - 42;
+        var colR = cx + 42;
         var row1 = cy + 4;
         var row2 = cy + 40;
 
@@ -70,7 +63,6 @@ class PageLock extends WatchUi.View {
         PageChrome.drawAge(dc, state);
     }
 
-    // One grid cell: position label + colored status dot (kept as requested).
     function _cell(dc, x, y, name, state, key) {
         dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
         dc.drawText(x, y - 9, Graphics.FONT_XTINY, name,

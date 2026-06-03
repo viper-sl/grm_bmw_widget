@@ -117,9 +117,7 @@ class PageVehicle extends WatchUi.View {
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
-        var hint = _refreshing ? "Refreshing…"
-                 : (!_requested || _apiBitmap != null) ? "OK to refresh"
-                 : "OK to refresh  [" + _lastRespCode.toString() + "]";
+        var hint = _refreshing ? "Refreshing…" : "OK to refresh";
         dc.setColor(_refreshing ? Theme.COLOR_WARN : Theme.COLOR_DIM, Theme.COLOR_BG);
         dc.drawText(cx, dc.getHeight() - 70, Graphics.FONT_XTINY, hint,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);

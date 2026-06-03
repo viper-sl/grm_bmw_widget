@@ -8,9 +8,12 @@
 # Usage:
 #   ./build-personal.sh            # build + load into the running simulator
 #   ./build-personal.sh --device   # build a sideload-ready .prg for a real fenix 6 Pro
+#   ./build-personal.sh --iq       # build a signed .iq package (all installed devices)
 #
-# Output: bin/personal.prg          (simulator)
-#         bin/personal-device.prg   (real watch — copy to GARMIN/APPS/)
+# Output:
+#   bin/personal.prg               (simulator)
+#   bin/BMWWIDGET.PRG              (real watch — copy to GARMIN/APPS/)
+#   bin/BMWWIDGET.iq               (signed IQ package — sideload via Connect IQ phone app)
 set -euo pipefail
 
 SDK="${CIQ_SDK:-$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-9.1.0-2026-03-09-6a872a80b}"
@@ -28,27 +31,23 @@ if [ ! -f "$KEY" ]; then
   exit 1
 fi
 
+mkdir -p bin
+
+# ── --device: real watch sideload .prg ──────────────────────────────────────
 if [ "${1:-}" == "--device" ]; then
-  # Output named BMWWIDGET.PRG (not "release.prg") to avoid colliding with a stale
-  # ghost registry entry the watch may have keyed by the old filename.
   OUT="bin/BMWWIDGET.PRG"
   echo "Building DEVICE release build → $OUT  (target: $DEVICE)"
-  # Matches the known-good manual command: -d fenix6pro (real target, NOT _sim) -r.
   java -jar "$SDK/bin/monkeybrains.jar" \
-    -o "$OUT" -f "$JUNGLE" -y "$KEY" -d "$DEVICE" -r
+    -o "$OUT" -f "$JUNGLE" -y "$KEY" -d "$DEVICE" -r 2>&1 \
+    | grep -v "^WARNING:.*Invalid device id found"
   echo "✓ Built $OUT"
 
-  # Auto-detect a mounted Garmin device (a volume containing GARMIN/APPS) and copy.
   DEST=""
   for v in /Volumes/*; do
     if [ -d "$v/GARMIN/APPS" ]; then DEST="$v/GARMIN/APPS"; break; fi
   done
 
   if [ -n "$DEST" ]; then
-    # Wipe stale persisted SETTINGS + DATA first. A previous install (esp. the generic
-    # no-clientId build) persists an EMPTY clientId that overrides the baked-in default,
-    # leaving the app stuck on "Press START to connect". Reinstalling the .prg alone does
-    # NOT clear this — the persisted SETTINGS/DATA must go.
     rm -f "$DEST/SETTINGS/GRM_BMW_WIDGET.SET" 2>/dev/null && echo "  cleared stale SETTINGS"
     rm -f "$DEST/DATA/GRM_BMW_WIDGET."* 2>/dev/null && echo "  cleared stale DATA"
     cp -f "$OUT" "$DEST/GRM_BMW_WIDGET.PRG"
@@ -64,10 +63,43 @@ if [ "${1:-}" == "--device" ]; then
   exit 0
 fi
 
+# ── --iq: signed application package for all installed devices ───────────────
+if [ "${1:-}" == "--iq" ]; then
+  OUT="bin/BMWWIDGET.iq"
+  echo "Building IQ package → $OUT  (all installed devices)"
+  java -jar "$SDK/bin/monkeybrains.jar" \
+    -o "$OUT" -f "$JUNGLE" -y "$KEY" -e -r 2>&1 \
+    | grep -v "^WARNING:.*Invalid device id found"
+  echo "✓ Built $OUT"
+  echo "  Sideload via the Connect IQ phone app → My Device Apps → Sideload Widget."
+  exit 0
+fi
+
+# ── default: simulator build + load ─────────────────────────────────────────
 OUT="bin/personal.prg"
 echo "Building SIM release build → $OUT  (target: ${DEVICE}_sim)"
 java -jar "$SDK/bin/monkeybrains.jar" \
-  -o "$OUT" -f "$JUNGLE" -y "$KEY" -d "${DEVICE}_sim" -w -r
+  -o "$OUT" -f "$JUNGLE" -y "$KEY" -d "${DEVICE}_sim" -w -r 2>&1 \
+  | grep -v "^WARNING:.*Invalid device id found"
+
+# Launch simulator if not already running, then wait for it to accept connections.
+SIM_APP="$SDK/bin/ConnectIQ.app"
+if ! pgrep -qx "simulator" 2>/dev/null; then
+  echo "Starting Connect IQ simulator…"
+  open -a "$SIM_APP"
+  # Poll until monkeydo can connect (max 15 s)
+  for i in $(seq 1 15); do
+    sleep 1
+    if "$SDK/bin/monkeydo" "$OUT" "$DEVICE" 2>/dev/null; then
+      echo "✓ Loaded into simulator"
+      exit 0
+    fi
+  done
+  echo "⚠ Simulator did not become ready in time. Try:"
+  echo "    $SDK/bin/monkeydo $OUT $DEVICE"
+  exit 1
+fi
 
 echo "Loading into simulator…"
 "$SDK/bin/monkeydo" "$OUT" "$DEVICE"
+echo "✓ Loaded into simulator"

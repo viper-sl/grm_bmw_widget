@@ -37,11 +37,6 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
             return;
         }
 
-        // "lastUpdated" is the car's last report time; parked cars report
-        // infrequently, so only flag >3 days as stale (matches PageChrome.STALE_SECONDS).
-        var stale = state.hasKey("lastUpdated")
-            && (Time.now().value() - state["lastUpdated"]) > 259200;
-
         var font = Graphics.FONT_XTINY;
         var lineH = dc.getFontHeight(font);
         var barH  = 4;
@@ -59,7 +54,7 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
         var fuelLitres  = state.hasKey("fuelLitres")  ? state["fuelLitres"]  : null;
 
         // ── row 1: lock state (left) + range (right) — pure white ──
-        var row1Color = stale ? Theme.COLOR_DIM : Theme.COLOR_WHITE;
+        var row1Color = Theme.COLOR_WHITE;
         if (state.hasKey("doorsLocked")) {
             dc.setColor(row1Color, Theme.COLOR_BG);
             dc.drawText(textX, row1Y, font, state["doorsLocked"] ? "LOCKED" : "OPEN",
@@ -100,7 +95,7 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
         } else {
             fuelStr = "FUEL --";
         }
-        dc.setColor(stale ? Theme.COLOR_DIM : Theme.COLOR_WHITE, Theme.COLOR_BG);
+        dc.setColor(Theme.COLOR_WHITE, Theme.COLOR_BG);
         dc.drawText(textX, row3Y, font, fuelStr,
             Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
 

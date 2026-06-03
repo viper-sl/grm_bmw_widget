@@ -26,8 +26,17 @@ class ForegroundSync {
         _token  = new TokenManager();
     }
 
+    static const COOLDOWN_SECONDS = 60;   // minimum gap between foreground refreshes
+    static const KEY_LAST_FG = "lastForegroundSync";
+
     function run(onDone) {
         _onDone = onDone;
+        // 1-minute cooldown guard — prevents rapid re-taps from hammering the API.
+        var lastSync = Application.Storage.getValue(KEY_LAST_FG);
+        if (lastSync != null && (Time.now().value() - lastSync) < COOLDOWN_SECONDS) {
+            _finish(false);
+            return;
+        }
         // Access tokens last ~1h; ensure a valid one (refresh if needed) first.
         _token.ensureValidToken(method(:onToken));
     }
@@ -84,7 +93,12 @@ class ForegroundSync {
         if (responseCode == 200 && state != null) {
             VehicleCache.write(state);
             QuotaGuard.updateAfterFetch();
+            Application.Storage.setValue(KEY_LAST_FG, Time.now().value());
             _finish(true);
+        } else if (responseCode == 429) {
+            // Manual refresh hit the quota — apply the same 24h block as the background service.
+            QuotaGuard.onQuotaExceeded();
+            _finish(false);
         } else {
             _finish(false);
         }

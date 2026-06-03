@@ -46,8 +46,8 @@ class BmwWidgetView extends WatchUi.View {
 
         // Transition to first data page as soon as one is visible.
         PageNav.initialize();
-        if (PageNav.current() != null) {
-            WatchUi.switchToView(PageNav.current(), new PageDelegate(), WatchUi.SLIDE_IMMEDIATE);
+        if (PageNav.hasVisible()) {
+            PageNav.switchToCurrent(WatchUi.SLIDE_IMMEDIATE);
             return;
         }
 
@@ -71,7 +71,7 @@ class BmwWidgetView extends WatchUi.View {
         var ts = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
         if (ts != null && ts.equals("NORMAL"))            { return false; }
         if (ts != null && ts.equals("NEEDS_REBOOTSTRAP")) { return true;  }
-        return (PageNav.current() == null);
+        return !PageNav.hasVisible();
     }
 
     function onSelect()       { return false; }

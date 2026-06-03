@@ -71,24 +71,27 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
             Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // ── row 2: fuel bar — fill width = fuel % of the row width ──
+        // Bar is always colored when data is available, even if stale — the age
+        // indicator in row 3 already tells the user the data is old. Grey bar
+        // is reserved for "no fuel data at all" to distinguish it from 0 % fuel.
         var barX = textX;
         var barW = rightX - barX;
-        var pct = 0.0;
-        if (fuelPercent != null) {
-            pct = fuelPercent / 100.0;
-            if (pct < 0.0) { pct = 0.0; }
-            if (pct > 1.0) { pct = 1.0; }
-        }
         dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
         dc.fillRectangle(barX, barY, barW, barH);
-        dc.setColor(stale ? Theme.COLOR_DIM : Theme.COLOR_ACCENT, Theme.COLOR_BG);
-        dc.fillRectangle(barX, barY, (barW * pct).toNumber(), barH);
+        if (fuelPercent != null) {
+            var pct = fuelPercent / 100.0;
+            if (pct < 0.0) { pct = 0.0; }
+            if (pct > 1.0) { pct = 1.0; }
+            var fillColor = (fuelPercent < 50) ? Theme.COLOR_WARN : Theme.COLOR_ACCENT;
+            dc.setColor(fillColor, Theme.COLOR_BG);
+            dc.fillRectangle(barX, barY, (barW * pct).toNumber(), barH);
+        }
 
         // ── row 3: fuel (left, ORANGE) + age (right, DIMMED) ──
         var fuelStr;
         if (fuelPercent != null && fuelPercent < 50 && fuelLitres != null) {
-            var tank = Application.Properties.getValue("tankLitres");
-            if (tank == null) { tank = 52; }
+            var tankProp = Application.Properties.getValue("tankLitres");
+            var tank = (tankProp != null) ? tankProp : 52;
             var fill = tank - fuelLitres;
             if (fill < 0) { fill = 0; }
             fuelStr = "FUEL " + fill.toString() + "L";

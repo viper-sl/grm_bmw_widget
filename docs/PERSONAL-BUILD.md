@@ -80,7 +80,23 @@ device build is signed with your `developer_key`.
 (If the app doesn't appear, confirm the file is directly in `GARMIN/APPS/`, not a
 subfolder, and that there's free space.)
 
-### ⚠ Installed but never appears in the widget list (ghost entry)
+### ⚠ Installed but never appears in the widget list (poisoned slot)
+
+**Confirmed root cause + fix (Jun 2026):** repeated *failed* installs of the same
+app id (e.g. a build with an unsupported permission) **poison that app id's slot**
+in the watch's app registry (`GARMIN/APPS/OUT.BIN`). Once poisoned, the watch
+rejects every subsequent install under that id — even a previously-working binary.
+
+The registry shows the poisoned app uniquely: `f5=0`, the raw upload filename (e.g.
+`release`) instead of an assigned 8-char hash, and `f8=-1` (0xFFFFFFFF). Working
+apps always get a nonzero `f5`, a hash filename, and no `f8`.
+
+**Fix that worked:** change the app id in `manifest.xml` (`iq:application id=...`)
+to a fresh UUID — `python3 -c "import uuid;print(uuid.uuid4().hex)"` — and install
+under a distinct filename (e.g. `BMWWIDGET.PRG`, not `release.prg`). This lands in a
+clean registry slot and installs normally. The poisoned slot can be left alone; the
+firmware ignores the dead entry.
+
 
 If a build with an **unsupported permission** was ever sideloaded (e.g. a build that
 requested `PersistedContent`, which the fēnix 6 firmware does not support), the watch

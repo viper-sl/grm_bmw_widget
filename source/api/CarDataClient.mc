@@ -5,7 +5,6 @@
 using Toybox.Application;
 using Toybox.Communications;
 using Toybox.Lang;
-using Toybox.PersistedContent;
 using Toybox.Time;
 
 (:background)
@@ -94,7 +93,10 @@ class CarDataClient {
     // --- VIN discovery (GET /customers/vehicles/mappings) ---
     // Auto-learns the user's VIN after auth so it need not be entered manually.
 
-    (:release)
+    // typecheck off: makeWebRequest's callback type names PersistedContent.Iterator,
+    // whose permission is unsupported on fenix 6 (adding it makes the watch refuse to
+    // run the widget). We don't name that type anywhere; suppress the check here.
+    (:release :typecheck(false))
     function fetchMappings(accessToken, callback) {
         _callback = callback;
         Communications.makeWebRequest(
@@ -114,12 +116,12 @@ class CarDataClient {
     }
 
     // Picks the PRIMARY VIN (or the first) and stores it. Returns vin via callback.
-    // The /mappings body is a JSON array; makeWebRequest may surface it as the array
-    // itself or wrapped in {"data":[...]}. Handle both without instanceof/chained index.
-    // makeWebRequest may surface the /mappings JSON array as a Dictionary
-    // ({"data":[...]}), a Lang.Array, or (top-level array) a PersistedContent.Iterator.
-    // We avoid naming the Iterator type (it needs a permission) and duck-type instead.
-    function onMappingsResponse(responseCode as Lang.Number, data as Lang.Dictionary or Lang.String or PersistedContent.Iterator or Null) as Void {
+    // The /mappings body is a JSON array; makeWebRequest may surface it as a Lang.Array,
+    // wrapped as {"data":[...]}, or (top-level array) an iterator. We type the param as
+    // Lang.Object to AVOID naming PersistedContent.Iterator (that permission is not
+    // supported on fenix 6 and made the watch silently refuse to run the widget).
+    (:typecheck(false))
+    function onMappingsResponse(responseCode, data) {
         var vin = null;
         if (responseCode == 200 && data != null) {
             var list = data;

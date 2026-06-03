@@ -47,16 +47,22 @@ class PageLock extends WatchUi.View {
         PageChrome.drawAge(dc, state);
     }
 
-    // One grid cell: position label over open/closed status.
+    // One grid cell: position label over graphical open/closed indicator.
+    // Closed → filled green circle. Open → outlined red ring with center dot.
     function _cell(dc, x, y, name, state, key) {
         dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
         dc.drawText(x, y - 9, Graphics.FONT_XTINY, name,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         var isOpen = state.hasKey(key) ? state[key] : false;
-        dc.setColor(isOpen ? Theme.COLOR_ERROR : Theme.COLOR_TEXT, Theme.COLOR_BG);
-        dc.drawText(x, y + 6, Graphics.FONT_XTINY, isOpen ? "OPEN" : "CLOSED",
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        if (isOpen) {
+            dc.setColor(Theme.COLOR_ERROR, Theme.COLOR_BG);
+            dc.drawCircle(x, y + 6, 5);
+            dc.fillCircle(x, y + 6, 2);
+        } else {
+            dc.setColor(Theme.COLOR_OK, Theme.COLOR_BG);
+            dc.fillCircle(x, y + 6, 5);
+        }
     }
 
 }

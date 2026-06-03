@@ -86,6 +86,15 @@ class PageChrome {
         return (sec / 86400).toString() + "d ago";
     }
 
+    // Faint arc at screen bottom — indicates OK/START does something on this page.
+    // Only call from pages whose onSelect() returns true.
+    static function drawSelectHint(dc) {
+        var cx = dc.getWidth() / 2;
+        dc.setPenWidth(2);
+        dc.setColor(Theme.COLOR_DIM, Graphics.COLOR_TRANSPARENT);
+        dc.drawArc(cx, dc.getHeight() - 20, 10, Graphics.ARC_CLOCKWISE, 200, 340);
+    }
+
     // Format a float to 1 decimal place (Monkey C lacks printf on all types).
     static function oneDecimal(f) {
         var whole = f.toNumber();

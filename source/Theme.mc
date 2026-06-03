@@ -4,7 +4,8 @@
 class Theme {
     static const COLOR_BG     = 0x111111; // --bg    near-black background
     static const COLOR_ACCENT = 0xE02020; // --red   M Performance red (bars, accents)
-    static const COLOR_TEXT   = 0xF5F5F5; // --text1 primary value text
+    static const COLOR_WHITE  = 0xFFFFFF; // pure white — hero primary values
+    static const COLOR_TEXT   = 0xF5F5F5; // --text1 secondary value text
     static const COLOR_MUTED  = 0xAAAAAA; // --text2 secondary / labels / unit
     static const COLOR_DIM    = 0x555555; // --text3 tertiary: headers, age, dots
     static const COLOR_WARN   = 0xE07020; // amber: low fuel / tyre low / unlocked

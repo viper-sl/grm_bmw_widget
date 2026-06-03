@@ -54,6 +54,7 @@ class PageTyres extends WatchUi.View {
         _cell(dc, colR, row2, "REAR R",  state, "tyrePressureRR", "tyreTargetRR");
 
         PageChrome.drawAge(dc, state);
+        PageChrome.drawSelectHint(dc);
     }
 
     // One tyre cell: position label over value. Showing actuals: green=OK / amber=LOW

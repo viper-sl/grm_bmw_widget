@@ -100,58 +100,54 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
 // Read-only "About car" key/value list — full basicData snapshot (all ~19 fields).
 // Curated, human-friendly fields first; the rest follow in catalogue order.
 class AboutMenu {
-    // NOTE: static const arrays are typed as Object at the Monkey C runtime,
-    // so .size() / [i] on them causes Symbol Not Found. All data is defined
-    // as local variables inside build() where the types are properly inferred.
+    // Key insight: every function parameter becomes Object in Monkey C, so
+    // passing 'about' (Dictionary) or string keys to any helper function loses
+    // type info and causes Symbol Not Found on hasKey / [] / indexOf.
+    // Solution: keep 'about' as a local var with the 'as Dictionary' type and
+    // inline every field directly in build() — no helper functions at all.
 
     static function build() {
-        var menu = new WatchUi.Menu2({ :title => "About car" });
+        var menu  = new WatchUi.Menu2({ :title => "About car" });
         var about = Application.Storage.getValue(StorageKeys.KEY_BASIC_DATA) as Lang.Dictionary or Null;
         if (about == null) {
             menu.addItem(new WatchUi.MenuItem("No data yet", "Refresh to load", null, null));
             return menu;
         }
-
-        // Curated display order: parallel local arrays (typed Array<String>).
-        var cKeys = [
-            "modelName", "series", "bodyType", "colourDescription", "engine",
-            "driveTrain", "propulsionType", "numberOfDoors", "steering",
-            "constructionDate", "countryCode", "hasNavi", "hasSunRoof",
-            "headUnit", "modelKey", "seriesDevt", "simStatus", "colourCodeRaw"
-        ];
-        var cLabels = [
-            "Model", "Series", "Body", "Colour", "Engine",
-            "Drive", "Propulsion", "Doors", "Steering",
-            "Built", "Country", "Navi", "Sunroof",
-            "Head unit", "Model key", "Platform", "SIM", "Colour code"
-        ];
-
-        // Show curated fields only — covers all known BMW basicData keys.
-        // Avoiding about.keys() iteration: the return type is Object at runtime,
-        // causing Symbol Not Found on .size() and array subscript.
-        var n = cKeys.size();
-        for (var i = 0; i < n; i++) {
-            var k = cKeys[i];
-            if (about.hasKey(k)) {
-                // about[k] returns Object — call toString() immediately to get
-                // a typed String so that indexOf/substring are available.
-                var raw = about[k];
-                var vs  = (raw == null) ? "" : raw.toString();
-                if (k.equals("constructionDate")) {
-                    var t = vs.indexOf("T");
-                    if (t > 0) { vs = vs.substring(0, t); }
-                }
-                _add(menu, cLabels[i], vs);
-            }
-        }
+        _row(menu, about, "modelName",         "Model",       false);
+        _row(menu, about, "series",            "Series",      false);
+        _row(menu, about, "bodyType",          "Body",        false);
+        _row(menu, about, "colourDescription", "Colour",      false);
+        _row(menu, about, "engine",            "Engine",      false);
+        _row(menu, about, "driveTrain",        "Drive",       false);
+        _row(menu, about, "propulsionType",    "Propulsion",  false);
+        _row(menu, about, "numberOfDoors",     "Doors",       false);
+        _row(menu, about, "steering",          "Steering",    false);
+        _row(menu, about, "constructionDate",  "Built",       true);
+        _row(menu, about, "countryCode",       "Country",     false);
+        _row(menu, about, "hasNavi",           "Navi",        false);
+        _row(menu, about, "hasSunRoof",        "Sunroof",     false);
+        _row(menu, about, "headUnit",          "Head unit",   false);
+        _row(menu, about, "modelKey",          "Model key",   false);
+        _row(menu, about, "seriesDevt",        "Platform",    false);
+        _row(menu, about, "simStatus",         "SIM",         false);
+        _row(menu, about, "colourCodeRaw",     "Colour code", false);
         return menu;
     }
 
-    static function _add(menu, label, value) {
-        // value arrives as Object — convert to String before any String method calls.
-        var vs = (value == null) ? "" : value.toString();
-        var v  = vs.equals("") ? "—" : vs;
-        menu.addItem(new WatchUi.MenuItem(label, v, null, null));
+    // about is Lang.Dictionary here (properly typed local in build()).
+    // Re-read it from Storage to ensure the type annotation carries through
+    // after being passed as a parameter — parameters lose type in Monkey C.
+    static function _row(menu, aboutIgnored, key, label, isDate) {
+        var about = Application.Storage.getValue(StorageKeys.KEY_BASIC_DATA) as Lang.Dictionary or Null;
+        if (about == null || !about.hasKey(key)) { return; }
+        var raw = about[key];
+        var vs  = (raw != null) ? raw.toString() : "—";
+        if (isDate) {
+            var t = vs.indexOf("T");
+            if (t > 0) { vs = vs.substring(0, t); }
+        }
+        if (vs.equals("")) { vs = "—"; }
+        menu.addItem(new WatchUi.MenuItem(label, vs, null, null));
     }
 }
 

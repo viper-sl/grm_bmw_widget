@@ -31,12 +31,15 @@ class QuotaGuard {
     }
 
     // Call when CarDataClient receives a CU-429 quota-exceeded response.
-    // Blocks all Data Fetches for 24 hours.
+    // Blocks until 4 AM local time the next day — quota resets at midnight and
+    // 4 AM gives BMW's systems time to fully flush the counter.
     static function onQuotaExceeded() {
-        Application.Storage.setValue(
-            StorageKeys.KEY_NEXT_ALLOWED,
-            Time.now().value() + 86400
-        );
+        // Time.today() returns local midnight of the current day as epoch seconds.
+        var todayAt4AM = Time.today().value() + 4 * 3600;
+        var blockUntil = (Time.now().value() < todayAt4AM)
+            ? todayAt4AM              // before 4 AM today → unblock at 4 AM today
+            : todayAt4AM + 86400;    // after  4 AM today → unblock at 4 AM tomorrow
+        Application.Storage.setValue(StorageKeys.KEY_NEXT_ALLOWED, blockUntil);
     }
 
 }

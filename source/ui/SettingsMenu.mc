@@ -126,7 +126,11 @@ class AboutMenu {
             "Head unit", "Model key", "Platform", "SIM", "Colour code"
         ];
 
-        for (var i = 0; i < cKeys.size(); i++) {
+        // Show curated fields only — covers all known BMW basicData keys.
+        // Avoiding about.keys() iteration: the return type is Object at runtime,
+        // causing Symbol Not Found on .size() and array subscript.
+        var n = cKeys.size();
+        for (var i = 0; i < n; i++) {
             var k = cKeys[i];
             if (about.hasKey(k)) {
                 var v = about[k];
@@ -137,23 +141,7 @@ class AboutMenu {
                 _add(menu, cLabels[i], v);
             }
         }
-
-        // Any remaining fields not in the curated set (skip fullSAList and brand).
-        var keys = about.keys();
-        for (var j = 0; j < keys.size(); j++) {
-            var kk = keys[j];
-            if (!kk.equals("fullSAList") && !kk.equals("brand") && !_isCurated(kk, cKeys)) {
-                _add(menu, kk, about[kk]);
-            }
-        }
         return menu;
-    }
-
-    static function _isCurated(key, cKeys) {
-        for (var i = 0; i < cKeys.size(); i++) {
-            if (cKeys[i].equals(key)) { return true; }
-        }
-        return false;
     }
 
     static function _add(menu, label, value) {

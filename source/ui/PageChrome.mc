@@ -138,9 +138,8 @@ class PageChrome {
     // Navigation dots on left edge — reads rank/count from PageNav so dots are
     // always evenly spaced across visible pages only (no phantom gap for hidden pages).
     static function drawNavDots(dc) {
-        var info  = PageNav.visibleInfo();
-        var total = info[0];
-        var rank  = info[1];
+        var total = PageNav.visibleCount();
+        var rank  = PageNav.activeRank();
         if (total <= 1) { return; }
         var dotR    = 3;
         var spacing = 10;

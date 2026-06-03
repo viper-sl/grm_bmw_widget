@@ -100,20 +100,9 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
 // Read-only "About car" key/value list — full basicData snapshot (all ~19 fields).
 // Curated, human-friendly fields first; the rest follow in catalogue order.
 class AboutMenu {
-    // Two parallel flat arrays — avoids nested-array subscript type errors in Monkey C.
-    // Accessing _KEYS[i] gives a String directly; _LABELS[i] likewise.
-    static const _KEYS = [
-        "modelName", "series", "bodyType", "colourDescription", "engine",
-        "driveTrain", "propulsionType", "numberOfDoors", "steering",
-        "constructionDate", "countryCode", "hasNavi", "hasSunRoof",
-        "headUnit", "modelKey", "seriesDevt", "simStatus", "colourCodeRaw"
-    ];
-    static const _LABELS = [
-        "Model", "Series", "Body", "Colour", "Engine",
-        "Drive", "Propulsion", "Doors", "Steering",
-        "Built", "Country", "Navi", "Sunroof",
-        "Head unit", "Model key", "Platform", "SIM", "Colour code"
-    ];
+    // NOTE: static const arrays are typed as Object at the Monkey C runtime,
+    // so .size() / [i] on them causes Symbol Not Found. All data is defined
+    // as local variables inside build() where the types are properly inferred.
 
     static function build() {
         var menu = new WatchUi.Menu2({ :title => "About car" });
@@ -122,33 +111,47 @@ class AboutMenu {
             menu.addItem(new WatchUi.MenuItem("No data yet", "Refresh to load", null, null));
             return menu;
         }
-        // Curated fields first (only those present in basicData).
-        for (var i = 0; i < _KEYS.size(); i++) {
-            var k = _KEYS[i];
+
+        // Curated display order: parallel local arrays (typed Array<String>).
+        var cKeys = [
+            "modelName", "series", "bodyType", "colourDescription", "engine",
+            "driveTrain", "propulsionType", "numberOfDoors", "steering",
+            "constructionDate", "countryCode", "hasNavi", "hasSunRoof",
+            "headUnit", "modelKey", "seriesDevt", "simStatus", "colourCodeRaw"
+        ];
+        var cLabels = [
+            "Model", "Series", "Body", "Colour", "Engine",
+            "Drive", "Propulsion", "Doors", "Steering",
+            "Built", "Country", "Navi", "Sunroof",
+            "Head unit", "Model key", "Platform", "SIM", "Colour code"
+        ];
+
+        for (var i = 0; i < cKeys.size(); i++) {
+            var k = cKeys[i];
             if (about.hasKey(k)) {
                 var v = about[k];
-                // Strip time component: "2024-03-05T00:00:00.000+0000" → "2024-03-05"
                 if (k.equals("constructionDate") && v != null) {
                     var t = v.indexOf("T");
                     if (t > 0) { v = v.substring(0, t); }
                 }
-                _add(menu, _LABELS[i], v);
+                _add(menu, cLabels[i], v);
             }
         }
-        // Any remaining fields not already shown (skip fullSAList, brand, curated).
+
+        // Any remaining fields not in the curated set (skip fullSAList and brand).
         var keys = about.keys();
         for (var j = 0; j < keys.size(); j++) {
             var kk = keys[j];
-            if (!kk.equals("fullSAList") && !kk.equals("brand") && !_isCurated(kk)) {
+            if (!kk.equals("fullSAList") && !kk.equals("brand") && !_isCurated(kk, cKeys)) {
                 _add(menu, kk, about[kk]);
             }
         }
         return menu;
     }
 
-    static function _isCurated(key) {
-        for (var i = 0; i < _KEYS.size(); i++) {
-            if (_KEYS[i].equals(key)) { return true; }
+    static function _isCurated(key, cKeys) {
+        for (var i = 0; i < cKeys.size(); i++) {
+            if (cKeys[i].equals(key)) { return true; }
         }
         return false;
     }

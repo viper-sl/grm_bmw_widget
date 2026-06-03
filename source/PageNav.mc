@@ -41,17 +41,26 @@ class PageNav {
         return false;
     }
 
-    // [visibleTotal, activeRank] for nav dots.
-    static function visibleInfo() {
-        if (_pages == null) { return [0, 0]; }
-        var total = 0;
-        var rank  = 0;
+    // Number of visible pages (for nav dots sizing).
+    static function visibleCount() {
+        if (_pages == null) { return 0; }
+        var n = 0;
+        for (var i = 0; i < _pages.size(); i++) {
+            if (_pages[i].isVisible()) { n++; }
+        }
+        return n;
+    }
+
+    // 0-based rank of the current page among visible pages (for active dot).
+    static function activeRank() {
+        if (_pages == null) { return 0; }
+        var rank = 0;
         for (var i = 0; i < _pages.size(); i++) {
             if (!_pages[i].isVisible()) { continue; }
-            if (i == _idx) { rank = total; }
-            total++;
+            if (i == _idx) { return rank; }
+            rank++;
         }
-        return [total, rank];
+        return 0;
     }
 
     static function _firstVisible() {

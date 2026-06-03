@@ -38,7 +38,7 @@ class PageLock extends WatchUi.View {
 
         // Lock status hero text (y=52)
         var locked = state.hasKey("doorsLocked") ? state["doorsLocked"] : true;
-        dc.setColor(locked ? Theme.COLOR_OK : Theme.COLOR_WARN, Theme.COLOR_BG);
+        dc.setColor(locked ? Theme.COLOR_OK_HI : Theme.COLOR_WARN, Theme.COLOR_BG);
         dc.drawText(cx, 52, Graphics.FONT_SMALL, locked ? "SECURED" : "UNLOCKED",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
@@ -64,7 +64,7 @@ class PageLock extends WatchUi.View {
     }
 
     function _cell(dc, x, y, name, state, key) {
-        dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+        dc.setColor(Theme.COLOR_WHITE, Theme.COLOR_BG);
         dc.drawText(x, y - 9, Graphics.FONT_XTINY, name,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 

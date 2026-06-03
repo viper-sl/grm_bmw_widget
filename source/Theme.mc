@@ -9,6 +9,7 @@ class Theme {
     static const COLOR_MUTED  = 0xAAAAAA; // --text2 secondary / labels / unit
     static const COLOR_DIM    = 0x555555; // --text3 tertiary: headers, age, dots
     static const COLOR_WARN   = 0xE07020; // amber: low fuel / tyre low / unlocked
-    static const COLOR_OK     = 0x4CAF50; // green: all-clear / good
+    static const COLOR_OK     = 0x4CAF50; // green: all-clear / good (dots, bars)
+    static const COLOR_OK_HI  = 0x69F0AE; // bright green: hero status text (SECURED)
     static const COLOR_ERROR  = 0xE02020; // red: critical / open (= ACCENT)
 }

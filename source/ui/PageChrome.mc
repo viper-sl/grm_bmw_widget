@@ -124,15 +124,15 @@ class PageChrome {
         }
     }
 
-    // Legacy drawSelectHint for pages without data refresh (e.g. Tyres toggle).
+    // Chevron for toggle pages (Tyres) — same 2 o'clock position as drawRefreshHint.
     static function drawSelectHint(dc) {
-        var hy  = dc.getHeight() / 2;
-        var tip = dc.getWidth() - 5;
-        var arm = tip - 12;
+        var hy  = dc.getHeight() / 4;   // 2 o'clock ≈ 65 px on 260 px screen
+        var tip = dc.getWidth() - 22;
+        var arm = tip - 10;
         dc.setPenWidth(2);
         dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(arm, hy - 8, tip, hy);
-        dc.drawLine(tip, hy, arm, hy + 8);
+        dc.drawLine(arm, hy - 7, tip, hy);
+        dc.drawLine(tip, hy, arm, hy + 7);
     }
 
     // Format a float to 1 decimal place (Monkey C lacks printf on all types).

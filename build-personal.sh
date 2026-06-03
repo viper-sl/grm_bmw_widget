@@ -33,8 +33,15 @@ fi
 
 mkdir -p bin
 
+# Normalise single-dash aliases (-iq, -device) to double-dash form.
+ARG="${1:-}"
+case "$ARG" in
+  -iq)     ARG="--iq"     ;;
+  -device) ARG="--device" ;;
+esac
+
 # ── --device: real watch sideload .prg ──────────────────────────────────────
-if [ "${1:-}" == "--device" ]; then
+if [ "$ARG" == "--device" ]; then
   OUT="bin/BMWWIDGET.PRG"
   echo "Building DEVICE release build → $OUT  (target: $DEVICE)"
   java -jar "$SDK/bin/monkeybrains.jar" \
@@ -64,7 +71,7 @@ if [ "${1:-}" == "--device" ]; then
 fi
 
 # ── --iq: signed distribution package (separate app ID, no personal resources) ──
-if [ "${1:-}" == "--iq" ]; then
+if [ "$ARG" == "--iq" ]; then
   OUT="bin/BMWWIDGET.iq"
   echo "Building IQ distribution package → $OUT"
   echo "  App ID : 0a54403f6fef458a96fca6f8a147f299  (manifest-iq.xml)"

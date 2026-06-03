@@ -20,8 +20,8 @@ class SettingsMenu {
         menu.addItem(new WatchUi.MenuItem(
             "Update Mode", modeLabel(), :updateMode, null));
 
-        var tank = Application.Properties.getValue("tankLitres");
-        if (tank == null) { tank = 52; }
+        var tankProp = Application.Properties.getValue("tankLitres");
+        var tank = (tankProp != null) ? tankProp : 52;
         menu.addItem(new WatchUi.MenuItem(
             "Tank Size", tank.toString() + " L", :tankSize, null));
 

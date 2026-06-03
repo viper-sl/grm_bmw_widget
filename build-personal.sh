@@ -81,8 +81,8 @@ fi
 OUT="bin/personal.prg"
 echo "Building SIM release build → $OUT  (target: ${DEVICE}_sim)"
 java -jar "$SDK/bin/monkeybrains.jar" \
-  -o "$OUT" -f "$JUNGLE" -y "$KEY" -d "${DEVICE}_sim" -w -r 2>&1 \
-  | grep -v "^WARNING:.*Invalid device id found"
+  -o "$OUT" -f "$JUNGLE" -y "$KEY" -d "${DEVICE}_sim" -r 2>&1 \
+  | grep -v "^WARNING:"
 
 # Launch simulator if not already running, then wait for it to accept connections.
 SIM_APP="$SDK/bin/ConnectIQ.app"

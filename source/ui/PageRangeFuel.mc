@@ -12,21 +12,16 @@ class PageRangeFuel extends WatchUi.View {
     static const FUEL_MODE_LITERS  = 1;
 
     var _fuelMode;
-    var _cache;
-    var _cacheKey;   // lastUpdated * 10 + _fuelMode
 
     function initialize() {
         View.initialize();
         var saved = Application.Storage.getValue("fuelDisplayMode");
         _fuelMode = (saved != null) ? saved : FUEL_MODE_PERCENT;
-        _cache    = null;
-        _cacheKey = null;
     }
 
     function onSelect() {
         _fuelMode = (_fuelMode == FUEL_MODE_PERCENT) ? FUEL_MODE_LITERS : FUEL_MODE_PERCENT;
         Application.Storage.setValue("fuelDisplayMode", _fuelMode);
-        _cache = null; // invalidate cache on mode toggle
         WatchUi.requestUpdate();
         return true;
     }
@@ -36,48 +31,12 @@ class PageRangeFuel extends WatchUi.View {
         return state != null && state.hasKey("rangeKm") && state.hasKey("fuelPercent");
     }
 
-    // Returns cached bitmap, re-rendering if data or mode changed.
-    function getCachedBitmap(dc) {
-        var state = VehicleCache.read();
-        if (state == null) { return null; }
-        var epoch = state.hasKey("lastUpdated") ? state["lastUpdated"] : 0;
-        var key   = epoch * 10 + _fuelMode;
-        if (_cache == null || key != _cacheKey) {
-            _renderToCache(state);
-            _cacheKey = key;
-        }
-        return _cache;
-    }
-
     function onUpdate(dc) {
         dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
         dc.clear();
         var state = VehicleCache.read();
         if (state == null) { return; }
-        var bmp = getCachedBitmap(dc);
-        if (bmp != null) {
-            PageChrome.blitBuffer(dc, 0, 0, bmp);
-        } else {
-            _renderDirect(dc, state);
-        }
-    }
-
-    function _renderToCache(state) {
-        var w = System.getDeviceSettings().screenWidth;
-        var h = System.getDeviceSettings().screenHeight;
-        var bdc;
-        if (Graphics has :createBufferedBitmap) {
-            _cache = Graphics.createBufferedBitmap({:width => w, :height => h});
-            var locked = _cache.get();
-            if (locked == null) { _cache = null; return; }
-            bdc = locked.getDc();
-        } else {
-            _cache = new Graphics.BufferedBitmap({:width => w, :height => h});
-            bdc = _cache.getDc();
-        }
-        bdc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
-        bdc.clear();
-        _renderDirect(bdc, state);
+        _renderDirect(dc, state);
     }
 
     function _renderDirect(dc, state) {

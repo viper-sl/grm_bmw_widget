@@ -6,14 +6,7 @@ using Toybox.WatchUi;
 
 class PageOdometer extends WatchUi.View {
 
-    var _cache;
-    var _cacheKey;
-
-    function initialize() {
-        View.initialize();
-        _cache    = null;
-        _cacheKey = null;
-    }
+    function initialize() { View.initialize(); }
 
     function onSelect() { return false; }
 
@@ -22,46 +15,12 @@ class PageOdometer extends WatchUi.View {
         return state != null && state.hasKey("odometerKm");
     }
 
-    function getCachedBitmap(dc) {
-        var state = VehicleCache.read();
-        if (state == null) { return null; }
-        var key = state.hasKey("lastUpdated") ? state["lastUpdated"] : 0;
-        if (_cache == null || key != _cacheKey) {
-            _renderToCache(state);
-            _cacheKey = key;
-        }
-        return _cache;
-    }
-
     function onUpdate(dc) {
         dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
         dc.clear();
         var state = VehicleCache.read();
         if (state == null) { return; }
-        var bmp = getCachedBitmap(dc);
-        if (bmp != null) {
-            PageChrome.blitBuffer(dc, 0, 0, bmp);
-        } else {
-            _renderDirect(dc, state);
-        }
-    }
-
-    function _renderToCache(state) {
-        var w = System.getDeviceSettings().screenWidth;
-        var h = System.getDeviceSettings().screenHeight;
-        var bdc;
-        if (Graphics has :createBufferedBitmap) {
-            _cache = Graphics.createBufferedBitmap({:width => w, :height => h});
-            var locked = _cache.get();
-            if (locked == null) { _cache = null; return; }
-            bdc = locked.getDc();
-        } else {
-            _cache = new Graphics.BufferedBitmap({:width => w, :height => h});
-            bdc = _cache.getDc();
-        }
-        bdc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
-        bdc.clear();
-        _renderDirect(bdc, state);
+        _renderDirect(dc, state);
     }
 
     function _renderDirect(dc, state) {
@@ -78,10 +37,8 @@ class PageOdometer extends WatchUi.View {
         if (state.hasKey("serviceDistanceKm")) {
             var svcKm = state["serviceDistanceKm"];
             var svcColor = _serviceColor(svcKm);
-
             var pct = svcKm.toFloat() / 5000.0;
             PageChrome.drawBar(dc, pct, cy + 44, svcColor);
-
             dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
             dc.drawText(cx, cy + 58, Graphics.FONT_XTINY,
                 "SERVICE IN " + _short(svcKm),

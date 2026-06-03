@@ -1,25 +1,20 @@
 // Page: Tyres compact — matches UX mock page 5.
-// Header "BMW 218i · Tyres" · 2x2 grid: position (muted) / bar value (white) / OK|LOW status.
-// Warning (amber "LOW") if actual < target - 0.2 bar.
+// Header "BMW 218i · Tyres" · 2x2 grid: position (muted) / value / OK|LOW status.
+// Warning (amber "LOW") if actual < target - 0.2 bar. OK toggles actual ↔ target.
 using Toybox.Graphics;
 using Toybox.WatchUi;
 
 class PageTyres extends WatchUi.View {
 
-    var _showTarget;   // false = actual pressures, true = target pressures
-    var _cache;
-    var _cacheKey;     // lastUpdated * 10 + (_showTarget ? 1 : 0)
+    var _showTarget;
 
     function initialize() {
         View.initialize();
         _showTarget = false;
-        _cache      = null;
-        _cacheKey   = null;
     }
 
     function onSelect() {
         _showTarget = !_showTarget;
-        _cache = null; // invalidate cache on mode toggle
         WatchUi.requestUpdate();
         return true;
     }
@@ -29,47 +24,12 @@ class PageTyres extends WatchUi.View {
         return state != null && state.hasKey("tyrePressureFL");
     }
 
-    function getCachedBitmap(dc) {
-        var state = VehicleCache.read();
-        if (state == null) { return null; }
-        var epoch = state.hasKey("lastUpdated") ? state["lastUpdated"] : 0;
-        var key   = epoch * 10 + (_showTarget ? 1 : 0);
-        if (_cache == null || key != _cacheKey) {
-            _renderToCache(state);
-            _cacheKey = key;
-        }
-        return _cache;
-    }
-
     function onUpdate(dc) {
         dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
         dc.clear();
         var state = VehicleCache.read();
         if (state == null) { return; }
-        var bmp = getCachedBitmap(dc);
-        if (bmp != null) {
-            PageChrome.blitBuffer(dc, 0, 0, bmp);
-        } else {
-            _renderDirect(dc, state);
-        }
-    }
-
-    function _renderToCache(state) {
-        var w = System.getDeviceSettings().screenWidth;
-        var h = System.getDeviceSettings().screenHeight;
-        var bdc;
-        if (Graphics has :createBufferedBitmap) {
-            _cache = Graphics.createBufferedBitmap({:width => w, :height => h});
-            var locked = _cache.get();
-            if (locked == null) { _cache = null; return; }
-            bdc = locked.getDc();
-        } else {
-            _cache = new Graphics.BufferedBitmap({:width => w, :height => h});
-            bdc = _cache.getDc();
-        }
-        bdc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
-        bdc.clear();
-        _renderDirect(bdc, state);
+        _renderDirect(dc, state);
     }
 
     function _renderDirect(dc, state) {

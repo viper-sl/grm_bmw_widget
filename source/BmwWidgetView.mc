@@ -1,7 +1,8 @@
 // Main widget view — page manager with isVisible() skip navigation.
 // Pages: [PageVehicle(hidden), PageRangeFuel, PageLock, PageOdometer, PageTyres]
 // Navigation dots drawn on left edge. Re-link prompt when NEEDS_REBOOTSTRAP.
-// Slide animation: Timer ease-out blit of cached from/to pages on page change.
+// Slide animation: vertical ease-out. Two buffers pre-rendered at transition
+// start so animation frames are pure blits (fast on slow Fenix 6 CPU).
 using Toybox.Application;
 using Toybox.Graphics;
 using Toybox.Timer;
@@ -17,10 +18,13 @@ class BmwWidgetView extends WatchUi.View {
 
     // Animation state
     var _animTimer;
-    var _animOffset;   // pixels remaining to slide (positive = in progress)
-    var _animDir;      // -1 = next (slide left), +1 = prev (slide right)
-    var _animPrevIdx;  // page index we are sliding away from (-1 = not animating)
+    var _animOffset;   // pixels remaining (decays to 0)
+    var _animDir;      // -1 = next/DOWN (exits up), +1 = prev/UP (exits down)
+    var _animPrevIdx;  // -1 = not animating
+    var _animFromBuf;  // pre-rendered bitmap of the departing page
+    var _animToBuf;    // pre-rendered bitmap of the arriving page
     var _screenW;
+    var _screenH;
 
     function initialize() {
         View.initialize();
@@ -38,7 +42,11 @@ class BmwWidgetView extends WatchUi.View {
         _animOffset      = 0;
         _animDir         = -1;
         _animPrevIdx     = -1;
-        _screenW = System.getDeviceSettings().screenWidth;
+        _animFromBuf     = null;
+        _animToBuf       = null;
+        var s = System.getDeviceSettings();
+        _screenW = s.screenWidth;
+        _screenH = s.screenHeight;
     }
 
     function retryAutoSync() {
@@ -89,18 +97,14 @@ class BmwWidgetView extends WatchUi.View {
             _pageIdx = _firstVisibleIndex();
         }
 
-        if (_animPrevIdx >= 0) {
-            // Slide animation geometry (offset decays screenW→0):
-            //   fromX = dir*(screenW-offset): starts at 0, exits in dir direction
-            //   toX   = dir*(-offset):        starts at ∓screenW, arrives at 0
-            var fromX = _animDir * (_screenW - _animOffset);
-            var toX   = _animDir * (-_animOffset);
-            if (_animPrevIdx < _pages.size() && (_pages[_animPrevIdx] has :getCachedBitmap)) {
-                PageChrome.blitBuffer(dc, fromX, 0, _pages[_animPrevIdx].getCachedBitmap(dc));
-            }
-            if (_pageIdx >= 0 && _pageIdx < _pages.size()) {
-                PageChrome.blitBuffer(dc, toX, 0, _pages[_pageIdx].getCachedBitmap(dc));
-            }
+        if (_animPrevIdx >= 0 && _animFromBuf != null && _animToBuf != null) {
+            // Vertical slide — same geometry as horizontal but on Y axis:
+            //   fromY = dir*(screenH-offset): starts at 0, exits in dir direction
+            //   toY   = dir*(-offset):        starts at ∓screenH, arrives at 0
+            var fromY = _animDir * (_screenH - _animOffset);
+            var toY   = _animDir * (-_animOffset);
+            PageChrome.blitBuffer(dc, 0, fromY, _animFromBuf);
+            PageChrome.blitBuffer(dc, 0, toY,   _animToBuf);
         } else if (_pageIdx >= 0 && _pageIdx < _pages.size()) {
             _pages[_pageIdx].onUpdate(dc);
         }
@@ -136,22 +140,56 @@ class BmwWidgetView extends WatchUi.View {
         return false;
     }
 
+    // Render one page into a new BufferedBitmap. Returns null on OOM.
+    function _renderPageToBuffer(page) {
+        var buf;
+        var bdc;
+        if (Graphics has :createBufferedBitmap) {
+            buf = Graphics.createBufferedBitmap({:width => _screenW, :height => _screenH});
+            var locked = buf.get();
+            if (locked == null) { return null; }
+            bdc = locked.getDc();
+        } else {
+            buf = new Graphics.BufferedBitmap({:width => _screenW, :height => _screenH});
+            bdc = buf.getDc();
+        }
+        bdc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
+        bdc.clear();
+        page.onUpdate(bdc);
+        return buf;
+    }
+
     function _startAnimation(fromIdx, toIdx, dir) {
         if (_animTimer != null) {
             _animTimer.stop();
             _animTimer = null;
         }
+
+        // Pre-render departing and arriving pages into buffers.
+        // If either fails (OOM), skip animation and switch instantly.
+        var from = _renderPageToBuffer(_pages[fromIdx]);
+        var to   = _renderPageToBuffer(_pages[toIdx]);
+        if (from == null || to == null) {
+            _pageIdx     = toIdx;
+            _animPrevIdx = -1;
+            WatchUi.requestUpdate();
+            return;
+        }
+
+        _animFromBuf = from;
+        _animToBuf   = to;
         _animPrevIdx = fromIdx;
         _pageIdx     = toIdx;
-        _animOffset  = _screenW;
+        _animOffset  = _screenH;
         _animDir     = dir;
         _animTimer   = new Timer.Timer();
         _animTimer.start(method(:_onAnimTick), 33, true);
         WatchUi.requestUpdate();
     }
 
+    // Faster decay for Fenix 6: ~25% remaining per tick → 5 ticks ≈ 165 ms
     function _onAnimTick() as Void {
-        _animOffset = (_animOffset * 65) / 100;
+        _animOffset = (_animOffset * 25) / 100;
         if (_animOffset < 2) {
             _finishAnimation();
             return;
@@ -166,6 +204,8 @@ class BmwWidgetView extends WatchUi.View {
         }
         _animOffset  = 0;
         _animPrevIdx = -1;
+        _animFromBuf = null;
+        _animToBuf   = null;
         WatchUi.requestUpdate();
     }
 

@@ -62,21 +62,14 @@ class PageChrome {
         dc.fillRectangle(barX, y, (barW * pct).toNumber(), barH);
     }
 
-    // Data-age line at the bottom (mock: .page-age). Stale → amber prefix.
-    // "lastUpdated" is the CAR's last report time (max telematic timestamp), not the
-    // fetch time — a parked car reports infrequently, so only flag >24h as stale.
-    static const STALE_SECONDS = 259200; // 3 days — parked cars routinely report 1-2d old
+    // Data-age line near the bottom. Always shown in DIM — a parked car's
+    // 1-3d old data is normal, not an error condition requiring orange.
     static function drawAge(dc, state) {
         if (state == null || !state.hasKey("lastUpdated")) { return; }
         var ageSec = Time.now().value() - state["lastUpdated"];
-        var str = _ageString(ageSec);
-        var color = Theme.COLOR_DIM;   // mock .page-age = --text3
-        if (ageSec > STALE_SECONDS) {
-            str = "! " + str;
-            color = Theme.COLOR_WARN;
-        }
-        dc.setColor(color, Theme.COLOR_BG);
-        dc.drawText(dc.getWidth() / 2, dc.getHeight() - 44, Graphics.FONT_XTINY, str,
+        dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
+        dc.drawText(dc.getWidth() / 2, dc.getHeight() - 22, Graphics.FONT_XTINY,
+            _ageString(ageSec),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
@@ -103,13 +96,16 @@ class PageChrome {
     // isRefreshing=true tints the icon area amber while a sync is in flight.
     // Only call from pages whose onSelect() triggers a data refresh.
     static function drawRefreshHint(dc, isRefreshing) {
-        var hy = dc.getHeight() / 2;   // center = START button at 3 o'clock
+        // 2 o'clock position: y = h/4 ≈ 65px on a 260px screen.
+        // At y=65 the circular screen right edge ≈ x=243 (vs 260 at centre).
+        // Use inset=19 so a 20px icon's right edge lands at ~241, inside the circle.
+        var hy = dc.getHeight() / 4;
         var icon = null;
         try { icon = WatchUi.loadResource(Rez.Drawables.RefreshIcon); } catch (e) {}
         if (icon != null) {
             var iw = icon.getWidth();
             var ih = icon.getHeight();
-            var ix = dc.getWidth() - iw - 4;   // 4 px gap from screen edge
+            var ix = dc.getWidth() - iw - 19;  // right edge at ~241 px (inside circle at y=65)
             var iy = hy - ih / 2;
             if (isRefreshing) {
                 dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
@@ -117,17 +113,18 @@ class PageChrome {
             }
             dc.drawBitmap(ix, iy, icon);
         } else {
-            var tip = dc.getWidth() - 5;
-            var arm = tip - 12;
+            // Fallback chevron — same 2-o'clock position
+            var tip = dc.getWidth() - 22;
+            var arm = tip - 10;
             dc.setPenWidth(2);
             dc.setColor(isRefreshing ? Theme.COLOR_WARN : Theme.COLOR_MUTED,
                         Graphics.COLOR_TRANSPARENT);
-            dc.drawLine(arm, hy - 8, tip, hy);
-            dc.drawLine(tip, hy, arm, hy + 8);
+            dc.drawLine(arm, hy - 7, tip, hy);
+            dc.drawLine(tip, hy, arm, hy + 7);
         }
     }
 
-    // Keep legacy drawSelectHint for pages without data refresh (Tyres page toggle).
+    // Legacy drawSelectHint for pages without data refresh (e.g. Tyres toggle).
     static function drawSelectHint(dc) {
         var hy  = dc.getHeight() / 2;
         var tip = dc.getWidth() - 5;

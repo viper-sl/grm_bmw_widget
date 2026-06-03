@@ -106,9 +106,8 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
 
         if (state.hasKey("lastUpdated")) {
             var ageSec = Time.now().value() - state["lastUpdated"];
-            var ageStr = _ageString(ageSec);
-            dc.setColor(stale ? Theme.COLOR_WARN : Theme.COLOR_DIM, Theme.COLOR_BG);
-            dc.drawText(rightX, row3Y, font, (stale ? "! " : "") + ageStr,
+            dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
+            dc.drawText(rightX, row3Y, font, _ageString(ageSec),
                 Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
         }
     }

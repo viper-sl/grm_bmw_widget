@@ -80,6 +80,27 @@ device build is signed with your `developer_key`.
 (If the app doesn't appear, confirm the file is directly in `GARMIN/APPS/`, not a
 subfolder, and that there's free space.)
 
+### ⚠ Installed but never appears in the widget list (ghost entry)
+
+If a build with an **unsupported permission** was ever sideloaded (e.g. a build that
+requested `PersistedContent`, which the fēnix 6 firmware does not support), the watch
+**registers the app but refuses to load it** — leaving a "ghost": a `SETTINGS/<name>.SET`
+with no executable, and a registry entry with version 0. This ghost then **blocks**
+clean reinstalls.
+
+The widget dump shows it: the app appears in `GARMIN/APPS/OUT.BIN` (the master app
+registry) with the right app id and name but `version=00` and no `DATA/<name>.*`.
+
+Recover:
+1. Delete the ghost settings file on the watch: `GARMIN/APPS/SETTINGS/<name>.SET`
+   (it was named after the .prg you copied, e.g. `release.SET`).
+2. **Restart the watch** (power off/on) — the registry is cached in firmware; a restart
+   forces a re-scan and drops the dead entry.
+3. Copy the current `bin/BMWWIDGET.PRG` into `GARMIN/APPS/` and **safe-eject**.
+
+The widget only ever needs **Communications + Background** permissions (both supported
+on fēnix 6). Never add `PersistedContent` or other unsupported permissions.
+
 ### ⚠ Stuck on "Press START to connect" after install?
 
 This means the app is reading an **empty clientId** — almost always from **stale

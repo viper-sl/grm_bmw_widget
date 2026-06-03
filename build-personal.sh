@@ -29,7 +29,9 @@ if [ ! -f "$KEY" ]; then
 fi
 
 if [ "${1:-}" == "--device" ]; then
-  OUT="bin/personal-device.prg"
+  # Output named BMWWIDGET.PRG (not "release.prg") to avoid colliding with a stale
+  # ghost registry entry the watch may have keyed by the old filename.
+  OUT="bin/BMWWIDGET.PRG"
   echo "Building DEVICE release build → $OUT  (target: $DEVICE)"
   # Matches the known-good manual command: -d fenix6pro (real target, NOT _sim) -r.
   java -jar "$SDK/bin/monkeybrains.jar" \

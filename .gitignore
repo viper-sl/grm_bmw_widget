@@ -43,3 +43,7 @@ CIQ_LOG.*
 
 # Personal build source (real clientId) — NEVER commit
 source-personal/
+bin/BMWWIDGET.PRG
+
+# Watch dump (debugging) — not source
+temp/

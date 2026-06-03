@@ -1,25 +1,36 @@
 <?xml version="1.0"?>
 <settings>
-  <setting propertyKey="@Properties.clientId" title="@Strings.ClientIdLabel">
-    <settingConfig type="alphaNumeric"/>
-  </setting>
-  <setting propertyKey="@Properties.vin" title="@Strings.VinLabel">
-    <settingConfig type="alphaNumeric"/>
-  </setting>
-  <setting propertyKey="@Properties.containerId" title="@Strings.ContainerIdLabel">
-    <settingConfig type="alphaNumeric"/>
-  </setting>
-  <setting propertyKey="@Properties.refreshToken" title="@Strings.RefreshTokenLabel">
-    <settingConfig type="alphaNumeric"/>
-  </setting>
-  <setting propertyKey="@Properties.tankLitres" title="@Strings.TankLitresLabel">
-    <settingConfig type="numeric" min="20" max="120"/>
-  </setting>
-  <setting propertyKey="@Properties.updateMode" title="@Strings.UpdateModeLabel">
-    <settingConfig type="list">
-      <listEntry value="0">@Strings.UpdateModeManual</listEntry>
-      <listEntry value="1">@Strings.UpdateModeAuto</listEntry>
-      <listEntry value="2">@Strings.UpdateModeAdaptive</listEntry>
-    </settingConfig>
-  </setting>
+
+  <!-- ── Required ────────────────────────────────────────────────────── -->
+  <group id="required" title="@Strings.GroupRequired">
+    <setting propertyKey="@Properties.clientId" title="@Strings.ClientIdLabel">
+      <settingConfig type="alphaNumeric"/>
+    </setting>
+  </group>
+
+  <!-- ── Optional ─────────────────────────────────────────────────────
+       VIN, containerId and refreshToken are auto-discovered on first run.
+       Tank size and update mode control widget behaviour.              -->
+  <group id="optional" title="@Strings.GroupOptional">
+    <setting propertyKey="@Properties.vin" title="@Strings.VinLabel">
+      <settingConfig type="alphaNumeric"/>
+    </setting>
+    <setting propertyKey="@Properties.containerId" title="@Strings.ContainerIdLabel">
+      <settingConfig type="alphaNumeric"/>
+    </setting>
+    <setting propertyKey="@Properties.refreshToken" title="@Strings.RefreshTokenLabel">
+      <settingConfig type="alphaNumeric"/>
+    </setting>
+    <setting propertyKey="@Properties.tankLitres" title="@Strings.TankLitresLabel">
+      <settingConfig type="numeric" min="20" max="120"/>
+    </setting>
+    <setting propertyKey="@Properties.updateMode" title="@Strings.UpdateModeLabel">
+      <settingConfig type="list">
+        <listEntry value="0">@Strings.UpdateModeManual</listEntry>
+        <listEntry value="1">@Strings.UpdateModeAuto</listEntry>
+        <listEntry value="2">@Strings.UpdateModeAdaptive</listEntry>
+      </settingConfig>
+    </setting>
+  </group>
+
 </settings>

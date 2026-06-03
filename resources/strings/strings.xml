@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <strings>
   <string id="AppName">BMW Status</string>
+  <string id="GroupRequired">Required</string>
+  <string id="GroupOptional">Optional</string>
   <string id="ClientIdLabel">BMW Client ID</string>
   <string id="VinLabel">Vehicle VIN</string>
   <string id="ContainerIdLabel">Container ID</string>

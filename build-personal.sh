@@ -63,14 +63,16 @@ if [ "${1:-}" == "--device" ]; then
   exit 0
 fi
 
-# ── --iq: signed application package for all installed devices ───────────────
+# ── --iq: signed distribution package (separate app ID, no personal resources) ──
 if [ "${1:-}" == "--iq" ]; then
   OUT="bin/BMWWIDGET.iq"
-  echo "Building IQ package → $OUT  (all installed devices)"
+  echo "Building IQ distribution package → $OUT"
+  echo "  App ID : 0a54403f6fef458a96fca6f8a147f299  (manifest-iq.xml)"
+  echo "  Local  : 7f673698b206464a8e918654edcfeb6c  (manifest.xml / livetest)"
   java -jar "$SDK/bin/monkeybrains.jar" \
-    -o "$OUT" -f "$JUNGLE" -y "$KEY" -e -r 2>&1 \
+    -o "$OUT" -f "iq.jungle" -y "$KEY" -e -r 2>&1 \
     | grep -v "^WARNING:.*Invalid device id found"
-  echo "✓ Built $OUT"
+  echo "✓ Built $OUT  — can coexist on watch with the personal sideload build"
   echo "  Sideload via the Connect IQ phone app → My Device Apps → Sideload Widget."
   exit 0
 fi

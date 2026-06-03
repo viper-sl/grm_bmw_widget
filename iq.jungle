@@ -1,0 +1,7 @@
+# IQ Store / distribution build.
+# Uses manifest-iq.xml (different app ID from manifest.xml).
+# Does NOT include resources-livetest — the published widget has no baked-in
+# clientId; users supply their own via the Garmin Connect app settings.
+project.manifest = manifest-iq.xml
+base.sourcePath = source
+base.resourcePath = resources

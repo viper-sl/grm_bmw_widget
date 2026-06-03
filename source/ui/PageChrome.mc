@@ -5,6 +5,7 @@
 using Toybox.Application;
 using Toybox.Graphics;
 using Toybox.Time;
+using Toybox.WatchUi;
 
 class PageChrome {
 
@@ -98,12 +99,38 @@ class PageChrome {
         }
     }
 
-    // Rightward chevron strictly at 3 o'clock = START button on Fenix 6 Pro.
-    // y = screen center; tip x = screen width - 5 (right at circular edge).
-    // Only call from pages whose onSelect() returns true.
+    // Refresh icon at the 3 o'clock (START button) position on the right edge.
+    // isRefreshing=true tints the icon area amber while a sync is in flight.
+    // Only call from pages whose onSelect() triggers a data refresh.
+    static function drawRefreshHint(dc, isRefreshing) {
+        var hy = dc.getHeight() / 2;   // center = START button at 3 o'clock
+        var icon = null;
+        try { icon = WatchUi.loadResource(Rez.Drawables.RefreshIcon); } catch (e) {}
+        if (icon != null) {
+            var iw = icon.getWidth();
+            var ih = icon.getHeight();
+            var ix = dc.getWidth() - iw - 4;   // 4 px gap from screen edge
+            var iy = hy - ih / 2;
+            if (isRefreshing) {
+                dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
+                dc.fillRectangle(ix - 1, iy - 1, iw + 2, ih + 2);
+            }
+            dc.drawBitmap(ix, iy, icon);
+        } else {
+            var tip = dc.getWidth() - 5;
+            var arm = tip - 12;
+            dc.setPenWidth(2);
+            dc.setColor(isRefreshing ? Theme.COLOR_WARN : Theme.COLOR_MUTED,
+                        Graphics.COLOR_TRANSPARENT);
+            dc.drawLine(arm, hy - 8, tip, hy);
+            dc.drawLine(tip, hy, arm, hy + 8);
+        }
+    }
+
+    // Keep legacy drawSelectHint for pages without data refresh (Tyres page toggle).
     static function drawSelectHint(dc) {
-        var hy  = dc.getHeight() / 2;   // center = 3 o'clock (130 px on 260 px screen)
-        var tip = dc.getWidth() - 5;    // right at the circular screen edge
+        var hy  = dc.getHeight() / 2;
+        var tip = dc.getWidth() - 5;
         var arm = tip - 12;
         dc.setPenWidth(2);
         dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);

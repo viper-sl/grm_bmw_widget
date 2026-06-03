@@ -72,13 +72,8 @@ class PageVehicle extends WatchUi.View {
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
-        dc.setColor(_refreshing ? Theme.COLOR_WARN : Theme.COLOR_DIM, Theme.COLOR_BG);
-        dc.drawText(cx, dc.getHeight() - 70, Graphics.FONT_XTINY,
-            _refreshing ? "Refreshing…" : "OK to refresh",
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
         PageChrome.drawAge(dc, VehicleCache.read());
-        PageChrome.drawSelectHint(dc);
+        PageChrome.drawRefreshHint(dc, _refreshing);
     }
 
 }

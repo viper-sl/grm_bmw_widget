@@ -1,12 +1,19 @@
 // Page: Lock overview — matches UX mock page 3.
 // Header · "SECURED/UNLOCKED" status (green/amber) · 2x2 grid of door/trunk/hood.
-// Each cell: position name (muted) over graphical open/closed indicator.
+// Each cell: position name (muted) + PNG open/closed icon.
 using Toybox.Graphics;
 using Toybox.WatchUi;
 
 class PageLock extends WatchUi.View {
 
-    function initialize() { View.initialize(); }
+    var _iconClosed;   // closed_w.png (white lock icon)
+    var _iconOpen;     // open_w.png   (white open icon)
+
+    function initialize() {
+        View.initialize();
+        try { _iconClosed = WatchUi.loadResource(Rez.Drawables.ClosedIcon); } catch (e) { _iconClosed = null; }
+        try { _iconOpen   = WatchUi.loadResource(Rez.Drawables.OpenIcon);   } catch (e) { _iconOpen   = null; }
+    }
 
     function onSelect() { return false; }
 
@@ -48,18 +55,27 @@ class PageLock extends WatchUi.View {
     }
 
     function _cell(dc, x, y, name, state, key) {
+        // Position label
         dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
         dc.drawText(x, y - 9, Graphics.FONT_XTINY, name,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         var isOpen = state.hasKey(key) ? state[key] : false;
-        if (isOpen) {
-            dc.setColor(Theme.COLOR_ERROR, Theme.COLOR_BG);
-            dc.drawCircle(x, y + 6, 5);
-            dc.fillCircle(x, y + 6, 2);
+        var icon   = isOpen ? _iconOpen : _iconClosed;
+
+        if (icon != null) {
+            // Center 16×16 icon at (x, y+6)
+            dc.drawBitmap(x - 8, y - 2, icon);
         } else {
-            dc.setColor(Theme.COLOR_OK, Theme.COLOR_BG);
-            dc.fillCircle(x, y + 6, 5);
+            // Fallback: colored circle when icons failed to load
+            if (isOpen) {
+                dc.setColor(Theme.COLOR_ERROR, Theme.COLOR_BG);
+                dc.drawCircle(x, y + 6, 5);
+                dc.fillCircle(x, y + 6, 2);
+            } else {
+                dc.setColor(Theme.COLOR_OK, Theme.COLOR_BG);
+                dc.fillCircle(x, y + 6, 5);
+            }
         }
     }
 

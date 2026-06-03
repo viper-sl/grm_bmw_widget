@@ -2,4 +2,6 @@
 <drawables>
   <bitmap id="LauncherIcon" filename="launcher_icon.png"/>
   <bitmap id="BmwIcon" filename="bmw_icon.png"/>
+  <bitmap id="ClosedIcon" filename="closed_w.png"/>
+  <bitmap id="OpenIcon"   filename="open_w.png"/>
 </drawables>

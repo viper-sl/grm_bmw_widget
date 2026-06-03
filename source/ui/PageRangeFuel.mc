@@ -46,9 +46,8 @@ class PageRangeFuel extends WatchUi.View {
         PageChrome.drawAccent(dc);
         PageChrome.drawHeader(dc, null);
 
-        var rangeKm     = state.hasKey("rangeKm")     ? state["rangeKm"]     : null;
-        var fuelPercent = state.hasKey("fuelPercent")  ? state["fuelPercent"] : null;
-        var fuelLitres  = state.hasKey("fuelLitres")   ? state["fuelLitres"]  : null;
+        var rangeKm     = state.hasKey("rangeKm")    ? state["rangeKm"]    : null;
+        var fuelPercent = state.hasKey("fuelPercent") ? state["fuelPercent"] : null;
 
         var lowFuel  = (fuelPercent != null && fuelPercent < 50);
         var barColor = lowFuel ? Theme.COLOR_WARN : Theme.COLOR_ACCENT;
@@ -60,18 +59,25 @@ class PageRangeFuel extends WatchUi.View {
         var pct = (rangeKm != null) ? (rangeKm.toFloat() / 700.0) : 0.0;
         PageChrome.drawBar(dc, pct, cy + 40, barColor);
 
-        if (_fuelMode == FUEL_MODE_LITERS && fuelLitres != null) {
+        if (_fuelMode == FUEL_MODE_LITERS) {
             var tankProp = Application.Properties.getValue("tankLitres");
             var tank = (tankProp != null) ? tankProp : 52;
-            var fill = tank - fuelLitres;
-            if (fill < 0) { fill = 0; }
-            var valueColor   = lowFuel ? Theme.COLOR_WARN : Theme.COLOR_WHITE;
-            var captionColor = lowFuel ? Theme.COLOR_WARN : Theme.COLOR_MUTED;
-            dc.setColor(valueColor, Theme.COLOR_BG);
-            dc.drawText(cx, cy + 50, Graphics.FONT_TINY, fuelLitres.toNumber().toString() + "L in tank",
-                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.setColor(captionColor, Theme.COLOR_BG);
-            dc.drawText(cx, cy + 68, Graphics.FONT_XTINY, fill.toNumber().toString() + "L to fill",
+            // Derive liters in tank from percent × capacity for consistency.
+            // fuelLitres from API can disagree with fuelPercent when tank size differs.
+            var inTank = (fuelPercent != null) ? ((tank * fuelPercent) / 100) : null;
+            var fuelStr;
+            var fuelColor;
+            if (inTank != null) {
+                var fill = tank - inTank;
+                if (fill < 0) { fill = 0; }
+                fuelStr   = inTank.toNumber().toString() + "L in  " + fill.toNumber().toString() + "L to fill";
+                fuelColor = lowFuel ? Theme.COLOR_WARN : Theme.COLOR_WHITE;
+            } else {
+                fuelStr   = "FUEL  --";
+                fuelColor = Theme.COLOR_MUTED;
+            }
+            dc.setColor(fuelColor, Theme.COLOR_BG);
+            dc.drawText(cx, cy + 62, Graphics.FONT_XTINY, fuelStr,
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         } else {
             var fuelStr;

@@ -98,13 +98,16 @@ class PageChrome {
         }
     }
 
-    // Faint arc at screen bottom — indicates OK/START does something on this page.
+    // Downward chevron at screen bottom — indicates OK/START is interactive.
     // Only call from pages whose onSelect() returns true.
     static function drawSelectHint(dc) {
-        var cx = dc.getWidth() / 2;
+        var cx  = dc.getWidth() / 2;
+        var tip = dc.getHeight() - 12;   // chevron tip y
+        var top = tip - 8;               // chevron arms y
         dc.setPenWidth(2);
-        dc.setColor(Theme.COLOR_DIM, Graphics.COLOR_TRANSPARENT);
-        dc.drawArc(cx, dc.getHeight() - 20, 10, Graphics.ARC_CLOCKWISE, 200, 340);
+        dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
+        dc.drawLine(cx - 8, top, cx, tip);
+        dc.drawLine(cx, tip, cx + 8, top);
     }
 
     // Format a float to 1 decimal place (Monkey C lacks printf on all types).

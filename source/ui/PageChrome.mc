@@ -86,6 +86,18 @@ class PageChrome {
         return (sec / 86400).toString() + "d ago";
     }
 
+    // Blit a BufferedBitmap or BufferedBitmapReference at (x, y).
+    // Handles SDK 3.x (bitmap directly) and SDK 4.0+ (reference with .get()).
+    static function blitBuffer(dc, x, y, buf) {
+        if (buf == null) { return; }
+        if (buf has :get) {
+            var b = buf.get();
+            if (b != null) { dc.drawBitmap(x, y, b); }
+        } else {
+            dc.drawBitmap(x, y, buf);
+        }
+    }
+
     // Faint arc at screen bottom — indicates OK/START does something on this page.
     // Only call from pages whose onSelect() returns true.
     static function drawSelectHint(dc) {

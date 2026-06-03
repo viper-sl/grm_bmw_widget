@@ -6,35 +6,75 @@ using Toybox.WatchUi;
 
 class PageOdometer extends WatchUi.View {
 
-    function initialize() { View.initialize(); }
+    var _cache;
+    var _cacheKey;
 
-    function onSelect() { return false; } // no OK action on this page
+    function initialize() {
+        View.initialize();
+        _cache    = null;
+        _cacheKey = null;
+    }
+
+    function onSelect() { return false; }
 
     function isVisible() {
         var state = VehicleCache.read();
         return state != null && state.hasKey("odometerKm");
     }
 
+    function getCachedBitmap(dc) {
+        var state = VehicleCache.read();
+        if (state == null) { return null; }
+        var key = state.hasKey("lastUpdated") ? state["lastUpdated"] : 0;
+        if (_cache == null || key != _cacheKey) {
+            _renderToCache(state);
+            _cacheKey = key;
+        }
+        return _cache;
+    }
+
     function onUpdate(dc) {
         dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
         dc.clear();
-
         var state = VehicleCache.read();
         if (state == null) { return; }
+        var bmp = getCachedBitmap(dc);
+        if (bmp != null) {
+            PageChrome.blitBuffer(dc, 0, 0, bmp);
+        } else {
+            _renderDirect(dc, state);
+        }
+    }
 
+    function _renderToCache(state) {
+        var w = System.getDeviceSettings().screenWidth;
+        var h = System.getDeviceSettings().screenHeight;
+        var bdc;
+        if (Graphics has :createBufferedBitmap) {
+            _cache = Graphics.createBufferedBitmap({:width => w, :height => h});
+            var locked = _cache.get();
+            if (locked == null) { _cache = null; return; }
+            bdc = locked.getDc();
+        } else {
+            _cache = new Graphics.BufferedBitmap({:width => w, :height => h});
+            bdc = _cache.getDc();
+        }
+        bdc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
+        bdc.clear();
+        _renderDirect(bdc, state);
+    }
+
+    function _renderDirect(dc, state) {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
 
         PageChrome.drawAccent(dc);
         PageChrome.drawHeader(dc, null);
 
-        // Odometer (primary). Number font has digits only — no comma (renders as tofu).
-        // Unit folded into the label to free vertical space (avoids number/label collision).
         PageChrome.drawLabel(dc, "ODOMETER (KM)", cy - 58);
         PageChrome.drawValue(dc, state["odometerKm"].toString(),
             Graphics.FONT_NUMBER_MEDIUM, cy - 8, Theme.COLOR_TEXT);
 
-        // Service distance (secondary, with colored bar). FONT_TINY supports comma.
         if (state.hasKey("serviceDistanceKm")) {
             var svcKm = state["serviceDistanceKm"];
             var svcColor = _serviceColor(svcKm);
@@ -57,16 +97,14 @@ class PageOdometer extends WatchUi.View {
         return Theme.COLOR_ERROR;
     }
 
-    // Compact distance: >=1000 -> "22K km" / "1.5K km"; else "850 km".
     function _short(n) {
         if (n < 1000) { return n.toString() + " km"; }
         var k = n / 1000;
-        var rem = (n % 1000) / 100;   // first decimal of the thousands
+        var rem = (n % 1000) / 100;
         if (rem == 0) { return k.toString() + "K km"; }
         return k.toString() + "." + rem.toString() + "K km";
     }
 
-    // Insert thousands separators: 40926 -> "40,926"
     function _grouped(n) {
         var s = n.toString();
         var out = "";

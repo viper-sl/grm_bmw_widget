@@ -1,39 +1,80 @@
 // Page: Lock overview — matches UX mock page 3.
 // Header · "SECURED/UNLOCKED" status (green/amber) · 2x2 grid of door/trunk/hood.
-// Each cell: position name (muted) over status (white, or red if OPEN).
+// Each cell: position name (muted) over graphical open/closed indicator.
 using Toybox.Graphics;
 using Toybox.WatchUi;
 
 class PageLock extends WatchUi.View {
 
-    function initialize() { View.initialize(); }
+    var _cache;
+    var _cacheKey;
 
-    function onSelect() { return false; } // no OK action on this page
+    function initialize() {
+        View.initialize();
+        _cache    = null;
+        _cacheKey = null;
+    }
+
+    function onSelect() { return false; }
 
     function isVisible() {
         var state = VehicleCache.read();
         return state != null && state.hasKey("doorsLocked");
     }
 
+    function getCachedBitmap(dc) {
+        var state = VehicleCache.read();
+        if (state == null) { return null; }
+        var key = state.hasKey("lastUpdated") ? state["lastUpdated"] : 0;
+        if (_cache == null || key != _cacheKey) {
+            _renderToCache(state);
+            _cacheKey = key;
+        }
+        return _cache;
+    }
+
     function onUpdate(dc) {
         dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
         dc.clear();
-
         var state = VehicleCache.read();
         if (state == null) { return; }
+        var bmp = getCachedBitmap(dc);
+        if (bmp != null) {
+            PageChrome.blitBuffer(dc, 0, 0, bmp);
+        } else {
+            _renderDirect(dc, state);
+        }
+    }
 
+    function _renderToCache(state) {
+        var w = System.getDeviceSettings().screenWidth;
+        var h = System.getDeviceSettings().screenHeight;
+        var bdc;
+        if (Graphics has :createBufferedBitmap) {
+            _cache = Graphics.createBufferedBitmap({:width => w, :height => h});
+            var locked = _cache.get();
+            if (locked == null) { _cache = null; return; }
+            bdc = locked.getDc();
+        } else {
+            _cache = new Graphics.BufferedBitmap({:width => w, :height => h});
+            bdc = _cache.getDc();
+        }
+        bdc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
+        bdc.clear();
+        _renderDirect(bdc, state);
+    }
+
+    function _renderDirect(dc, state) {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
 
         PageChrome.drawAccent(dc);
 
-        // Lock status header (the hero)
-        var locked = state["doorsLocked"];
+        var locked = state.hasKey("doorsLocked") ? state["doorsLocked"] : true;
         dc.setColor(locked ? Theme.COLOR_OK : Theme.COLOR_WARN, Theme.COLOR_BG);
         dc.drawText(cx, 52, Graphics.FONT_SMALL, locked ? "SECURED" : "UNLOCKED",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // 2x2 grid: columns centered around cx, two rows below center
         var colL = cx - 42;
         var colR = cx + 42;
         var row1 = cy + 4;
@@ -47,8 +88,6 @@ class PageLock extends WatchUi.View {
         PageChrome.drawAge(dc, state);
     }
 
-    // One grid cell: position label over graphical open/closed indicator.
-    // Closed → filled green circle. Open → outlined red ring with center dot.
     function _cell(dc, x, y, name, state, key) {
         dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
         dc.drawText(x, y - 9, Graphics.FONT_XTINY, name,

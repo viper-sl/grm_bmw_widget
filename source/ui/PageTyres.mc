@@ -7,15 +7,19 @@ using Toybox.WatchUi;
 class PageTyres extends WatchUi.View {
 
     var _showTarget;   // false = actual pressures, true = target pressures
+    var _cache;
+    var _cacheKey;     // lastUpdated * 10 + (_showTarget ? 1 : 0)
 
     function initialize() {
         View.initialize();
         _showTarget = false;
+        _cache      = null;
+        _cacheKey   = null;
     }
 
-    // OK/START toggles between actual and target pressures.
     function onSelect() {
         _showTarget = !_showTarget;
+        _cache = null; // invalidate cache on mode toggle
         WatchUi.requestUpdate();
         return true;
     }
@@ -25,24 +29,58 @@ class PageTyres extends WatchUi.View {
         return state != null && state.hasKey("tyrePressureFL");
     }
 
+    function getCachedBitmap(dc) {
+        var state = VehicleCache.read();
+        if (state == null) { return null; }
+        var epoch = state.hasKey("lastUpdated") ? state["lastUpdated"] : 0;
+        var key   = epoch * 10 + (_showTarget ? 1 : 0);
+        if (_cache == null || key != _cacheKey) {
+            _renderToCache(state);
+            _cacheKey = key;
+        }
+        return _cache;
+    }
+
     function onUpdate(dc) {
         dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
         dc.clear();
-
         var state = VehicleCache.read();
         if (state == null) { return; }
+        var bmp = getCachedBitmap(dc);
+        if (bmp != null) {
+            PageChrome.blitBuffer(dc, 0, 0, bmp);
+        } else {
+            _renderDirect(dc, state);
+        }
+    }
 
+    function _renderToCache(state) {
+        var w = System.getDeviceSettings().screenWidth;
+        var h = System.getDeviceSettings().screenHeight;
+        var bdc;
+        if (Graphics has :createBufferedBitmap) {
+            _cache = Graphics.createBufferedBitmap({:width => w, :height => h});
+            var locked = _cache.get();
+            if (locked == null) { _cache = null; return; }
+            bdc = locked.getDc();
+        } else {
+            _cache = new Graphics.BufferedBitmap({:width => w, :height => h});
+            bdc = _cache.getDc();
+        }
+        bdc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
+        bdc.clear();
+        _renderDirect(bdc, state);
+    }
+
+    function _renderDirect(dc, state) {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
 
         PageChrome.drawAccent(dc);
         PageChrome.drawHeader(dc, null);
 
-        // Label reflects which set is shown; OK toggles actual <-> target.
         PageChrome.drawLabel(dc, _showTarget ? "TARGET (BAR)" : "TYRES (BAR)", cy - 56);
 
-        // 2x2 grid below the label. Rows far enough apart that a cell's value
-        // (drawn at y+12) clears the next row's label (drawn at y-12).
         var colL = cx - 44;
         var colR = cx + 44;
         var row1 = cy - 16;
@@ -57,8 +95,6 @@ class PageTyres extends WatchUi.View {
         PageChrome.drawSelectHint(dc);
     }
 
-    // One tyre cell: position label over value. Showing actuals: green=OK / amber=LOW
-    // vs target. Showing targets: muted reference value.
     function _cell(dc, x, y, name, state, pKey, tKey) {
         dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
         dc.drawText(x, y - 12, Graphics.FONT_XTINY, name,
@@ -77,7 +113,7 @@ class PageTyres extends WatchUi.View {
 
         var color;
         if (_showTarget) {
-            color = Theme.COLOR_MUTED;   // targets are reference values, not status
+            color = Theme.COLOR_MUTED;
         } else {
             var low = (target != null && actual < (target - 0.2));
             color = low ? Theme.COLOR_WARN : Theme.COLOR_OK;

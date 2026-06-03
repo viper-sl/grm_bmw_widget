@@ -100,26 +100,19 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
 // Read-only "About car" key/value list — full basicData snapshot (all ~19 fields).
 // Curated, human-friendly fields first; the rest follow in catalogue order.
 class AboutMenu {
-    // Preferred fields shown first, with nicer labels. (basicData key -> label)
-    static const _PRIMARY = [
-        ["modelName",          "Model"],
-        ["series",             "Series"],
-        ["bodyType",           "Body"],
-        ["colourDescription",  "Colour"],
-        ["engine",             "Engine"],
-        ["driveTrain",         "Drive"],
-        ["propulsionType",     "Propulsion"],
-        ["numberOfDoors",      "Doors"],
-        ["steering",           "Steering"],
-        ["constructionDate",   "Built"],
-        ["countryCode",        "Country"],
-        ["hasNavi",            "Navi"],
-        ["hasSunRoof",         "Sunroof"],
-        ["headUnit",           "Head unit"],
-        ["modelKey",           "Model key"],
-        ["seriesDevt",         "Platform"],
-        ["simStatus",          "SIM"],
-        ["colourCodeRaw",      "Colour code"]
+    // Two parallel flat arrays — avoids nested-array subscript type errors in Monkey C.
+    // Accessing _KEYS[i] gives a String directly; _LABELS[i] likewise.
+    static const _KEYS = [
+        "modelName", "series", "bodyType", "colourDescription", "engine",
+        "driveTrain", "propulsionType", "numberOfDoors", "steering",
+        "constructionDate", "countryCode", "hasNavi", "hasSunRoof",
+        "headUnit", "modelKey", "seriesDevt", "simStatus", "colourCodeRaw"
+    ];
+    static const _LABELS = [
+        "Model", "Series", "Body", "Colour", "Engine",
+        "Drive", "Propulsion", "Doors", "Steering",
+        "Built", "Country", "Navi", "Sunroof",
+        "Head unit", "Model key", "Platform", "SIM", "Colour code"
     ];
 
     static function build() {
@@ -129,20 +122,20 @@ class AboutMenu {
             menu.addItem(new WatchUi.MenuItem("No data yet", "Refresh to load", null, null));
             return menu;
         }
-        // Curated fields first (only those present).
-        for (var i = 0; i < _PRIMARY.size(); i++) {
-            var k = _PRIMARY[i][0];
+        // Curated fields first (only those present in basicData).
+        for (var i = 0; i < _KEYS.size(); i++) {
+            var k = _KEYS[i];
             if (about.hasKey(k)) {
                 var v = about[k];
-                // Strip time component from ISO timestamp: "2024-03-05T00:00:00.000+0000" → "2024-03-05"
+                // Strip time component: "2024-03-05T00:00:00.000+0000" → "2024-03-05"
                 if (k.equals("constructionDate") && v != null) {
                     var t = v.indexOf("T");
                     if (t > 0) { v = v.substring(0, t); }
                 }
-                _add(menu, _PRIMARY[i][1], v);
+                _add(menu, _LABELS[i], v);
             }
         }
-        // Any remaining basicData fields (except curated, brand, and the huge SA list).
+        // Any remaining fields not already shown (skip fullSAList, brand, curated).
         var keys = about.keys();
         for (var j = 0; j < keys.size(); j++) {
             var kk = keys[j];
@@ -154,8 +147,8 @@ class AboutMenu {
     }
 
     static function _isCurated(key) {
-        for (var i = 0; i < _PRIMARY.size(); i++) {
-            if (_PRIMARY[i][0].equals(key)) { return true; }
+        for (var i = 0; i < _KEYS.size(); i++) {
+            if (_KEYS[i].equals(key)) { return true; }
         }
         return false;
     }

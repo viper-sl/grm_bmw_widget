@@ -1,23 +1,18 @@
-// Central config resolver. clientId comes from Settings (Properties) for store
-// builds, but the PERSONAL build also bakes it into source (personalClientId) so it
-// works even when the persisted Property is empty/stale — important on a real watch
-// where stale SETTINGS can override the XML default and can't easily be cleared.
+// Central config resolver. clientId comes from Settings (Properties): the store
+// build reads the user's phone-settings value; the personal build reads the value
+// baked into resources-livetest/properties/properties.xml.
 //
-// personalClientId() has two definitions selected by build annotation:
-//   - source/PersonalClientId.mc        (:stubClientId)  committed stub, returns ""
-//   - resources-livetest/.../PersonalClientId.mc          gitignored real value
-// The personal jungle excludes :stubClientId and adds the gitignored source dir.
+// NOTE: we deliberately do NOT bake clientId into source via build annotations —
+// the source-exclusion machinery (excludeAnnotations + extra sourcePath) produces a
+// prg the fenix 6 installer rejects (f8=-1). A plain resource override matches the
+// known-good store-build structure.
 using Toybox.Application;
 
 (:background)
 class Config {
 
-    // Effective clientId: the Settings value if present, else the baked-in personal
-    // fallback (empty for store builds — users enter it in phone settings).
     static function clientId() {
-        var p = Application.Properties.getValue("clientId");
-        if (p != null && !p.equals("")) { return p; }
-        return personalClientId();
+        return Application.Properties.getValue("clientId");
     }
 
 }

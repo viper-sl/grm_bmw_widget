@@ -39,7 +39,7 @@ if [ "${1:-}" == "--device" ]; then
   echo "Building DEVICE release build → $OUT  (target: $DEVICE)"
   java -jar "$SDK/bin/monkeybrains.jar" \
     -o "$OUT" -f "$JUNGLE" -y "$KEY" -d "$DEVICE" -r 2>&1 \
-    | grep -v "^WARNING:.*Invalid device id found"
+    | grep -v "^WARNING:"
   echo "✓ Built $OUT"
 
   DEST=""
@@ -71,7 +71,7 @@ if [ "${1:-}" == "--iq" ]; then
   echo "  Local  : 7f673698b206464a8e918654edcfeb6c  (manifest.xml / livetest)"
   java -jar "$SDK/bin/monkeybrains.jar" \
     -o "$OUT" -f "iq.jungle" -y "$KEY" -e -r 2>&1 \
-    | grep -v "^WARNING:.*Invalid device id found"
+    | grep -v "^WARNING:"
   echo "✓ Built $OUT  — can coexist on watch with the personal sideload build"
   echo "  Sideload via the Connect IQ phone app → My Device Apps → Sideload Widget."
   exit 0

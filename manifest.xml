@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 <iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
   <iq:application entry="BmwWidgetApp"
-                  glance="BmwWidgetApp"
                   id="7f673698b206464a8e918654edcfeb6c"
                   launcherIcon="@Drawables.LauncherIcon"
                   minSdkVersion="3.4.0"

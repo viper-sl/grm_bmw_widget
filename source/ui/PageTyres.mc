@@ -56,7 +56,7 @@ class PageTyres extends WatchUi.View {
     }
 
     function _cell(dc, x, y, name, state, pKey, tKey) {
-        dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+        dc.setColor(Theme.COLOR_WHITE, Theme.COLOR_BG);
         dc.drawText(x, y - 12, Graphics.FONT_XTINY, name,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 

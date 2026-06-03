@@ -40,7 +40,7 @@ class PageOdometer extends WatchUi.View {
             var pct = svcKm.toFloat() / 5000.0;
             PageChrome.drawBar(dc, pct, cy + 44, svcColor);
             dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
-            dc.drawText(cx, cy + 58, Graphics.FONT_XTINY,
+            dc.drawText(cx, cy + 68, Graphics.FONT_XTINY,
                 "SERVICE IN " + _short(svcKm),
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }

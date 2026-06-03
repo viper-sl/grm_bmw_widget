@@ -58,15 +58,15 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
         var fuelPercent = state.hasKey("fuelPercent") ? state["fuelPercent"] : null;
         var fuelLitres  = state.hasKey("fuelLitres")  ? state["fuelLitres"]  : null;
 
-        // ── row 1: lock state (left) + range (right) — WHITE ──
-        var topColor = stale ? Theme.COLOR_DIM : Theme.COLOR_TEXT;
+        // ── row 1: lock state (left) + range (right) — pure white ──
+        var row1Color = stale ? Theme.COLOR_DIM : Theme.COLOR_WHITE;
         if (state.hasKey("doorsLocked")) {
-            dc.setColor(topColor, Theme.COLOR_BG);
+            dc.setColor(row1Color, Theme.COLOR_BG);
             dc.drawText(textX, row1Y, font, state["doorsLocked"] ? "LOCKED" : "OPEN",
                 Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
         }
         var rangeStr = (rangeKm != null) ? (rangeKm.toString() + " km") : "-- km";
-        dc.setColor(topColor, Theme.COLOR_BG);
+        dc.setColor(row1Color, Theme.COLOR_BG);
         dc.drawText(rightX, row1Y, font, rangeStr,
             Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
 
@@ -100,7 +100,7 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
         } else {
             fuelStr = "FUEL --";
         }
-        dc.setColor(stale ? Theme.COLOR_DIM : Theme.COLOR_WARN, Theme.COLOR_BG);
+        dc.setColor(stale ? Theme.COLOR_DIM : Theme.COLOR_WHITE, Theme.COLOR_BG);
         dc.drawText(textX, row3Y, font, fuelStr,
             Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
 

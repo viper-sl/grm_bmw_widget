@@ -133,19 +133,24 @@ class AboutMenu {
         for (var i = 0; i < n; i++) {
             var k = cKeys[i];
             if (about.hasKey(k)) {
-                var v = about[k];
-                if (k.equals("constructionDate") && v != null) {
-                    var t = v.indexOf("T");
-                    if (t > 0) { v = v.substring(0, t); }
+                // about[k] returns Object — call toString() immediately to get
+                // a typed String so that indexOf/substring are available.
+                var raw = about[k];
+                var vs  = (raw == null) ? "" : raw.toString();
+                if (k.equals("constructionDate")) {
+                    var t = vs.indexOf("T");
+                    if (t > 0) { vs = vs.substring(0, t); }
                 }
-                _add(menu, cLabels[i], v);
+                _add(menu, cLabels[i], vs);
             }
         }
         return menu;
     }
 
     static function _add(menu, label, value) {
-        var v = (value == null || value.toString().equals("")) ? "—" : value.toString();
+        // value arrives as Object — convert to String before any String method calls.
+        var vs = (value == null) ? "" : value.toString();
+        var v  = vs.equals("") ? "—" : vs;
         menu.addItem(new WatchUi.MenuItem(label, v, null, null));
     }
 }

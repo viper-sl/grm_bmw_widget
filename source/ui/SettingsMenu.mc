@@ -100,11 +100,12 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
 // Read-only "About car" key/value list — full basicData snapshot (all ~19 fields).
 // Curated, human-friendly fields first; the rest follow in catalogue order.
 class AboutMenu {
-    // Key insight: every function parameter becomes Object in Monkey C, so
-    // passing 'about' (Dictionary) or string keys to any helper function loses
-    // type info and causes Symbol Not Found on hasKey / [] / indexOf.
-    // Solution: keep 'about' as a local var with the 'as Dictionary' type and
-    // inline every field directly in build() — no helper functions at all.
+    // Fully inlined — no helper functions.
+    // about and menu are LOCAL vars so they keep their declared types.
+    // Function parameters always become Object in Monkey C, causing Symbol
+    // Not Found for type-specific methods (hasKey, indexOf, addItem, etc).
+    // v.substring() returns String or Null — use a separate var + .toString()
+    // to re-pin the type to String before passing to MenuItem.
 
     static function build() {
         var menu  = new WatchUi.Menu2({ :title => "About car" });
@@ -113,41 +114,35 @@ class AboutMenu {
             menu.addItem(new WatchUi.MenuItem("No data yet", "Refresh to load", null, null));
             return menu;
         }
-        _row(menu, about, "modelName",         "Model",       false);
-        _row(menu, about, "series",            "Series",      false);
-        _row(menu, about, "bodyType",          "Body",        false);
-        _row(menu, about, "colourDescription", "Colour",      false);
-        _row(menu, about, "engine",            "Engine",      false);
-        _row(menu, about, "driveTrain",        "Drive",       false);
-        _row(menu, about, "propulsionType",    "Propulsion",  false);
-        _row(menu, about, "numberOfDoors",     "Doors",       false);
-        _row(menu, about, "steering",          "Steering",    false);
-        _row(menu, about, "constructionDate",  "Built",       true);
-        _row(menu, about, "countryCode",       "Country",     false);
-        _row(menu, about, "hasNavi",           "Navi",        false);
-        _row(menu, about, "hasSunRoof",        "Sunroof",     false);
-        _row(menu, about, "headUnit",          "Head unit",   false);
-        _row(menu, about, "modelKey",          "Model key",   false);
-        _row(menu, about, "seriesDevt",        "Platform",    false);
-        _row(menu, about, "simStatus",         "SIM",         false);
-        _row(menu, about, "colourCodeRaw",     "Colour code", false);
-        return menu;
-    }
 
-    // about is Lang.Dictionary here (properly typed local in build()).
-    // Re-read it from Storage to ensure the type annotation carries through
-    // after being passed as a parameter — parameters lose type in Monkey C.
-    static function _row(menu, aboutIgnored, key, label, isDate) {
-        var about = Application.Storage.getValue(StorageKeys.KEY_BASIC_DATA) as Lang.Dictionary or Null;
-        if (about == null || !about.hasKey(key)) { return; }
-        var raw = about[key];
-        var vs  = (raw != null) ? raw.toString() : "—";
-        if (isDate) {
-            var t = vs.indexOf("T");
-            if (t > 0) { vs = vs.substring(0, t); }
+        if (about.hasKey("modelName"))         { var v = about["modelName"].toString();         menu.addItem(new WatchUi.MenuItem("Model",       v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("series"))            { var v = about["series"].toString();            menu.addItem(new WatchUi.MenuItem("Series",      v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("bodyType"))          { var v = about["bodyType"].toString();          menu.addItem(new WatchUi.MenuItem("Body",        v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("colourDescription")) { var v = about["colourDescription"].toString(); menu.addItem(new WatchUi.MenuItem("Colour",      v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("engine"))            { var v = about["engine"].toString();            menu.addItem(new WatchUi.MenuItem("Engine",      v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("driveTrain"))        { var v = about["driveTrain"].toString();        menu.addItem(new WatchUi.MenuItem("Drive",       v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("propulsionType"))    { var v = about["propulsionType"].toString();    menu.addItem(new WatchUi.MenuItem("Propulsion",  v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("numberOfDoors"))     { var v = about["numberOfDoors"].toString();     menu.addItem(new WatchUi.MenuItem("Doors",       v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("steering"))          { var v = about["steering"].toString();          menu.addItem(new WatchUi.MenuItem("Steering",    v.equals("") ? "—" : v, null, null)); }
+
+        if (about.hasKey("constructionDate")) {
+            var raw = about["constructionDate"].toString();
+            var t   = raw.indexOf("T");
+            // Re-pin to String after substring (returns String or Null in Monkey C).
+            var vd  = (t > 0) ? raw.substring(0, t).toString() : raw;
+            menu.addItem(new WatchUi.MenuItem("Built", vd.equals("") ? "—" : vd, null, null));
         }
-        if (vs.equals("")) { vs = "—"; }
-        menu.addItem(new WatchUi.MenuItem(label, vs, null, null));
+
+        if (about.hasKey("countryCode"))   { var v = about["countryCode"].toString();   menu.addItem(new WatchUi.MenuItem("Country",    v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("hasNavi"))       { var v = about["hasNavi"].toString();       menu.addItem(new WatchUi.MenuItem("Navi",       v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("hasSunRoof"))    { var v = about["hasSunRoof"].toString();    menu.addItem(new WatchUi.MenuItem("Sunroof",    v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("headUnit"))      { var v = about["headUnit"].toString();      menu.addItem(new WatchUi.MenuItem("Head unit",  v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("modelKey"))      { var v = about["modelKey"].toString();      menu.addItem(new WatchUi.MenuItem("Model key",  v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("seriesDevt"))    { var v = about["seriesDevt"].toString();    menu.addItem(new WatchUi.MenuItem("Platform",   v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("simStatus"))     { var v = about["simStatus"].toString();     menu.addItem(new WatchUi.MenuItem("SIM",        v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("colourCodeRaw")) { var v = about["colourCodeRaw"].toString(); menu.addItem(new WatchUi.MenuItem("Colour code", v.equals("") ? "—" : v, null, null)); }
+
+        return menu;
     }
 }
 

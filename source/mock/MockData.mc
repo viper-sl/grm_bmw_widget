@@ -53,6 +53,19 @@ class MockData {
         };
     }
 
+    static function tyreDiagnosisFixture() {
+        return {
+            "passengerCar" => {
+                "mountedTyres" => {
+                    "frontLeft"  => { "tyreWear" => { "dueMileage" => 11500, "status" => "OK", "unit" => "KILOMETER" } },
+                    "frontRight" => { "tyreWear" => { "dueMileage" => 11500, "status" => "OK", "unit" => "KILOMETER" } },
+                    "rearLeft"   => { "tyreWear" => { "dueMileage" => 10500, "status" => "OK", "unit" => "KILOMETER" } },
+                    "rearRight"  => { "tyreWear" => { "dueMileage" => 10500, "status" => "OK", "unit" => "KILOMETER" } }
+                }
+            }
+        };
+    }
+
     static function basicDataFixture() {
         return {
             "brand"      => "BMW",

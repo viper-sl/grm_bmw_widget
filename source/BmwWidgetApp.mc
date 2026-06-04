@@ -68,6 +68,10 @@ class BmwWidgetApp extends Application.AppBase {
             "tyreTargetFR"      => 2.2,
             "tyreTargetRL"      => 2.2,
             "tyreTargetRR"      => 2.2,
+            "tyreWearKmFL"      => 11500,
+            "tyreWearKmFR"      => 11500,
+            "tyreWearKmRL"      => 10500,
+            "tyreWearKmRR"      => 10500,
             "lastUpdated"       => Time.now().value()
         });
     }

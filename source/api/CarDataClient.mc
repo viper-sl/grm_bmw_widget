@@ -90,6 +90,52 @@ class CarDataClient {
         _callback.invoke(responseCode, null);
     }
 
+    // --- Tyre Diagnosis (best-effort, separate endpoint, no container needed) ---
+
+    (:release)
+    function fetchTyreDiagnosis(vin, accessToken, callback) {
+        _callback = callback;
+        Communications.makeWebRequest(
+            _DATA_HOST + "/customers/vehicles/" + vin + "/smartMaintenanceTyreDiagnosis",
+            null,
+            { :method       => Communications.HTTP_REQUEST_METHOD_GET,
+              :headers      => _buildHeaders(accessToken),
+              :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON },
+            method(:onTyreDiagnosisResponse)
+        );
+    }
+
+    (:debug)
+    function fetchTyreDiagnosis(vin, accessToken, callback) {
+        _callback = callback;
+        onTyreDiagnosisResponse(200, MockData.tyreDiagnosisFixture());
+    }
+
+    function onTyreDiagnosisResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
+        var result = {};
+        if (responseCode == 200 && data != null) {
+            var car     = data.hasKey("passengerCar")   ? data["passengerCar"]   : null;
+            var mounted = (car != null && car.hasKey("mountedTyres")) ? car["mountedTyres"] : null;
+            if (mounted != null) {
+                _parseTyreKm(mounted, "frontLeft",  result, "tyreWearKmFL");
+                _parseTyreKm(mounted, "frontRight", result, "tyreWearKmFR");
+                _parseTyreKm(mounted, "rearLeft",   result, "tyreWearKmRL");
+                _parseTyreKm(mounted, "rearRight",  result, "tyreWearKmRR");
+            }
+        }
+        data = null;
+        _callback.invoke(responseCode, result);
+    }
+
+    function _parseTyreKm(mounted, position, result, key) {
+        var pos  = mounted.hasKey(position) ? mounted[position] : null;
+        if (pos == null) { return; }
+        var wear = pos.hasKey("tyreWear") ? pos["tyreWear"] : null;
+        if (wear == null) { return; }
+        var km   = wear.hasKey("dueMileage") ? wear["dueMileage"] : null;
+        if (km != null && km > 0) { result[key] = km.toNumber(); }
+    }
+
     // --- VIN discovery (GET /customers/vehicles/mappings) ---
     // Auto-learns the user's VIN after auth so it need not be entered manually.
 

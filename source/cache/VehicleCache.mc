@@ -24,6 +24,10 @@
 //   "tyreTargetFR"      : Float   (bar)                 vehicle.chassis.axle.row1.wheel.right.tire.pressureTarget
 //   "tyreTargetRL"      : Float   (bar)                 vehicle.chassis.axle.row2.wheel.left.tire.pressureTarget
 //   "tyreTargetRR"      : Float   (bar)                 vehicle.chassis.axle.row2.wheel.right.tire.pressureTarget
+//   "tyreWearKmFL"      : Number  (integer km)          smartMaintenanceTyreDiagnosis frontLeft.tyreWear.dueMileage
+//   "tyreWearKmFR"      : Number  (integer km)          smartMaintenanceTyreDiagnosis frontRight.tyreWear.dueMileage
+//   "tyreWearKmRL"      : Number  (integer km)          smartMaintenanceTyreDiagnosis rearLeft.tyreWear.dueMileage
+//   "tyreWearKmRR"      : Number  (integer km)          smartMaintenanceTyreDiagnosis rearRight.tyreWear.dueMileage
 //   "lastUpdated"       : Number  (epoch seconds)       max(timestamp) across all non-null fields
 //
 // NOT in schema — computed at render time only:

@@ -20,6 +20,7 @@ class ForegroundSync {
     var _vin;
     var _containerId;
     var _accessToken;
+    var _tyreKm;
 
     function initialize() {
         _client = new CarDataClient();
@@ -86,11 +87,23 @@ class ForegroundSync {
     }
 
     function onBasic(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
+        _client.fetchTyreDiagnosis(_vin, _accessToken, method(:onTyreDiag));
+    }
+
+    function onTyreDiag(responseCode as Lang.Number, tyreKm as Lang.Dictionary or Null) as Void {
+        _tyreKm = tyreKm;  // best-effort — proceed regardless of success
         _client.fetchTelematicData(_vin, _containerId, _accessToken, method(:onTelematic));
     }
 
     function onTelematic(responseCode as Lang.Number, state as Lang.Dictionary or Null) as Void {
         if (responseCode == 200 && state != null) {
+            // Merge tyre wear km (from separate endpoint) into the telematic state before writing.
+            if (_tyreKm != null) {
+                var wkeys = ["tyreWearKmFL", "tyreWearKmFR", "tyreWearKmRL", "tyreWearKmRR"];
+                for (var i = 0; i < wkeys.size(); i++) {
+                    if (_tyreKm.hasKey(wkeys[i])) { state[wkeys[i]] = _tyreKm[wkeys[i]]; }
+                }
+            }
             VehicleCache.write(state);
             QuotaGuard.updateAfterFetch();
             Application.Storage.setValue(KEY_LAST_FG, Time.now().value());

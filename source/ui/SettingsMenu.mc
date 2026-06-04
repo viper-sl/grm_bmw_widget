@@ -125,13 +125,7 @@ class AboutMenu {
         if (about.hasKey("numberOfDoors"))     { var v = about["numberOfDoors"].toString();     menu.addItem(new WatchUi.MenuItem("Doors",       v.equals("") ? "—" : v, null, null)); }
         if (about.hasKey("steering"))          { var v = about["steering"].toString();          menu.addItem(new WatchUi.MenuItem("Steering",    v.equals("") ? "—" : v, null, null)); }
 
-        if (about.hasKey("constructionDate")) {
-            var raw = about["constructionDate"].toString();
-            var t   = raw.indexOf("T");
-            // Re-pin to String after substring (returns String or Null in Monkey C).
-            var vd  = (t > 0) ? raw.substring(0, t).toString() : raw;
-            menu.addItem(new WatchUi.MenuItem("Built", vd.equals("") ? "—" : vd, null, null));
-        }
+        if (about.hasKey("constructionDate")) { var v = about["constructionDate"].toString(); menu.addItem(new WatchUi.MenuItem("Built", v.equals("") ? "—" : v, null, null)); }
 
         if (about.hasKey("countryCode"))   { var v = about["countryCode"].toString();   menu.addItem(new WatchUi.MenuItem("Country",    v.equals("") ? "—" : v, null, null)); }
         if (about.hasKey("hasNavi"))       { var v = about["hasNavi"].toString();       menu.addItem(new WatchUi.MenuItem("Navi",       v.equals("") ? "—" : v, null, null)); }

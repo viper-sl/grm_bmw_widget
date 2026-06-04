@@ -81,7 +81,7 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
             var pct = fuelPercent / 100.0;
             if (pct < 0.0) { pct = 0.0; }
             if (pct > 1.0) { pct = 1.0; }
-            var fillColor = (fuelPercent < 50) ? Theme.COLOR_WARN : Theme.COLOR_ACCENT;
+            var fillColor = (fuelPercent <= 20) ? Theme.COLOR_WARN : Theme.COLOR_ACCENT;
             dc.setColor(fillColor, Theme.COLOR_BG);
             dc.fillRectangle(barX, barY, (barW * pct).toNumber(), barH);
         }

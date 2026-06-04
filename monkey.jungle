@@ -5,3 +5,5 @@ base.resourcePath = resources
 
 fenix6pro.sourcePath = $(base.sourcePath)
 fenix6pro.resourcePath = $(base.resourcePath)
+fr255.sourcePath = $(base.sourcePath)
+fr255.resourcePath = $(base.resourcePath)

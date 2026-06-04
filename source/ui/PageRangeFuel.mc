@@ -1,6 +1,6 @@
 // Page: Range & Fuel — main data page.
 // Layout: RANGE label · big km · bar (moved up) · FUEL XX% · XX L in / XX L fill
-// Low fuel (<50%): bar + fuel text turn amber.
+// Low fuel (≤20%): bar + fuel text turn amber.
 // OK/START → manual data refresh (same as vehicle page).
 using Toybox.Application;
 using Toybox.Graphics;
@@ -62,7 +62,7 @@ class PageRangeFuel extends WatchUi.View {
         var rangeKm     = state.hasKey("rangeKm")    ? state["rangeKm"]    : null;
         var fuelPercent = state.hasKey("fuelPercent") ? state["fuelPercent"] : null;
 
-        var lowFuel  = (fuelPercent != null && fuelPercent < 50);
+        var lowFuel  = (fuelPercent != null && fuelPercent <= 20);
         var barColor = lowFuel ? Theme.COLOR_WARN : Theme.COLOR_ACCENT;
 
         // ── Range value (big) ──────────────────────────────────────────────

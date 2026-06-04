@@ -6,8 +6,10 @@
 # on first run). Pairing is done on-watch via the device flow.
 #
 # Usage:
-#   ./build-personal.sh            # build + load into the running simulator
+#   ./build-personal.sh            # build + load into the running simulator (fenix 6 Pro)
 #   ./build-personal.sh --device   # build a sideload-ready .prg for a real fenix 6 Pro
+#   ./build-personal.sh --fr255-sim  # build + load into simulator as Forerunner 255
+#   ./build-personal.sh --fr255    # build a sideload-ready .prg for a real Forerunner 255
 #   ./build-personal.sh --iq       # build a signed .iq package (all installed devices)
 #
 # Output:
@@ -33,12 +35,79 @@ fi
 
 mkdir -p bin
 
-# Normalise single-dash aliases (-iq, -device) to double-dash form.
+# Normalise single-dash aliases.
 ARG="${1:-}"
 case "$ARG" in
-  -iq)     ARG="--iq"     ;;
-  -device) ARG="--device" ;;
+  -iq)        ARG="--iq"        ;;
+  -device)    ARG="--device"    ;;
+  -fr255)     ARG="--fr255"     ;;
+  -fr255-sim) ARG="--fr255-sim" ;;
 esac
+
+# ── --fr255-sim: simulator build for Forerunner 255 ─────────────────────────
+if [ "$ARG" == "--fr255-sim" ]; then
+  OUT="bin/personal-fr255.prg"
+  echo "Building SIM release build → $OUT  (target: fr255_sim)"
+  java -jar "$SDK/bin/monkeybrains.jar" \
+    -o "$OUT" -f "$JUNGLE" -y "$KEY" -d "fr255_sim" -r 2>&1 \
+    | grep -v "^WARNING:" || true
+  if [ ! -f "$OUT" ]; then
+    echo "✗ Build failed — fr255 SDK profile may not be installed." >&2
+    echo "  Install it: SDK Manager → Devices → Forerunner 255, then re-run." >&2
+    exit 1
+  fi
+  SIM_APP="$SDK/bin/ConnectIQ.app"
+  if ! pgrep -qx "simulator" 2>/dev/null; then
+    echo "Starting Connect IQ simulator…"
+    open -a "$SIM_APP"
+    for i in $(seq 1 15); do
+      sleep 1
+      if "$SDK/bin/monkeydo" "$OUT" "fr255" 2>/dev/null; then
+        echo "✓ Loaded into simulator"
+        exit 0
+      fi
+    done
+    echo "⚠ Simulator did not become ready in time. Try:"
+    echo "    $SDK/bin/monkeydo $OUT fr255"
+    exit 1
+  fi
+  echo "Loading into simulator…"
+  "$SDK/bin/monkeydo" "$OUT" "fr255"
+  echo "✓ Loaded into simulator"
+  exit 0
+fi
+
+# ── --fr255: real Forerunner 255 sideload .prg ───────────────────────────────
+if [ "$ARG" == "--fr255" ]; then
+  OUT="bin/BMWWIDGET-FR255.PRG"
+  echo "Building DEVICE release build → $OUT  (target: fr255)"
+  java -jar "$SDK/bin/monkeybrains.jar" \
+    -o "$OUT" -f "$JUNGLE" -y "$KEY" -d "fr255" -r 2>&1 \
+    | grep -v "^WARNING:" || true
+  if [ ! -f "$OUT" ]; then
+    echo "✗ Build failed — fr255 SDK profile may not be installed." >&2
+    echo "  Install it: SDK Manager → Devices → Forerunner 255, then re-run." >&2
+    exit 1
+  fi
+  echo "✓ Built $OUT"
+
+  DEST=""
+  for v in /Volumes/*; do
+    if [ -d "$v/GARMIN/APPS" ]; then DEST="$v/GARMIN/APPS"; break; fi
+  done
+
+  if [ -n "$DEST" ]; then
+    rm -f "$DEST/SETTINGS/GRM_BMW_WIDGET.SET" 2>/dev/null && echo "  cleared stale SETTINGS"
+    rm -f "$DEST/DATA/GRM_BMW_WIDGET."* 2>/dev/null && echo "  cleared stale DATA"
+    cp -f "$OUT" "$DEST/GRM_BMW_WIDGET.PRG"
+    sync
+    echo "✓ Copied to $DEST/GRM_BMW_WIDGET.PRG"
+  else
+    echo "⚠ No Garmin device mounted."
+    echo "  Copy manually: cp $OUT /Volumes/<GARMIN>/GARMIN/APPS/GRM_BMW_WIDGET.PRG"
+  fi
+  exit 0
+fi
 
 # ── --device: real watch sideload .prg ──────────────────────────────────────
 if [ "$ARG" == "--device" ]; then

@@ -97,16 +97,7 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
 
 }
 
-// Read-only "About car" key/value list — full basicData snapshot (all ~19 fields).
-// Curated, human-friendly fields first; the rest follow in catalogue order.
 class AboutMenu {
-    // Fully inlined — no helper functions.
-    // about and menu are LOCAL vars so they keep their declared types.
-    // Function parameters always become Object in Monkey C, causing Symbol
-    // Not Found for type-specific methods (hasKey, indexOf, addItem, etc).
-    // v.substring() returns String or Null — use a separate var + .toString()
-    // to re-pin the type to String before passing to MenuItem.
-
     static function build() {
         var menu  = new WatchUi.Menu2({ :title => "About car" });
         var about = Application.Storage.getValue(StorageKeys.KEY_BASIC_DATA) as Lang.Dictionary or Null;

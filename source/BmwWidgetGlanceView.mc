@@ -32,16 +32,16 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
 
         if (state == null) {
             dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-            dc.drawText(textX, h / 2, Graphics.FONT_XTINY, "Press to set up",
+            dc.drawText(textX, h / 2, Graphics.FONT_TINY, "Press to set up",
                 Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
             return;
         }
 
-        var font = Graphics.FONT_XTINY;
+        var font = Graphics.FONT_GLANCE;
         var lineH = dc.getFontHeight(font);
-        var barH  = 4;
+        var barH  = 7;
         // Total block = row1 + gap + bar + gap + row3. Center it vertically in h.
-        var gap = 4;
+        var gap = 5;
         var blockH = lineH + gap + barH + gap + lineH;
         var top = (h - blockH) / 2;
         var row1Y = top + lineH / 2;
@@ -60,9 +60,13 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
             dc.drawText(textX, row1Y, font, state["doorsLocked"] ? "LOCKED" : "OPEN",
                 Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
         }
-        var rangeStr = (rangeKm != null) ? (rangeKm.toString() + " km") : "-- km";
+        var numStr  = (rangeKm != null) ? rangeKm.toString() : "--";
+        var unitStr = " km";
+        var unitW   = dc.getTextDimensions(unitStr, font)[0];
         dc.setColor(row1Color, Theme.COLOR_BG);
-        dc.drawText(rightX, row1Y, font, rangeStr,
+        dc.drawText(rightX - unitW, row1Y, Graphics.FONT_GLANCE_NUMBER, numStr,
+            Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(rightX, row1Y, font, unitStr,
             Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // ── row 2: fuel bar — fill width = fuel % of the row width ──

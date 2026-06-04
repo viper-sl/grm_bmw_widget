@@ -36,29 +36,25 @@ class PageLock extends WatchUi.View {
 
         PageChrome.drawAccent(dc);
 
-        // Lock status hero text (y=52)
         var locked = state.hasKey("doorsLocked") ? state["doorsLocked"] : true;
+
+        // Status label at top
         dc.setColor(locked ? Theme.COLOR_OK_HI : Theme.COLOR_WARN, Theme.COLOR_BG);
         dc.drawText(cx, 52, Graphics.FONT_SMALL, locked ? "SECURED" : "UNLOCKED",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // ONE state icon (48×48) centered between status text (y≈52) and grid (row1=cy+4≈134).
-        // Center icon at y=93: (52+134)/2. drawBitmap top-left so offset by half icon size (24).
+        // Icon + cross shifted down to sit between SECURED label and age text
+        var mid = cy + 16;
         var icon = locked ? _iconClosed : _iconOpen;
         if (icon != null) {
-            dc.drawBitmap(cx - 24, 93 - 24, icon);
+            dc.drawBitmap(cx - 24, mid - 24, icon);
         }
 
-        // Door grid 2x2 with colored dots
-        var colL = cx - 42;
-        var colR = cx + 42;
-        var row1 = cy + 4;
-        var row2 = cy + 40;
-
-        _cell(dc, colL, row1, "DOOR L", state, "doorFLOpen");
-        _cell(dc, colR, row1, "DOOR R", state, "doorFROpen");
-        _cell(dc, colL, row2, "TRUNK",   state, "trunkOpen");
-        _cell(dc, colR, row2, "HOOD",    state, "hoodOpen");
+        // Cross layout: HOOD above · DOOR L/R on sides · TRUNK below
+        _cell(dc, cx,      mid - 46, "HOOD",   state, "hoodOpen");
+        _cell(dc, cx - 60, mid,      "DOOR L", state, "doorFLOpen");
+        _cell(dc, cx + 60, mid,      "DOOR R", state, "doorFROpen");
+        _cell(dc, cx,      mid + 46, "TRUNK",  state, "trunkOpen");
 
         PageChrome.drawAge(dc, state);
         PageChrome.drawNavDots(dc);
@@ -66,17 +62,17 @@ class PageLock extends WatchUi.View {
 
     function _cell(dc, x, y, name, state, key) {
         dc.setColor(Theme.COLOR_WHITE, Theme.COLOR_BG);
-        dc.drawText(x, y - 9, Graphics.FONT_XTINY, name,
+        dc.drawText(x, y - 12, Graphics.FONT_XTINY, name,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         var isOpen = state.hasKey(key) ? state[key] : false;
         if (isOpen) {
             dc.setColor(Theme.COLOR_ERROR, Theme.COLOR_BG);
-            dc.drawCircle(x, y + 6, 5);
-            dc.fillCircle(x, y + 6, 2);
+            dc.drawCircle(x, y + 10, 7);
+            dc.fillCircle(x, y + 10, 3);
         } else {
             dc.setColor(Theme.COLOR_OK, Theme.COLOR_BG);
-            dc.fillCircle(x, y + 6, 5);
+            dc.fillCircle(x, y + 10, 7);
         }
     }
 

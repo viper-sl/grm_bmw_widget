@@ -4,6 +4,7 @@
 // OK/START → manual data refresh (same as vehicle page).
 using Toybox.Application;
 using Toybox.Graphics;
+using Toybox.Time;
 using Toybox.WatchUi;
 
 class PageRangeFuel extends WatchUi.View {
@@ -18,6 +19,10 @@ class PageRangeFuel extends WatchUi.View {
 
     function onSelect() {
         if (_refreshing) { return true; }
+        var lastSync = Application.Storage.getValue(ForegroundSync.KEY_LAST_FG);
+        if (lastSync != null && (Time.now().value() - lastSync) < ForegroundSync.COOLDOWN_SECONDS) {
+            return true;
+        }
         _refreshing = true;
         WatchUi.requestUpdate();
         _sync = new ForegroundSync();
@@ -69,7 +74,7 @@ class PageRangeFuel extends WatchUi.View {
         // cy-8 = range value center (~122). FONT_NUMBER_MEDIUM height ≈ 60px → bottom ≈ 152.
         // Bar starts at cy+30=160, 8px below value bottom → no overlap.
         var pct = (rangeKm != null) ? (rangeKm.toFloat() / 700.0) : 0.0;
-        PageChrome.drawBar(dc, pct, cy + 30, barColor);
+        PageChrome.drawBar(dc, pct, cy + 26, barColor);
 
         // ── Fuel percent — 14px below bar bottom (bar bottom = cy+35=165) ─
         var fuelStr   = (fuelPercent != null) ? ("FUEL  " + fuelPercent.toString() + "%") : "FUEL  --";

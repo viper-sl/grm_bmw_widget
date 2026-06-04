@@ -39,7 +39,7 @@ class PageChrome {
 
     static function drawBar(dc, pct, y, fillColor) {
         var barW = 160;
-        var barH = 5;
+        var barH = 8;
         var barX = (dc.getWidth() - barW) / 2;
         if (pct < 0) { pct = 0; }
         if (pct > 1) { pct = 1; }
@@ -76,6 +76,13 @@ class PageChrome {
     }
 
     static function drawRefreshHint(dc, isRefreshing) {
+        // Hide while cooling down (but keep visible during active in-flight refresh).
+        if (!isRefreshing) {
+            var lastSync = Application.Storage.getValue(ForegroundSync.KEY_LAST_FG);
+            if (lastSync != null && (Time.now().value() - lastSync) < ForegroundSync.COOLDOWN_SECONDS) {
+                return;
+            }
+        }
         var hy = dc.getHeight() / 4;
         var icon = null;
         try { icon = WatchUi.loadResource(Rez.Drawables.RefreshIcon); } catch (e) {}
@@ -114,6 +121,7 @@ class PageChrome {
         var total = PageNav.visibleCount();
         var rank  = PageNav.activeRank();
         if (total <= 1) { return; }
+        dc.setPenWidth(1);
         var spacing = 10;
         var startY  = (dc.getHeight() - (total - 1) * spacing) / 2;
         for (var i = 0; i < total; i++) {

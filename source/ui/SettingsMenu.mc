@@ -125,18 +125,7 @@ class AboutMenu {
         if (about.hasKey("numberOfDoors"))     { var v = about["numberOfDoors"].toString();     menu.addItem(new WatchUi.MenuItem("Doors",       v.equals("") ? "—" : v, null, null)); }
         if (about.hasKey("steering"))          { var v = about["steering"].toString();          menu.addItem(new WatchUi.MenuItem("Steering",    v.equals("") ? "—" : v, null, null)); }
 
-        if (about.hasKey("constructionDate")) {
-            var full = about["constructionDate"].toString();
-            var t    = full.indexOf("T");
-            // substring() returns String or Null in Monkey C — can't call methods on it.
-            // Null-check narrows the type; concatenate "" to force String result.
-            var disp = full;
-            if (t > 0) {
-                var s = full.substring(0, t);
-                if (s != null) { disp = s + ""; }
-            }
-            menu.addItem(new WatchUi.MenuItem("Built", disp.equals("") ? "—" : disp, null, null));
-        }
+        if (about.hasKey("constructionDate")) { var v = about["constructionDate"].toString(); menu.addItem(new WatchUi.MenuItem("Built", v.equals("") ? "—" : v, null, null)); }
 
         if (about.hasKey("countryCode"))   { var v = about["countryCode"].toString();   menu.addItem(new WatchUi.MenuItem("Country",    v.equals("") ? "—" : v, null, null)); }
         if (about.hasKey("hasNavi"))       { var v = about["hasNavi"].toString();       menu.addItem(new WatchUi.MenuItem("Navi",       v.equals("") ? "—" : v, null, null)); }

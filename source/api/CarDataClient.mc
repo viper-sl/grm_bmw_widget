@@ -82,7 +82,19 @@ class CarDataClient {
             for (var i = 0; i < keys.size(); i++) {
                 var k = keys[i];
                 var v = data[k];
-                if (v != null) { about[k] = v.toString(); }
+                if (v != null) {
+                    var vs = v.toString();
+                    // Trim constructionDate to date-only at write time.
+                    // vs is a definite String here; substring() result is stored
+                    // directly (no method call on String or Null = no type crash).
+                    if (k.equals("constructionDate")) {
+                        var t = vs.indexOf("T");
+                        if (t > 0) { about[k] = vs.substring(0, t); }
+                        else       { about[k] = vs; }
+                    } else {
+                        about[k] = vs;
+                    }
+                }
             }
             Application.Storage.setValue(StorageKeys.KEY_BASIC_DATA, about);
         }

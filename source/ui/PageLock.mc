@@ -55,8 +55,8 @@ class PageLock extends WatchUi.View {
         var row1 = cy + 4;
         var row2 = cy + 40;
 
-        _cell(dc, colL, row1, "FRONT L", state, "doorFLOpen");
-        _cell(dc, colR, row1, "FRONT R", state, "doorFROpen");
+        _cell(dc, colL, row1, "DOOR L", state, "doorFLOpen");
+        _cell(dc, colR, row1, "DOOR R", state, "doorFROpen");
         _cell(dc, colL, row2, "TRUNK",   state, "trunkOpen");
         _cell(dc, colR, row2, "HOOD",    state, "hoodOpen");
 

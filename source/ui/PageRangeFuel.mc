@@ -86,7 +86,7 @@ class PageRangeFuel extends WatchUi.View {
             var inTank   = (tank * fuelPercent) / 100;
             var fill     = tank - inTank;
             if (fill < 0) { fill = 0; }
-            var litStr   = inTank.toNumber().toString() + "L in  " + fill.toNumber().toString() + "L to fill";
+            var litStr   = inTank.toNumber().toString() + "L in   | " + fill.toNumber().toString() + "L to fill";
             dc.setColor(lowFuel ? Theme.COLOR_WARN : Theme.COLOR_MUTED, Theme.COLOR_BG);
             dc.drawText(cx, cy + 70, Graphics.FONT_XTINY, litStr,
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);

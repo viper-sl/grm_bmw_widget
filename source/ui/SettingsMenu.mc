@@ -116,7 +116,7 @@ class AboutMenu {
         if (about.hasKey("numberOfDoors"))     { var v = about["numberOfDoors"].toString();     menu.addItem(new WatchUi.MenuItem("Doors",       v.equals("") ? "—" : v, null, null)); }
         if (about.hasKey("steering"))          { var v = about["steering"].toString();          menu.addItem(new WatchUi.MenuItem("Steering",    v.equals("") ? "—" : v, null, null)); }
 
-        if (about.hasKey("constructionDate")) { var v = about["constructionDate"].toString(); menu.addItem(new WatchUi.MenuItem("Built", v.equals("") ? "—" : v, null, null)); }
+        if (about.hasKey("constructionDate")) { var v = about["constructionDate"].substring(0, 10).toString(); menu.addItem(new WatchUi.MenuItem("Built", v.equals("") ? "—" : v, null, null)); }
 
         if (about.hasKey("countryCode"))   { var v = about["countryCode"].toString();   menu.addItem(new WatchUi.MenuItem("Country",    v.equals("") ? "—" : v, null, null)); }
         if (about.hasKey("hasNavi"))       { var v = about["hasNavi"].toString();       menu.addItem(new WatchUi.MenuItem("Navi",       v.equals("") ? "—" : v, null, null)); }

@@ -86,7 +86,7 @@ class PageChrome {
             var iy = hy - ih / 2;
             if (isRefreshing) {
                 dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
-                dc.fillRectangle(ix - 1, iy - 1, iw + 2, ih + 2);
+                dc.fillCircle(ix + iw / 2, iy + ih / 2, iw / 2 + 2);
             }
             dc.drawBitmap(ix, iy, icon);
         } else {

@@ -58,6 +58,19 @@ class PageChrome {
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
+    // Data Age with staleness emphasis (FR-20) — same position/font as drawAge(),
+    // but turns COLOR_WARN once the cached data is more than 30 minutes old, so a
+    // "locked, all closed" reading isn't mistaken for current while the car idles.
+    static function drawAgeProminent(dc, state) {
+        if (state == null || !state.hasKey("lastUpdated")) { return; }
+        var ageSec = Time.now().value() - state["lastUpdated"];
+        var color = (ageSec > 1800) ? Theme.COLOR_WARN : Theme.COLOR_DIM;
+        dc.setColor(color, Theme.COLOR_BG);
+        dc.drawText(dc.getWidth() / 2, dc.getHeight() - 22, Graphics.FONT_XTINY,
+            _ageString(ageSec),
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
     static function _ageString(sec) {
         if (sec < 60)    { return sec.toString() + "s ago"; }
         if (sec < 3600)  { return (sec / 60).toString() + "m ago"; }

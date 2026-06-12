@@ -107,6 +107,11 @@ class ForegroundSync {
             VehicleCache.write(state);
             QuotaGuard.updateAfterFetch();
             Application.Storage.setValue(KEY_LAST_FG, Time.now().value());
+            // Re-assert the background poll schedule. Manual mode's daily 10:00
+            // event is one-shot; if its re-registration in onTemporalEvent ever
+            // failed silently, the chain stays broken until the app re-registers —
+            // any successful manual refresh is a natural point to re-arm it.
+            Application.getApp()._applyUpdateMode();
             _finish(true);
         } else if (responseCode == 429) {
             // Manual refresh hit the quota — apply the same 24h block as the background service.
@@ -126,7 +131,7 @@ class ForegroundSync {
     }
 
     function _resolveContainer() {
-        var c = Application.Storage.getValue(StorageKeys.KEY_CONTAINER_ID);
+        var c = CarDataClient.cachedContainerId();
         if (c == null) { c = Application.Properties.getValue("containerId"); }
         if (c != null && c.equals("")) { c = null; }
         return c;

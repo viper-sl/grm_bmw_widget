@@ -25,6 +25,9 @@ class SettingsMenu {
         menu.addItem(new WatchUi.MenuItem(
             "Tank Size", tank.toString() + " L", :tankSize, null));
 
+        menu.addItem(new WatchUi.MenuItem(
+            "Next Service", nextMaintenanceLabel(), :nextMaintenance, null));
+
         menu.addItem(new WatchUi.MenuItem("Re-pair", "Re-authenticate", :repair, null));
         menu.addItem(new WatchUi.MenuItem("Sign out", "Clear tokens", :signout, null));
         menu.addItem(new WatchUi.MenuItem("About car", null, :about, null));
@@ -42,6 +45,18 @@ class SettingsMenu {
         if (m == 1) { return "Auto · hourly"; }
         if (m == 2) { return "Auto · adaptive"; }
         return "Manual · button";
+    }
+
+    // FR-23: 0 = use BMW's serviceDistanceKm; >0 = user override (km).
+    static function nextMaintenanceKm() {
+        var v = Application.Properties.getValue("nextMaintenanceKm");
+        return (v == null) ? 0 : v;
+    }
+
+    static function nextMaintenanceLabel() {
+        var km = nextMaintenanceKm();
+        if (km == 0) { return "Auto (BMW)"; }
+        return km.toString() + " km";
     }
 
 }
@@ -73,6 +88,14 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
             item.setSubLabel(t.toString() + " L");
             WatchUi.requestUpdate();
 
+        } else if (id == :nextMaintenance) {
+            // FR-23: cycle in 1000 km steps, 0 ("Auto (BMW)") .. 50000, then wrap to 0.
+            var n = SettingsMenu.nextMaintenanceKm() + 1000;
+            if (n > 50000) { n = 0; }
+            Application.Properties.setValue("nextMaintenanceKm", n);
+            item.setSubLabel(SettingsMenu.nextMaintenanceLabel());
+            WatchUi.requestUpdate();
+
         } else if (id == :repair) {
             var auth = new DeviceAuthManager();
             WatchUi.pushView(new AuthView(auth), new AuthDelegate(auth), WatchUi.SLIDE_LEFT);
@@ -82,6 +105,15 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
             Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_TOKEN);
             Application.Storage.deleteValue(StorageKeys.KEY_ACCESS_EXPIRY);
             Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "UNCONFIGURED");
+            // The next pairing may be a different account/vehicle — drop all
+            // vehicle-derived state, or write()'s merge would resurrect this
+            // car's fields (doorsLocked, windows, ...) onto the next one.
+            VehicleCache.clear();
+            Application.Storage.deleteValue(StorageKeys.KEY_VEHICLE_NAME);
+            Application.Storage.deleteValue(StorageKeys.KEY_BASIC_DATA);
+            Application.Storage.deleteValue(StorageKeys.KEY_VIN);
+            Application.Storage.deleteValue(StorageKeys.KEY_CONTAINER_ID);
+            Application.Storage.deleteValue(StorageKeys.KEY_CONTAINER_NAME);
             item.setSubLabel("Signed out");
             WatchUi.requestUpdate();
 

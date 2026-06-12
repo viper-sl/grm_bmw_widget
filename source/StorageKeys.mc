@@ -12,4 +12,5 @@ class StorageKeys {
     static const KEY_BASIC_DATA       = "basicData";
     static const KEY_VIN              = "vin";
     static const KEY_CONTAINER_ID     = "containerId";
+    static const KEY_CONTAINER_NAME   = "containerName";
 }

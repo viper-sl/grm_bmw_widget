@@ -32,10 +32,15 @@ class PageOdometer extends WatchUi.View {
 
         PageChrome.drawLabel(dc, "ODOMETER (KM)", cy - 58);
         PageChrome.drawValue(dc, state["odometerKm"].toString(),
-            Graphics.FONT_NUMBER_MEDIUM, cy - 8, Theme.COLOR_TEXT);
+            Graphics.FONT_NUMBER_MEDIUM, cy - 8, Theme.COLOR_WHITE);
 
-        if (state.hasKey("serviceDistanceKm")) {
-            var svcKm = state["serviceDistanceKm"];
+        // FR-23: a user-set "next maintenance" override (km) replaces BMW's
+        // serviceDistanceKm for display when set (>0).
+        var override = SettingsMenu.nextMaintenanceKm();
+        var svcKm = (override > 0) ? override
+                  : (state.hasKey("serviceDistanceKm") ? state["serviceDistanceKm"] : null);
+
+        if (svcKm != null) {
             var svcColor = _serviceColor(svcKm);
             var pct = svcKm.toFloat() / 5000.0;
             PageChrome.drawBar(dc, pct, cy + 44, svcColor);
@@ -61,18 +66,6 @@ class PageOdometer extends WatchUi.View {
         var rem = (n % 1000) / 100;
         if (rem == 0) { return k.toString() + "K km"; }
         return k.toString() + "." + rem.toString() + "K km";
-    }
-
-    function _grouped(n) {
-        var s = n.toString();
-        var out = "";
-        var count = 0;
-        for (var i = s.length() - 1; i >= 0; i--) {
-            out = s.substring(i, i + 1) + out;
-            count++;
-            if (count % 3 == 0 && i > 0) { out = "," + out; }
-        }
-        return out;
     }
 
 }

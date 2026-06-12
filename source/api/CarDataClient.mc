@@ -1,6 +1,6 @@
 // BMW CarData REST API client.
 // MANDATORY: x-version: v1 header on ALL requests to api-cardata.bmwgroup.com.
-// (:debug)/(:release) annotations control mock vs live network calls.
+// All builds use the live API (no mock layer); MockData exists for unit tests only.
 // Parse-and-discard: raw JSON is never stored; typed state dict is returned.
 using Toybox.Application;
 using Toybox.Communications;
@@ -17,7 +17,6 @@ class CarDataClient {
 
     // --- Telematic Data (main poll, every 40 min) ---
 
-    (:release)
     function fetchTelematicData(vin, containerId, accessToken, callback) {
         _callback = callback;
         Communications.makeWebRequest(
@@ -28,12 +27,6 @@ class CarDataClient {
               :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON },
             method(:onTelematicDataResponse)
         );
-    }
-
-    (:debug)
-    function fetchTelematicData(vin, containerId, accessToken, callback) {
-        _callback = callback;
-        onTelematicDataResponse(200, MockData.telematicFixture());
     }
 
     function onTelematicDataResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
@@ -49,7 +42,6 @@ class CarDataClient {
 
     // --- Basic Data (bootstrap only — called once from ServiceDelegate Phase 1) ---
 
-    (:release)
     function fetchBasicData(vin, accessToken, callback) {
         _callback = callback;
         Communications.makeWebRequest(
@@ -60,12 +52,6 @@ class CarDataClient {
               :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON },
             method(:onBasicDataResponse)
         );
-    }
-
-    (:debug)
-    function fetchBasicData(vin, accessToken, callback) {
-        _callback = callback;
-        onBasicDataResponse(200, MockData.basicDataFixture());
     }
 
     function onBasicDataResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
@@ -92,7 +78,6 @@ class CarDataClient {
 
     // --- Tyre Diagnosis (best-effort, separate endpoint, no container needed) ---
 
-    (:release)
     function fetchTyreDiagnosis(vin, accessToken, callback) {
         _callback = callback;
         Communications.makeWebRequest(
@@ -103,12 +88,6 @@ class CarDataClient {
               :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON },
             method(:onTyreDiagnosisResponse)
         );
-    }
-
-    (:debug)
-    function fetchTyreDiagnosis(vin, accessToken, callback) {
-        _callback = callback;
-        onTyreDiagnosisResponse(200, MockData.tyreDiagnosisFixture());
     }
 
     function onTyreDiagnosisResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
@@ -142,7 +121,7 @@ class CarDataClient {
     // typecheck off: makeWebRequest's callback type names PersistedContent.Iterator,
     // whose permission is unsupported on fenix 6 (adding it makes the watch refuse to
     // run the widget). We don't name that type anywhere; suppress the check here.
-    (:release :typecheck(false))
+    (:typecheck(false))
     function fetchMappings(accessToken, callback) {
         _callback = callback;
         Communications.makeWebRequest(
@@ -153,12 +132,6 @@ class CarDataClient {
               :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON },
             method(:onMappingsResponse)
         );
-    }
-
-    (:debug)
-    function fetchMappings(accessToken, callback) {
-        _callback = callback;
-        onMappingsResponse(200, { "data" => [ { "vin" => "WBADEBUGVIN000001", "mappingType" => "PRIMARY" } ] });
     }
 
     // Picks the PRIMARY VIN (or the first) and stores it. Returns vin via callback.
@@ -227,12 +200,11 @@ class CarDataClient {
     // Body shape (verified): { name, purpose, technicalDescriptors:[...] }.
     // technicalDescriptors is a FLAT array of dotted strings (not objects).
 
-    static const _CONTAINER_NAME = "grm_bmw_widget";
+    static const _CONTAINER_NAME = "grm_bmw_widget_v2";
 
     // List existing containers; reuse ours (match by name) if present.
     // GET /customers/containers -> {"data":{"containers":[ {id|containerId, name, ...} ]}}.
 
-    (:release)
     function fetchContainers(accessToken, callback) {
         _callback = callback;
         Communications.makeWebRequest(
@@ -245,44 +217,35 @@ class CarDataClient {
         );
     }
 
-    (:debug)
-    function fetchContainers(accessToken, callback) {
-        _callback = callback;
-        onContainersResponse(200, { "data" => { "containers" => [] } });
-    }
-
-    // Returns an existing container id (ours by name, else first) or null via callback.
+    // Returns an existing container id (name match ONLY) or null via callback.
+    // Containers under other names — including this widget's own older versions —
+    // must NOT be reused: the A3 migration relies on a no-match here so the
+    // caller falls through to createContainer with the current descriptor set.
     function onContainersResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
         var cid = null;
         if (responseCode == 200 && data != null) {
             var d = data.hasKey("data") ? data["data"] : data;
             var list = (d instanceof Lang.Dictionary && d.hasKey("containers")) ? d["containers"] : null;
             if (list instanceof Lang.Array) {
-                var firstId = null;
                 for (var i = 0; i < list.size(); i++) {
                     var c = list[i];
                     if (c instanceof Lang.Dictionary) {
                         var id = c.hasKey("containerId") ? c["containerId"]
                                : (c.hasKey("id") ? c["id"] : null);
-                        if (id != null) {
-                            if (firstId == null) { firstId = id; }
-                            var nm = c["name"];
-                            if (nm != null && nm.equals(_CONTAINER_NAME)) {
-                                cid = id;              // prefer our own container
-                                break;
-                            }
+                        var nm = c["name"];
+                        if (id != null && nm != null && nm.equals(_CONTAINER_NAME)) {
+                            cid = id;
+                            break;
                         }
                     }
                 }
-                if (cid == null) { cid = firstId; }    // else reuse any existing container
             }
         }
-        if (cid != null) { Application.Storage.setValue(StorageKeys.KEY_CONTAINER_ID, cid); }
+        if (cid != null) { _storeContainer(cid); }
         data = null;
         _callback.invoke(responseCode, cid);
     }
 
-    (:release)
     function createContainer(accessToken, callback) {
         _callback = callback;
         // JSON POST: Content-Type must be set via the REQUEST_CONTENT_TYPE_JSON enum in
@@ -307,29 +270,48 @@ class CarDataClient {
         );
     }
 
-    (:debug)
-    function createContainer(accessToken, callback) {
-        _callback = callback;
-        onCreateContainerResponse(200, { "containerId" => "DEBUGCONTAINER01" });
-    }
-
     function onCreateContainerResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
         var cid = null;
         if ((responseCode == 200 || responseCode == 201) && data != null) {
             cid = data.hasKey("containerId") ? data["containerId"]
                 : (data.hasKey("id") ? data["id"] : null);
-            if (cid != null) { Application.Storage.setValue(StorageKeys.KEY_CONTAINER_ID, cid); }
+            if (cid != null) { _storeContainer(cid); }
         }
         data = null;
         _callback.invoke(responseCode, cid);
     }
 
-    // The 21 descriptors the widget reads (ICE 218i, container v2).
+    // Cache the container id stamped with the name it was created/matched under,
+    // so cachedContainerId() can detect a version bump later.
+    static function _storeContainer(cid) {
+        Application.Storage.setValue(StorageKeys.KEY_CONTAINER_ID, cid);
+        Application.Storage.setValue(StorageKeys.KEY_CONTAINER_NAME, _CONTAINER_NAME);
+    }
+
+    // Returns the cached container id, or null after invalidating it if it was
+    // stored under a different container name (older widget version). Without
+    // this, a stale v1 id short-circuits discovery and the v2 container — with
+    // its expanded descriptor set — would never be created for existing installs.
+    static function cachedContainerId() {
+        var cid = Application.Storage.getValue(StorageKeys.KEY_CONTAINER_ID);
+        if (cid == null) { return null; }
+        var name = Application.Storage.getValue(StorageKeys.KEY_CONTAINER_NAME);
+        if (name == null || !name.equals(_CONTAINER_NAME)) {
+            Application.Storage.deleteValue(StorageKeys.KEY_CONTAINER_ID);
+            Application.Storage.deleteValue(StorageKeys.KEY_CONTAINER_NAME);
+            return null;
+        }
+        return cid;
+    }
+
+    // The 27 descriptors the widget reads (ICE 218i, container v2).
     static function _containerDescriptors() {
         return [
             "vehicle.cabin.door.lock.status",
             "vehicle.cabin.door.row1.driver.isOpen",
             "vehicle.cabin.door.row1.passenger.isOpen",
+            "vehicle.cabin.door.row2.driver.isOpen",
+            "vehicle.cabin.door.row2.passenger.isOpen",
             "vehicle.body.trunk.isOpen",
             "vehicle.body.trunk.isLocked",
             "vehicle.body.hood.isOpen",
@@ -340,6 +322,10 @@ class CarDataClient {
             "vehicle.status.serviceDistance.next",
             "vehicle.cabin.infotainment.displayUnit.distance",
             "vehicle.drivetrain.engine.isIgnitionOn",
+            "vehicle.cabin.window.row1.driver.status",
+            "vehicle.cabin.window.row1.passenger.status",
+            "vehicle.cabin.window.row2.driver.status",
+            "vehicle.cabin.window.row2.passenger.status",
             "vehicle.chassis.axle.row1.wheel.left.tire.pressure",
             "vehicle.chassis.axle.row1.wheel.right.tire.pressure",
             "vehicle.chassis.axle.row2.wheel.left.tire.pressure",
@@ -404,33 +390,13 @@ class CarDataClient {
             _updateMaxTs(e["timestamp"]);
         }
 
-        // Door FL
-        e = td["vehicle.cabin.door.row1.driver.isOpen"];
-        if (e != null && e["value"] != null) {
-            state["doorFLOpen"] = e["value"].equals("OPEN");
-            _updateMaxTs(e["timestamp"]);
-        }
-
-        // Door FR
-        e = td["vehicle.cabin.door.row1.passenger.isOpen"];
-        if (e != null && e["value"] != null) {
-            state["doorFROpen"] = e["value"].equals("OPEN");
-            _updateMaxTs(e["timestamp"]);
-        }
-
-        // Trunk
-        e = td["vehicle.body.trunk.isOpen"];
-        if (e != null && e["value"] != null) {
-            state["trunkOpen"] = e["value"].equals("OPEN");
-            _updateMaxTs(e["timestamp"]);
-        }
-
-        // Hood
-        e = td["vehicle.body.hood.isOpen"];
-        if (e != null && e["value"] != null) {
-            state["hoodOpen"] = e["value"].equals("OPEN");
-            _updateMaxTs(e["timestamp"]);
-        }
+        // Doors / trunk / hood: OPEN -> true, anything else -> false; absent -> omit.
+        _parseOpenState(td, "vehicle.cabin.door.row1.driver.isOpen",    state, "doorFLOpen");
+        _parseOpenState(td, "vehicle.cabin.door.row1.passenger.isOpen", state, "doorFROpen");
+        _parseOpenState(td, "vehicle.cabin.door.row2.driver.isOpen",    state, "doorRLOpen");
+        _parseOpenState(td, "vehicle.cabin.door.row2.passenger.isOpen", state, "doorRROpen");
+        _parseOpenState(td, "vehicle.body.trunk.isOpen",                state, "trunkOpen");
+        _parseOpenState(td, "vehicle.body.hood.isOpen",                 state, "hoodOpen");
 
         // Odometer
         e = td["vehicle.vehicle.travelledDistance"];
@@ -453,6 +419,29 @@ class CarDataClient {
             _updateMaxTs(e["timestamp"]);
         }
 
+        // Engine running (ignition). Value format unconfirmed (OQ-2) — accept plain
+        // booleans/strings or ASN_isTrue/ASN_isFalse enum strings; ASN_isUnknown/other -> omit.
+        e = td["vehicle.drivetrain.engine.isIgnitionOn"];
+        if (e != null && e["value"] != null) {
+            var ign = e["value"];
+            if (ign instanceof Lang.Boolean) {
+                state["engineRunning"] = ign;
+                _updateMaxTs(e["timestamp"]);
+            } else if (ign.equals("true") || ign.equals("True") || ign.equals("ASN_isTrue")) {
+                state["engineRunning"] = true;
+                _updateMaxTs(e["timestamp"]);
+            } else if (ign.equals("false") || ign.equals("False") || ign.equals("ASN_isFalse")) {
+                state["engineRunning"] = false;
+                _updateMaxTs(e["timestamp"]);
+            } // ASN_isUnknown / other -> omit
+        }
+
+        // Window status: OPEN/INTERMEDIATE -> true (open), CLOSED/INVALID -> false.
+        _parseWindowStatus(td, "vehicle.cabin.window.row1.driver.status",    state, "windowFLOpen");
+        _parseWindowStatus(td, "vehicle.cabin.window.row1.passenger.status", state, "windowFROpen");
+        _parseWindowStatus(td, "vehicle.cabin.window.row2.driver.status",    state, "windowRLOpen");
+        _parseWindowStatus(td, "vehicle.cabin.window.row2.passenger.status", state, "windowRROpen");
+
         // Tyre pressures (kPa → bar = kPa / 100.0)
         _parseTyrePressure(td, "vehicle.chassis.axle.row1.wheel.left.tire.pressure",        state, "tyrePressureFL");
         _parseTyrePressure(td, "vehicle.chassis.axle.row1.wheel.right.tire.pressure",       state, "tyrePressureFR");
@@ -470,6 +459,27 @@ class CarDataClient {
 
         raw = null;
         return state;
+    }
+
+    // Parse a door/trunk/hood isOpen entry: OPEN -> true, anything else -> false.
+    // Absent descriptor (e.g. row2 doors not in this vehicle's catalog, OQ-4) -> omit.
+    function _parseOpenState(td, descriptor, state, key) {
+        var e = td[descriptor];
+        if (e != null && e["value"] != null) {
+            state[key] = e["value"].equals("OPEN");
+            _updateMaxTs(e["timestamp"]);
+        }
+    }
+
+    // Parse a window status entry: OPEN/INTERMEDIATE -> true, CLOSED/INVALID -> false.
+    // Absent descriptor (e.g. not in this vehicle's catalog, OQ-4) -> omit entirely.
+    function _parseWindowStatus(td, descriptor, state, key) {
+        var e = td[descriptor];
+        if (e != null && e["value"] != null) {
+            var v = e["value"];
+            state[key] = v.equals("OPEN") || v.equals("INTERMEDIATE");
+            _updateMaxTs(e["timestamp"]);
+        }
     }
 
     // Parse a kPa tyre entry; convert to Float bar; update _maxTs.

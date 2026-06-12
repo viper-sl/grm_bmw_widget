@@ -79,7 +79,7 @@ class PageRangeFuel extends WatchUi.View {
         // ── Fuel percent — 14px below bar bottom (bar bottom = cy+35=165) ─
         var fuelStr   = (fuelPercent != null) ? ("FUEL  " + fuelPercent.toString() + "%") : "FUEL  --";
         var fuelColor = (fuelPercent == null) ? Theme.COLOR_MUTED
-                      : lowFuel ? Theme.COLOR_WARN : Theme.COLOR_TEXT;
+                      : lowFuel ? Theme.COLOR_WARN : Theme.COLOR_WHITE;
         dc.setColor(fuelColor, Theme.COLOR_BG);
         dc.drawText(cx, cy + 50, Graphics.FONT_TINY, fuelStr,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
@@ -97,9 +97,26 @@ class PageRangeFuel extends WatchUi.View {
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
+        // ── Fuel consumption estimate (FR-22) — instantaneous L/100km, not trip-based ──
+        var fuelLitres = state.hasKey("fuelLitres") ? state["fuelLitres"] : null;
+        var consumption = consumptionPer100Km(fuelLitres, rangeKm);
+        if (consumption != null) {
+            dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
+            dc.drawText(cx, cy + 86, Graphics.FONT_XTINY,
+                "~" + PageChrome.oneDecimal(consumption) + " L/100KM (EST)",
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+
         PageChrome.drawAge(dc, state);
         PageChrome.drawNavDots(dc);
         PageChrome.drawRefreshHint(dc, _refreshing);
+    }
+
+    // FR-22: instantaneous L/100km from remaining fuel + remaining range.
+    // Returns null when not computable (missing data or zero range).
+    static function consumptionPer100Km(fuelLitres, rangeKm) {
+        if (fuelLitres == null || rangeKm == null || rangeKm <= 0) { return null; }
+        return (fuelLitres.toFloat() / rangeKm.toFloat()) * 100.0;
     }
 
 }

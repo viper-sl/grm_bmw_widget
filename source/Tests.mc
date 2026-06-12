@@ -18,6 +18,7 @@ function testParse_numericCasts(logger as Test.Logger) as Lang.Boolean {
     Test.assertEqualMessage(s["fuelLitres"], 21, "fuelLitres");
     Test.assertEqualMessage(s["odometerKm"], 40926, "odometerKm");
     Test.assertEqualMessage(s["serviceDistanceKm"], 22000, "serviceDistanceKm");
+    _resetStorage();
     return true;
 }
 
@@ -29,6 +30,7 @@ function testParse_booleanCasts(logger as Test.Logger) as Lang.Boolean {
     Test.assertMessage(s["doorFROpen"] == false, "FR CLOSED->false");
     Test.assertMessage(s["trunkOpen"] == false, "trunk CLOSED->false");
     Test.assertMessage(s["hoodOpen"] == false, "hood CLOSED->false");
+    _resetStorage();
     return true;
 }
 
@@ -36,6 +38,7 @@ function testParse_booleanCasts(logger as Test.Logger) as Lang.Boolean {
 function testParse_stringPassthrough(logger as Test.Logger) as Lang.Boolean {
     var s = new CarDataClient()._parseTelematicData(_fixture());
     Test.assertEqualMessage(s["displayUnit"], "km", "displayUnit");
+    _resetStorage();
     return true;
 }
 
@@ -45,6 +48,7 @@ function testParse_kpaToBar(logger as Test.Logger) as Lang.Boolean {
     Test.assertMessage(_fEq(s["tyrePressureFL"], 2.3), "FL 230kPa->2.3");
     Test.assertMessage(_fEq(s["tyrePressureRL"], 2.2), "RL 220kPa->2.2");
     Test.assertMessage(_fEq(s["tyreTargetFL"], 2.2), "target 220->2.2");
+    _resetStorage();
     return true;
 }
 
@@ -54,6 +58,7 @@ function testParse_nullOmitted(logger as Test.Logger) as Lang.Boolean {
     Test.assertMessage(!s.hasKey("dataAge"), "dataAge never stored");
     // trunk.isLocked + ignitionOn are null in fixture and not mapped -> absent
     Test.assertMessage(!s.hasKey("ignitionOn"), "null ignition omitted");
+    _resetStorage();
     return true;
 }
 
@@ -63,6 +68,7 @@ function testParse_lastUpdatedIsMax(logger as Test.Logger) as Lang.Boolean {
     Test.assertMessage(s.hasKey("lastUpdated"), "lastUpdated present");
     var expected = CarDataClient._parseIso8601("2026-05-27T17:53:20Z");
     Test.assertEqualMessage(s["lastUpdated"], expected, "max ts, not older 05-24");
+    _resetStorage();
     return true;
 }
 
@@ -71,6 +77,7 @@ function testParse_emptyContainer(logger as Test.Logger) as Lang.Boolean {
     var s = new CarDataClient()._parseTelematicData({});
     Test.assertMessage(s != null, "empty -> dict not null");
     Test.assertMessage(!s.hasKey("rangeKm"), "empty -> no fields");
+    _resetStorage();
     return true;
 }
 
@@ -83,6 +90,61 @@ function testParse_lockEnums(logger as Test.Logger) as Lang.Boolean {
     Test.assertMessage(locked["doorsLocked"] == true, "LOCKED->true");
     var invalid = c._parseTelematicData(_lockFixture("INVALID"));
     Test.assertMessage(!invalid.hasKey("doorsLocked"), "INVALID omitted");
+    _resetStorage();
+    return true;
+}
+
+// ============================================================
+//  FR-19/FR-18 — rear doors + windows (B4/B6)
+// ============================================================
+
+(:test)
+function testParse_rearDoorsAndWindowsClosed(logger as Test.Logger) as Lang.Boolean {
+    var s = new CarDataClient()._parseTelematicData(_fixture());
+    Test.assertMessage(s["doorRLOpen"] == false, "rear-left door CLOSED->false");
+    Test.assertMessage(s["doorRROpen"] == false, "rear-right door CLOSED->false");
+    Test.assertMessage(s["windowFLOpen"] == false, "FL window CLOSED->false");
+    Test.assertMessage(s["windowFROpen"] == false, "FR window CLOSED->false");
+    Test.assertMessage(s["windowRLOpen"] == false, "RL window CLOSED->false");
+    Test.assertMessage(s["windowRROpen"] == false, "RR window CLOSED->false");
+    _resetStorage();
+    return true;
+}
+
+(:test)
+function testParse_windowStatusVariants(logger as Test.Logger) as Lang.Boolean {
+    var c = new CarDataClient();
+    var open = c._parseTelematicData(_windowFixture("OPEN"));
+    Test.assertMessage(open["windowFLOpen"] == true, "OPEN->true");
+    var intermediate = c._parseTelematicData(_windowFixture("INTERMEDIATE"));
+    Test.assertMessage(intermediate["windowFLOpen"] == true, "INTERMEDIATE->true");
+    var closed = c._parseTelematicData(_windowFixture("CLOSED"));
+    Test.assertMessage(closed["windowFLOpen"] == false, "CLOSED->false");
+    var invalid = c._parseTelematicData(_windowFixture("INVALID"));
+    Test.assertMessage(invalid["windowFLOpen"] == false, "INVALID->false");
+    // OQ-4: descriptor absent entirely from this vehicle's catalog -> field omitted.
+    var absent = c._parseTelematicData({ "telematicData" => {} });
+    Test.assertMessage(!absent.hasKey("windowFLOpen"), "absent descriptor omitted");
+    _resetStorage();
+    return true;
+}
+
+// ============================================================
+//  FR-17 — engine running / ignition (B5, OQ-2)
+// ============================================================
+
+(:test)
+function testParse_engineRunningVariants(logger as Test.Logger) as Lang.Boolean {
+    var c = new CarDataClient();
+    Test.assertMessage(c._parseTelematicData(_ignitionFixture(true))["engineRunning"] == true, "Boolean true");
+    Test.assertMessage(c._parseTelematicData(_ignitionFixture(false))["engineRunning"] == false, "Boolean false");
+    Test.assertMessage(c._parseTelematicData(_ignitionFixture("true"))["engineRunning"] == true, "\"true\"->true");
+    Test.assertMessage(c._parseTelematicData(_ignitionFixture("ASN_isTrue"))["engineRunning"] == true, "ASN_isTrue->true");
+    Test.assertMessage(c._parseTelematicData(_ignitionFixture("false"))["engineRunning"] == false, "\"false\"->false");
+    Test.assertMessage(c._parseTelematicData(_ignitionFixture("ASN_isFalse"))["engineRunning"] == false, "ASN_isFalse->false");
+    Test.assertMessage(!c._parseTelematicData(_ignitionFixture("ASN_isUnknown")).hasKey("engineRunning"), "ASN_isUnknown omitted");
+    Test.assertMessage(!c._parseTelematicData(_ignitionFixture(null)).hasKey("engineRunning"), "null omitted");
+    _resetStorage();
     return true;
 }
 
@@ -98,6 +160,7 @@ function testIso8601_basic(logger as Test.Logger) as Lang.Boolean {
     Test.assertMessage(later > e, "later -> greater");
     var hour = CarDataClient._parseIso8601("2026-05-27T18:53:20Z");
     Test.assertEqualMessage(hour - e, 3600, "1h apart = 3600s");
+    _resetStorage();
     return true;
 }
 
@@ -105,6 +168,7 @@ function testIso8601_basic(logger as Test.Logger) as Lang.Boolean {
 function testIso8601_malformed(logger as Test.Logger) as Lang.Boolean {
     Test.assertEqualMessage(CarDataClient._parseIso8601("bad"), 0, "short->0");
     Test.assertEqualMessage(CarDataClient._parseIso8601(null), 0, "null->0");
+    _resetStorage();
     return true;
 }
 
@@ -112,12 +176,27 @@ function testIso8601_malformed(logger as Test.Logger) as Lang.Boolean {
 //  PageChrome.oneDecimal
 // ============================================================
 
+// ============================================================
+//  FR-22 — fuel consumption estimate (F9)
+// ============================================================
+
+(:test)
+function testFuelConsumptionPer100Km(logger as Test.Logger) as Lang.Boolean {
+    Test.assertMessage(_fEq(PageRangeFuel.consumptionPer100Km(21, 653), 3.215), "21L / 653km ~= 3.2 L/100km");
+    Test.assertMessage(PageRangeFuel.consumptionPer100Km(null, 653) == null, "missing fuel -> null");
+    Test.assertMessage(PageRangeFuel.consumptionPer100Km(21, null) == null, "missing range -> null");
+    Test.assertMessage(PageRangeFuel.consumptionPer100Km(21, 0) == null, "zero range -> null");
+    _resetStorage();
+    return true;
+}
+
 (:test)
 function testOneDecimal(logger as Test.Logger) as Lang.Boolean {
     Test.assertEqualMessage(PageChrome.oneDecimal(2.3), "2.3", "2.3");
     Test.assertEqualMessage(PageChrome.oneDecimal(2.0), "2.0", "2.0");
     Test.assertEqualMessage(PageChrome.oneDecimal(2.25), "2.3", "round up .25->.3");
     Test.assertEqualMessage(PageChrome.oneDecimal(2.96), "3.0", "carry 2.96->3.0");
+    _resetStorage();
     return true;
 }
 
@@ -131,6 +210,7 @@ function testAgeString(logger as Test.Logger) as Lang.Boolean {
     Test.assertEqualMessage(PageChrome._ageString(120), "2m ago", "mins");
     Test.assertEqualMessage(PageChrome._ageString(7200), "2h ago", "hours");
     Test.assertEqualMessage(PageChrome._ageString(172800), "2d ago", "days");
+    _resetStorage();
     return true;
 }
 
@@ -155,6 +235,7 @@ function testToken_guardStatesNoNetwork(logger as Test.Logger) as Lang.Boolean {
         Test.assertMessage(cap.called, "callback fired");
         Test.assertMessage(cap.value == false, "permanent-failure state -> false");
     }
+    _resetStorage();
     return true;
 }
 
@@ -166,6 +247,7 @@ function testToken_validTokenSkipsRefresh(logger as Test.Logger) as Lang.Boolean
     var cap = new _BoolCapture();
     new TokenManager().ensureValidToken(cap.method(:onResult));
     Test.assertMessage(cap.value == true, "valid unexpired token -> true (no network)");
+    _resetStorage();
     return true;
 }
 
@@ -188,6 +270,7 @@ function testToken_refreshSuccessAtomicRotation(logger as Test.Logger) as Lang.B
     Test.assertEqualMessage(tm.getTokenState(), "NORMAL", "state NORMAL");
     var expiry = Application.Storage.getValue(StorageKeys.KEY_ACCESS_EXPIRY);
     Test.assertMessage(_nearNow(expiry, 3600), "expiry ~= now + expires_in");
+    _resetStorage();
     return true;
 }
 
@@ -200,6 +283,7 @@ function testToken_refreshDefaultExpiryWhenMissing(logger as Test.Logger) as Lan
     tm.onTokenRefreshResponse(200, { "access_token" => "A", "refresh_token" => "R" });
     var expiry = Application.Storage.getValue(StorageKeys.KEY_ACCESS_EXPIRY);
     Test.assertMessage(_nearNow(expiry, 3600), "missing expires_in -> 3600 default");
+    _resetStorage();
     return true;
 }
 
@@ -212,6 +296,7 @@ function testToken_invalidGrantRebootstrap(logger as Test.Logger) as Lang.Boolea
     tm.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
     Test.assertMessage(cap.value == false, "invalid_grant -> false");
     Test.assertEqualMessage(tm.getTokenState(), "NEEDS_REBOOTSTRAP", "permanent failure state");
+    _resetStorage();
     return true;
 }
 
@@ -225,6 +310,7 @@ function testToken_transientFailureSetsBackoff(logger as Test.Logger) as Lang.Bo
     Test.assertMessage(cap.value == false, "5xx -> false");
     var until = Application.Storage.getValue(StorageKeys.KEY_BACKOFF_UNTIL);
     Test.assertMessage(_nearNow(until, 2400), "first backoff ~= now + 2400");
+    _resetStorage();
     return true;
 }
 
@@ -245,6 +331,7 @@ function testToken_backoffDoublesAndCaps(logger as Test.Logger) as Lang.Boolean 
     tm._incrementBackoff();
     until = Application.Storage.getValue(StorageKeys.KEY_BACKOFF_UNTIL);
     Test.assertMessage(_nearNow(until, 14400), "doubling capped at 14400");
+    _resetStorage();
     return true;
 }
 
@@ -256,6 +343,7 @@ function testToken_backoffDoublesAndCaps(logger as Test.Logger) as Lang.Boolean 
 function testQuota_firstRunAllowed(logger as Test.Logger) as Lang.Boolean {
     _resetStorage();
     Test.assertMessage(QuotaGuard.canFetch(), "null gate -> allowed");
+    _resetStorage();
     return true;
 }
 
@@ -264,6 +352,7 @@ function testQuota_activeGateBlocks(logger as Test.Logger) as Lang.Boolean {
     _resetStorage();
     Application.Storage.setValue(StorageKeys.KEY_NEXT_ALLOWED, Time.now().value() + 1000);
     Test.assertMessage(!QuotaGuard.canFetch(), "future gate -> blocked");
+    _resetStorage();
     return true;
 }
 
@@ -272,6 +361,7 @@ function testQuota_expiredGateAllows(logger as Test.Logger) as Lang.Boolean {
     _resetStorage();
     Application.Storage.setValue(StorageKeys.KEY_NEXT_ALLOWED, Time.now().value() - 10);
     Test.assertMessage(QuotaGuard.canFetch(), "past gate -> allowed");
+    _resetStorage();
     return true;
 }
 
@@ -281,15 +371,25 @@ function testQuota_updateAdvancesGate(logger as Test.Logger) as Lang.Boolean {
     QuotaGuard.updateAfterFetch();
     var next = Application.Storage.getValue(StorageKeys.KEY_NEXT_ALLOWED);
     Test.assertMessage(_nearNow(next, 2400), "advances ~40min");
+    _resetStorage();
     return true;
 }
 
 (:test)
-function testQuota_exceededBlocks24h(logger as Test.Logger) as Lang.Boolean {
+function testQuota_exceededBlocksUntil4Am(logger as Test.Logger) as Lang.Boolean {
     _resetStorage();
     QuotaGuard.onQuotaExceeded();
     var next = Application.Storage.getValue(StorageKeys.KEY_NEXT_ALLOWED);
-    Test.assertMessage(_nearNow(next, 86400), "429 blocks ~24h");
+    var now = Time.now().value();
+    Test.assertMessage(next > now, "429 blocks future fetches");
+    Test.assertMessage(next - now <= 86400, "block lifts within 24h");
+    // Unblock time is the NEXT 4 AM local — today's or tomorrow's, so its
+    // offset from local midnight is 4h or 28h. (The old assertion of
+    // "~now + 86400" only held when the test ran at exactly 4 AM.)
+    var offset = next - Time.today().value();
+    Test.assertMessage(offset == 4 * 3600 || offset == 86400 + 4 * 3600,
+        "unblocks at next 4 AM local");
+    _resetStorage();
     return true;
 }
 
@@ -306,6 +406,42 @@ function testCache_roundTrip(logger as Test.Logger) as Lang.Boolean {
     Test.assertMessage(s != null, "after write -> not null");
     Test.assertEqualMessage(s["rangeKm"], 653, "value preserved");
     Test.assertMessage(s["doorsLocked"] == true, "bool preserved");
+    _resetStorage();
+    return true;
+}
+
+// A3 migration: a container id cached under an older container name (or with no
+// name stamp at all — pre-v2 installs) must be invalidated, so the bootstrap
+// chain re-runs discovery/creation with the v2 descriptor set.
+(:test)
+function testContainer_staleNameInvalidatesCachedId(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Test.assertMessage(CarDataClient.cachedContainerId() == null, "empty -> null");
+    // Pre-upgrade install: id cached without a name stamp.
+    Application.Storage.setValue(StorageKeys.KEY_CONTAINER_ID, "OLD-V1-ID");
+    Test.assertMessage(CarDataClient.cachedContainerId() == null, "unstamped id invalidated");
+    Test.assertMessage(Application.Storage.getValue(StorageKeys.KEY_CONTAINER_ID) == null,
+        "stale id deleted from Storage");
+    // Current install: id stamped with the current container name round-trips.
+    CarDataClient._storeContainer("NEW-V2-ID");
+    Test.assertEqualMessage(CarDataClient.cachedContainerId(), "NEW-V2-ID", "stamped id returned");
+    _resetStorage();
+    return true;
+}
+
+// FR-15/B3: a fetch where the lock descriptor came back INVALID (so doorsLocked is
+// absent from the new state) must not erase the previously-cached doorsLocked —
+// merge-on-write preserves it, keeping PageLock visible (FR-16).
+(:test)
+function testCache_mergePreservesDoorsLocked(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    VehicleCache.write({ "doorsLocked" => true, "rangeKm" => 653, "lastUpdated" => 1000 });
+    VehicleCache.write({ "rangeKm" => 660, "lastUpdated" => 2000 });
+    var s = VehicleCache.read();
+    Test.assertMessage(s["doorsLocked"] == true, "doorsLocked preserved across merge");
+    Test.assertEqualMessage(s["rangeKm"], 660, "rangeKm updated");
+    Test.assertEqualMessage(s["lastUpdated"], 2000, "lastUpdated advances to newer");
+    _resetStorage();
     return true;
 }
 
@@ -349,6 +485,20 @@ function _lockFixture(val) {
     }};
 }
 
+function _windowFixture(status) {
+    return { "telematicData" => {
+        "vehicle.cabin.window.row1.driver.status" =>
+            { "value" => status, "timestamp" => "2026-05-27T10:00:00Z", "unit" => null }
+    }};
+}
+
+function _ignitionFixture(value) {
+    return { "telematicData" => {
+        "vehicle.drivetrain.engine.isIgnitionOn" =>
+            { "value" => value, "timestamp" => "2026-05-27T10:00:00Z", "unit" => null }
+    }};
+}
+
 function _fEq(a, b) {
     if (a == null) { return false; }
     var d = a - b;
@@ -356,28 +506,10 @@ function _fEq(a, b) {
     return d < 0.01;
 }
 
+// The canonical 27-descriptor fixture lives in MockData — one copy to maintain.
+// (:debug) because MockData is compiled out of (:release); the (:test) callers
+// are compiled out there too, so nothing dangles.
+(:debug)
 function _fixture() {
-    return { "telematicData" => {
-        "vehicle.cabin.door.lock.status" => { "value" => "SECURED", "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
-        "vehicle.drivetrain.lastRemainingRange" => { "value" => "653", "timestamp" => "2026-05-27T17:53:20Z", "unit" => "km" },
-        "vehicle.drivetrain.fuelSystem.level" => { "value" => "95", "timestamp" => "2026-05-27T17:53:20Z", "unit" => "%" },
-        "vehicle.drivetrain.fuelSystem.remainingFuel" => { "value" => "21", "timestamp" => "2026-05-24T12:15:23Z", "unit" => "l" },
-        "vehicle.cabin.door.row1.driver.isOpen" => { "value" => "CLOSED", "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
-        "vehicle.cabin.door.row1.passenger.isOpen" => { "value" => "CLOSED", "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
-        "vehicle.body.trunk.isOpen" => { "value" => "CLOSED", "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
-        "vehicle.body.trunk.isLocked" => { "value" => null, "timestamp" => null, "unit" => null },
-        "vehicle.body.hood.isOpen" => { "value" => "CLOSED", "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
-        "vehicle.vehicle.travelledDistance" => { "value" => "40926", "timestamp" => "2026-05-27T17:53:20Z", "unit" => "km" },
-        "vehicle.status.serviceDistance.next" => { "value" => "22000", "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
-        "vehicle.cabin.infotainment.displayUnit.distance" => { "value" => "km", "timestamp" => "2026-05-24T12:15:23Z", "unit" => null },
-        "vehicle.drivetrain.engine.isIgnitionOn" => { "value" => null, "timestamp" => null, "unit" => null },
-        "vehicle.chassis.axle.row1.wheel.left.tire.pressure" => { "value" => "230", "timestamp" => "2026-05-27T17:53:20Z", "unit" => "kPa" },
-        "vehicle.chassis.axle.row1.wheel.right.tire.pressure" => { "value" => "230", "timestamp" => "2026-05-27T17:53:20Z", "unit" => "kPa" },
-        "vehicle.chassis.axle.row2.wheel.left.tire.pressure" => { "value" => "220", "timestamp" => "2026-05-27T17:53:20Z", "unit" => "kPa" },
-        "vehicle.chassis.axle.row2.wheel.right.tire.pressure" => { "value" => "230", "timestamp" => "2026-05-27T17:53:20Z", "unit" => "kPa" },
-        "vehicle.chassis.axle.row1.wheel.left.tire.pressureTarget" => { "value" => "220", "timestamp" => "2026-05-27T17:53:20Z", "unit" => "kPa" },
-        "vehicle.chassis.axle.row1.wheel.right.tire.pressureTarget" => { "value" => "220", "timestamp" => "2026-05-27T17:53:20Z", "unit" => "kPa" },
-        "vehicle.chassis.axle.row2.wheel.left.tire.pressureTarget" => { "value" => "220", "timestamp" => "2026-05-27T17:53:20Z", "unit" => "kPa" },
-        "vehicle.chassis.axle.row2.wheel.right.tire.pressureTarget" => { "value" => "220", "timestamp" => "2026-05-27T17:53:20Z", "unit" => "kPa" }
-    }};
+    return MockData.telematicFixture();
 }

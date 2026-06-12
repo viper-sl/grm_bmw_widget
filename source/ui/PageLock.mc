@@ -1,7 +1,12 @@
 // Page: Lock overview — matches UX mock page 3.
-// Header · "SECURED/UNLOCKED" status · ONE state icon (48×48) centered below it ·
-// 2x2 door grid with colored dots.
+// Header · "SECURED/UNLOCKED/RUNNING" status · ONE state icon (48×48) centered below it ·
+// cross layout: HOOD above · door cells on the sides · TRUNK below.
+// Rear-door cells render ONLY when the vehicle reports them (FR-19, OQ-4) — a car
+// without row2 descriptors keeps the original single DOOR L/R cross.
+// OK/START → manual data refresh (same as the range/fuel page).
+using Toybox.Application;
 using Toybox.Graphics;
+using Toybox.Time;
 using Toybox.WatchUi;
 
 class PageLock extends WatchUi.View {
@@ -9,14 +14,41 @@ class PageLock extends WatchUi.View {
     var _iconClosed;   // closed_w.png (48×48) — shown when secured
     var _iconOpen;     // open_w.png   (48×48) — shown when unsecured
 
+    var _sync;
+    var _refreshing;
+
     function initialize() {
         View.initialize();
+        _refreshing = false;
         try { _iconClosed = WatchUi.loadResource(Rez.Drawables.ClosedIcon); } catch (e) { _iconClosed = null; }
         try { _iconOpen   = WatchUi.loadResource(Rez.Drawables.OpenIcon);   } catch (e) { _iconOpen   = null; }
     }
 
-    function onSelect() { return false; }
+    function onSelect() {
+        if (_refreshing) { return true; }
+        var lastSync = Application.Storage.getValue(ForegroundSync.KEY_LAST_FG);
+        if (lastSync != null && (Time.now().value() - lastSync) < ForegroundSync.COOLDOWN_SECONDS) {
+            return true;
+        }
+        _refreshing = true;
+        WatchUi.requestUpdate();
+        _sync = new ForegroundSync();
+        _sync.run(method(:onRefreshDone));
+        return true;
+    }
 
+    function onRefreshDone(success) {
+        _refreshing = false;
+        WatchUi.requestUpdate();
+        if (!success) {
+            var auth = new DeviceAuthManager();
+            WatchUi.pushView(new AuthView(auth), new AuthDelegate(auth), WatchUi.SLIDE_LEFT);
+        }
+    }
+
+    // FR-16: a Cache that has previously held doorsLocked keeps showing this page (with
+    // its last-known state + Data Age) even if the most recent fetch omitted it — the
+    // FR-15 merge-on-write ensures doorsLocked is never dropped from the Cache once seen.
     function isVisible() {
         var state = VehicleCache.read();
         return state != null && state.hasKey("doorsLocked");
@@ -36,31 +68,68 @@ class PageLock extends WatchUi.View {
 
         PageChrome.drawAccent(dc);
 
-        var locked = state.hasKey("doorsLocked") ? state["doorsLocked"] : true;
+        var locked  = state.hasKey("doorsLocked")   ? state["doorsLocked"]   : true;
+        var running = state.hasKey("engineRunning") ? state["engineRunning"] : false;
 
-        // Status label at top
-        dc.setColor(locked ? Theme.COLOR_OK_HI : Theme.COLOR_WARN, Theme.COLOR_BG);
-        dc.drawText(cx, 52, Graphics.FONT_SMALL, locked ? "SECURED" : "UNLOCKED",
+        // Status label at top. FR-17: running takes precedence over locked/unlocked.
+        var statusLabel;
+        var statusColor;
+        if (running) {
+            statusLabel = "RUNNING";
+            statusColor = Theme.COLOR_WARN;
+        } else if (locked) {
+            statusLabel = "SECURED";
+            statusColor = Theme.COLOR_OK_HI;
+        } else {
+            statusLabel = "UNLOCKED";
+            statusColor = Theme.COLOR_WARN;
+        }
+        dc.setColor(statusColor, Theme.COLOR_BG);
+        dc.drawText(cx, 52, Graphics.FONT_SMALL, statusLabel,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // Icon + cross shifted down to sit between SECURED label and age text
+        // Icon + cross shifted down to sit between the status label and age text
         var mid = cy + 16;
         var icon = locked ? _iconClosed : _iconOpen;
         if (icon != null) {
             dc.drawBitmap(cx - 24, mid - 24, icon);
         }
 
-        // Cross layout: HOOD above · DOOR L/R on sides · TRUNK below
-        _cell(dc, cx,      mid - 46, "HOOD",   state, "hoodOpen");
-        _cell(dc, cx - 60, mid,      "DOOR L", state, "doorFLOpen");
-        _cell(dc, cx + 60, mid,      "DOOR R", state, "doorFROpen");
-        _cell(dc, cx,      mid + 46, "TRUNK",  state, "trunkOpen");
+        // Cross layout: HOOD above · door cells on sides · TRUNK below.
+        _cell(dc, cx, mid - 46, "HOOD",  state, "hoodOpen", null, 0);
+        _cell(dc, cx, mid + 46, "TRUNK", state, "trunkOpen", null, 0);
 
-        PageChrome.drawAge(dc, state);
+        // FR-19: rear doors only if this vehicle reports them — then each side
+        // stacks front above rear; otherwise the original single DOOR L/R cells.
+        // FR-18: each door cell shows a red "W" badge beside its status dot when
+        // that door's window is open/intermediate.
+        var hasRear = state.hasKey("doorRLOpen") || state.hasKey("doorRROpen");
+        if (hasRear) {
+            _cell(dc, cx - 60, mid - 22, "DOOR FL", state, "doorFLOpen", "windowFLOpen", -18);
+            _cell(dc, cx + 60, mid - 22, "DOOR FR", state, "doorFROpen", "windowFROpen", 18);
+            _cell(dc, cx - 60, mid + 24, "DOOR RL", state, "doorRLOpen", "windowRLOpen", -18);
+            _cell(dc, cx + 60, mid + 24, "DOOR RR", state, "doorRROpen", "windowRROpen", 18);
+        } else {
+            _cell(dc, cx - 60, mid, "DOOR L", state, "doorFLOpen", "windowFLOpen", -18);
+            _cell(dc, cx + 60, mid, "DOOR R", state, "doorFROpen", "windowFROpen", 18);
+        }
+
+        PageChrome.drawAgeProminent(dc, state);
         PageChrome.drawNavDots(dc);
+        PageChrome.drawRefreshHint(dc, _refreshing);
     }
 
-    function _cell(dc, x, y, name, state, key) {
+    function _drawWindowBadge(dc, x, y, radius) {
+        dc.setColor(Theme.COLOR_ERROR, Theme.COLOR_BG);
+        dc.fillCircle(x, y, radius);
+        dc.setColor(Theme.COLOR_WHITE, Theme.COLOR_ERROR);
+        dc.drawText(x, y, Graphics.FONT_XTINY, "W",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    // windowKey/badgeDx: when windowKey is non-null and that window is open/intermediate,
+    // draw a red "W" badge offset by badgeDx on the same row as the status dot.
+    function _cell(dc, x, y, name, state, key, windowKey, badgeDx) {
         dc.setColor(Theme.COLOR_WHITE, Theme.COLOR_BG);
         dc.drawText(x, y - 12, Graphics.FONT_XTINY, name,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
@@ -73,6 +142,10 @@ class PageLock extends WatchUi.View {
         } else {
             dc.setColor(Theme.COLOR_OK, Theme.COLOR_BG);
             dc.fillCircle(x, y + 10, 7);
+        }
+
+        if (windowKey != null && state.hasKey(windowKey) && state[windowKey]) {
+            _drawWindowBadge(dc, x + badgeDx, y + 10, 8);
         }
     }
 

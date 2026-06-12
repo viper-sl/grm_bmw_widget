@@ -12,6 +12,7 @@
   <string id="UpdateModeManual">Manual (button)</string>
   <string id="UpdateModeAuto">Auto (hourly)</string>
   <string id="UpdateModeAdaptive">Auto (adaptive)</string>
+  <string id="NextMaintenanceLabel">Next Maintenance Override (km)</string>
   <string id="SetupPrompt">Setup BMW Widget</string>
   <string id="RelinkPrompt">Re-auth needed. Open Garmin Connect.</string>
   <string id="StaleIndicator">Data may be outdated</string>

@@ -31,6 +31,9 @@
         <listEntry value="2">@Strings.UpdateModeAdaptive</listEntry>
       </settingConfig>
     </setting>
+    <setting propertyKey="@Properties.nextMaintenanceKm" title="@Strings.NextMaintenanceLabel">
+      <settingConfig type="numeric" min="0" max="50000"/>
+    </setting>
   </group>
 
 </settings>

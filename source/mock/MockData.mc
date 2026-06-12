@@ -1,6 +1,8 @@
-// Fixture dictionaries for (:debug) builds only — never compiled into (:release).
+// UNIT-TEST fixtures only — referenced exclusively from Tests.mc ((:debug) keeps
+// this out of (:release) builds; the app itself has no mock layer and always
+// talks to the live API).
 // Values match empirical live data from BMW 218i (VIN REDACTED-VIN, 2026-05-29 session).
-// Container REDACTED-CONTAINER (v2, 21 descriptors). Mirror live API shape exactly.
+// Container grm_bmw_widget_v2 (27 descriptors). Mirror live API shape exactly.
 (:debug :background)
 class MockData {
 
@@ -19,6 +21,10 @@ class MockData {
                     => { "value" => "CLOSED",  "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
                 "vehicle.cabin.door.row1.passenger.isOpen"
                     => { "value" => "CLOSED",  "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
+                "vehicle.cabin.door.row2.driver.isOpen"
+                    => { "value" => "CLOSED",  "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
+                "vehicle.cabin.door.row2.passenger.isOpen"
+                    => { "value" => "CLOSED",  "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
                 "vehicle.body.trunk.isOpen"
                     => { "value" => "CLOSED",  "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
                 "vehicle.body.trunk.isLocked"
@@ -33,6 +39,14 @@ class MockData {
                     => { "value" => "km",      "timestamp" => "2026-05-24T12:15:23Z", "unit" => null },
                 "vehicle.drivetrain.engine.isIgnitionOn"
                     => { "value" => null,      "timestamp" => null,                   "unit" => null },
+                "vehicle.cabin.window.row1.driver.status"
+                    => { "value" => "CLOSED",  "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
+                "vehicle.cabin.window.row1.passenger.status"
+                    => { "value" => "CLOSED",  "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
+                "vehicle.cabin.window.row2.driver.status"
+                    => { "value" => "CLOSED",  "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
+                "vehicle.cabin.window.row2.passenger.status"
+                    => { "value" => "CLOSED",  "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
                 "vehicle.chassis.axle.row1.wheel.left.tire.pressure"
                     => { "value" => "230",     "timestamp" => "2026-05-27T17:53:20Z", "unit" => "kPa" },
                 "vehicle.chassis.axle.row1.wheel.right.tire.pressure"

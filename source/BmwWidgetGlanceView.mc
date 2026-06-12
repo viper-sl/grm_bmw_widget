@@ -2,8 +2,9 @@
 // rows on the right.
 //   row 1:  LOCKED            653 km     (white)
 //   row 2:  ▭▭▭▭▭▭▭▭▭▭▭▭▭▭▭▭  fuel bar (red, width = fuel %)
-//   row 3:  FUEL 70%          1d ago     (fuel orange, age dimmed)
-// Low fuel (<50%): fuel cell shows "{tank-litres}L" in orange instead of "%".
+//   row 3:  70%               1d ago     (fuel orange, age dimmed)
+// Low fuel (<50%): fuel cell shows "XX% (+YYL)" instead of just "XX%" — the "+"
+// marks YY as litres still needed to fill the tank, not litres currently in it.
 // Read-only from VehicleCache. No network I/O.
 using Toybox.Application;
 using Toybox.Graphics;
@@ -91,11 +92,11 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
         if (fuelPercent != null && fuelPercent < 50 && fuelLitres != null) {
             var tankProp = Application.Properties.getValue("tankLitres");
             var tank = (tankProp != null) ? tankProp : 52;
-            var fill = tank - fuelLitres;
-            if (fill < 0) { fill = 0; }
-            fuelStr = "FUEL " + fill.toString() + "L";
+            var toFill = tank - fuelLitres;
+            if (toFill < 0) { toFill = 0; }
+            fuelStr = fuelPercent.toString() + "% (+" + toFill.toString() + "L)";
         } else if (fuelPercent != null) {
-            fuelStr = "FUEL " + fuelPercent.toString() + "%";
+            fuelStr = fuelPercent.toString() + "%";
         } else {
             fuelStr = "FUEL --";
         }

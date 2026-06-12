@@ -20,16 +20,30 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
     }
 
     function onTemporalEvent() {
+        var mode = Application.Properties.getValue("updateMode");
+
+        // FR-25: Manual mode's daily 10:00 event is Moment-based, hence one-shot —
+        // re-register tomorrow's 10:00 occurrence immediately so the daily cadence
+        // continues without requiring the user to reopen the app.
+        if (mode == null || mode == 0) {
+            try {
+                Background.registerForTemporalEvent(BmwWidgetApp._nextTenAmMoment());
+            } catch (e instanceof Lang.Exception) {}
+        }
+
         // Adaptive mode (2) fires every 30 min but should only fetch at chosen hours;
         // skip ticks that don't match the schedule to conserve quota/battery.
-        var mode = Application.Properties.getValue("updateMode");
         if (mode != null && mode == 2 && !_adaptiveShouldFetch()) {
             Background.exit(null);
             return;
         }
 
-        // Phase 1: one-time bootstrap (KEY_VEHICLE_NAME absent = first run or Storage wipe)
-        if (Application.Storage.getValue(StorageKeys.KEY_VEHICLE_NAME) == null) {
+        // Phase 1: bootstrap on first run / Storage wipe (KEY_VEHICLE_NAME absent),
+        // or on container schema migration — cachedContainerId() invalidates an id
+        // stored under an older container name, and the bootstrap chain recreates
+        // it under the current name with the expanded descriptor set.
+        if (Application.Storage.getValue(StorageKeys.KEY_VEHICLE_NAME) == null
+                || _resolveContainer() == null) {
             _runBootstrap();
             return; // Background.exit() called from onBootstrapComplete
         }
@@ -116,7 +130,7 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
     }
 
     function _resolveContainer() {
-        var c = Application.Storage.getValue(StorageKeys.KEY_CONTAINER_ID);
+        var c = CarDataClient.cachedContainerId();
         if (c == null) { c = Application.Properties.getValue("containerId"); }
         if (c != null && c.equals("")) { c = null; }
         return c;

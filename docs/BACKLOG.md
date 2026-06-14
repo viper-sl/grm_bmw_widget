@@ -216,15 +216,28 @@ electric range also surfaced in the About-car groups. Covered by `testParse_rang
 
 ## Chores
 
-### C1 — Git history cleanup, docs, publish on GitHub
+### 🟡 C1 — Git history cleanup, docs, publish on GitHub *(prep done 2026-06-14 — publish step remains)*
 Clean up git history, write up documentation, and publish the project on GitHub.
 
-**Plan:** audit history for secrets (real `clientId` lives only in gitignored
-`resources-livetest/` — confirm none leaked); write README (setup, build-personal.sh,
-CarData pairing); squash/curate noisy commits; add LICENSE; publish public repo.
-⚠️ Scrub any captured `telematicData` (VIN/location) before publishing.
+**Done (2026-06-14):**
+- **History audited:** the only sensitive data in tree+history was the **VIN** (and two
+  account container IDs). No real `clientId`/tokens were ever committed (`resources-livetest/`,
+  `bmw_tokens.json`, `developer_key`, `bmw_data/` never tracked — confirmed).
+- **Untracked (kept locally via `.gitignore`):** internal tooling (`.agents/`, `_bmad/`,
+  `_bmad-output/`, `.github/agents/`), personal-data scripts (capture/probe/inspect),
+  the local sim `settings.xml`, and debug/intermediate docs (DEBUGGING, LIVE-TESTING,
+  CAPTURE-PLAN, test-coverage). Tracked files 335 → 59.
+- **PII scrubbed** from staying files (MockData fixture + CarData reference docs).
+- **History rewritten** with `git filter-repo`: purged the untracked paths from all 60
+  commits and replaced VIN/container IDs → `REDACTED-*` everywhere. Verified: 0 commits
+  contain the VIN or container IDs; build + 32 tests still green.
+- **README.md + LICENSE (MIT)** added.
+- Backup of the original history saved as `../grm_bmw_widget-backup-*.bundle`.
 
-_Effort: M · Risk: Med._
+**Remaining:** create the public GitHub repo and `git push` (no remote yet — intentional).
+Optionally choose a different license than MIT.
+
+_Effort: S (publish only) · Risk: Low._
 
 ### ✅ C2 — Memory consumption review / performance optimization *(done 2026-06-14)*
 Review overall memory usage and look for performance optimization opportunities. Binding

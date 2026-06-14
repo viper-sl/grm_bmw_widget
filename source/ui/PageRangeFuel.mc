@@ -40,8 +40,10 @@ class PageRangeFuel extends WatchUi.View {
     }
 
     function isVisible() {
+        // F16: visible for ICE (fuelPercent) or EV/PHEV (socPercent) once a range is known.
         var state = VehicleCache.read();
-        return state != null && state.hasKey("rangeKm") && state.hasKey("fuelPercent");
+        return state != null && state.hasKey("rangeKm")
+            && (state.hasKey("fuelPercent") || state.hasKey("socPercent"));
     }
 
     function onUpdate(dc) {
@@ -76,15 +78,26 @@ class PageRangeFuel extends WatchUi.View {
         var pct = (rangeKm != null) ? (rangeKm.toFloat() / 700.0) : 0.0;
         PageChrome.drawBar(dc, pct, cy + 26, barColor);
 
-        // ── Fuel percent — 14px below bar bottom (bar bottom = cy+35=165) ─
-        var fuelStr   = (fuelPercent != null) ? ("FUEL  " + fuelPercent.toString() + "%") : "FUEL  --";
-        var fuelColor = (fuelPercent == null) ? Theme.COLOR_MUTED
-                      : lowFuel ? Theme.COLOR_WARN : Theme.COLOR_WHITE;
+        // ── Fuel / battery percent — 14px below bar bottom ─────────────────
+        // F16: ICE shows FUEL %, EV/PHEV (no fuel %) shows BATTERY %.
+        var socPercent = state.hasKey("socPercent") ? state["socPercent"] : null;
+        var fuelStr;
+        var fuelColor;
+        if (fuelPercent != null) {
+            fuelStr   = "FUEL  " + fuelPercent.toString() + "%";
+            fuelColor = lowFuel ? Theme.COLOR_WARN : Theme.COLOR_WHITE;
+        } else if (socPercent != null) {
+            fuelStr   = "BATTERY  " + socPercent.toString() + "%";
+            fuelColor = (socPercent <= 20) ? Theme.COLOR_WARN : Theme.COLOR_WHITE;
+        } else {
+            fuelStr   = "FUEL  --";
+            fuelColor = Theme.COLOR_MUTED;
+        }
         dc.setColor(fuelColor, Theme.COLOR_BG);
         dc.drawText(cx, cy + 50, Graphics.FONT_TINY, fuelStr,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // ── Liters line — 20px below fuel% center ─────────────────────────
+        // ── Liters line (ICE only) — 20px below fuel% center ───────────────
         if (fuelPercent != null) {
             var tankProp = Application.Properties.getValue("tankLitres");
             var tank     = (tankProp != null) ? tankProp : 52;
@@ -98,9 +111,10 @@ class PageRangeFuel extends WatchUi.View {
         }
 
         // ── Fuel consumption estimate (FR-22) — instantaneous L/100km, not trip-based ──
+        // F13: hidden when the showConsumption setting is off (default on).
         var fuelLitres = state.hasKey("fuelLitres") ? state["fuelLitres"] : null;
         var consumption = consumptionPer100Km(fuelLitres, rangeKm);
-        if (consumption != null) {
+        if (consumption != null && showConsumption()) {
             dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
             dc.drawText(cx, cy + 86, Graphics.FONT_XTINY,
                 "~" + PageChrome.oneDecimal(consumption) + " L/100KM (EST)",
@@ -117,6 +131,12 @@ class PageRangeFuel extends WatchUi.View {
     static function consumptionPer100Km(fuelLitres, rangeKm) {
         if (fuelLitres == null || rangeKm == null || rangeKm <= 0) { return null; }
         return (fuelLitres.toFloat() / rangeKm.toFloat()) * 100.0;
+    }
+
+    // F13: consumption-estimate row toggle (IQ property; default on).
+    static function showConsumption() {
+        var v = Application.Properties.getValue("showConsumption");
+        return (v == null) ? true : v;
     }
 
 }

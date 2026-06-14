@@ -55,10 +55,16 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
         var fuelLitres  = state.hasKey("fuelLitres")  ? state["fuelLitres"]  : null;
 
         // ── row 1: lock state (left) + range (right) — pure white ──
+        // B1: always draw a label. When doorsLocked is known, LOCKED/OPEN; when it's
+        // absent (INVALID/UNKNOWN/no-signal) draw a muted "—" so the row never goes blank.
         var row1Color = Theme.COLOR_WHITE;
         if (state.hasKey("doorsLocked")) {
             dc.setColor(row1Color, Theme.COLOR_BG);
             dc.drawText(textX, row1Y, font, state["doorsLocked"] ? "LOCKED" : "OPEN",
+                Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        } else {
+            dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+            dc.drawText(textX, row1Y, font, "—",
                 Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
         }
         var numStr  = (rangeKm != null) ? rangeKm.toString() : "--";

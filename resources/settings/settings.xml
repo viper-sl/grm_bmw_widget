@@ -34,6 +34,9 @@
     <setting propertyKey="@Properties.nextMaintenanceKm" title="@Strings.NextMaintenanceLabel">
       <settingConfig type="numeric" min="0" max="50000"/>
     </setting>
+    <setting propertyKey="@Properties.showConsumption" title="@Strings.ShowConsumptionLabel">
+      <settingConfig type="boolean"/>
+    </setting>
   </group>
 
 </settings>

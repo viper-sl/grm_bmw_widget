@@ -6,7 +6,7 @@
 //
 // Vehicle State Dictionary schema (all fields optional — absent = unavailable):
 //
-//   "rangeKm"           : Number  (integer km)          vehicle.drivetrain.lastRemainingRange
+//   "rangeKm"           : Number  (integer km)          best-available range (F16): totalRemainingRange / kombiRemainingElectricRange / lastRemainingRange
 //   "fuelPercent"       : Number  (integer 0-100)       vehicle.drivetrain.fuelSystem.level
 //   "fuelLitres"        : Number  (integer L)           vehicle.drivetrain.fuelSystem.remainingFuel
 //   "doorsLocked"       : Boolean                       vehicle.cabin.door.lock.status (SECURED/LOCKED=true)
@@ -16,11 +16,10 @@
 //   "doorRROpen"        : Boolean                       vehicle.cabin.door.row2.right.isOpen
 //   "trunkOpen"         : Boolean                       vehicle.body.trunk.isOpen
 //   "hoodOpen"          : Boolean                       vehicle.body.hood.isOpen
-//   "engineRunning"     : Boolean                       vehicle.drivetrain.engine.isIgnitionOn
-//   "windowFLOpen"      : Boolean (true=OPEN/INTERMEDIATE) vehicle.cabin.window.row1.driver.status
-//   "windowFROpen"      : Boolean (true=OPEN/INTERMEDIATE) vehicle.cabin.window.row1.passenger.status
-//   "windowRLOpen"      : Boolean (true=OPEN/INTERMEDIATE) vehicle.cabin.window.row2.driver.status
-//   "windowRROpen"      : Boolean (true=OPEN/INTERMEDIATE) vehicle.cabin.window.row2.passenger.status
+//   "windowFLOpen"      : Boolean (true=OPEN)           vehicle.cabin.window.row1.driver.status
+//   "windowFROpen"      : Boolean (true=OPEN)           vehicle.cabin.window.row1.passenger.status
+//   "windowRLOpen"      : Boolean (true=OPEN)           vehicle.cabin.window.row2.driver.status
+//   "windowRROpen"      : Boolean (true=OPEN)           vehicle.cabin.window.row2.passenger.status
 //   "odometerKm"        : Number  (integer km)          vehicle.vehicle.travelledDistance
 //   "serviceDistanceKm" : Number  (integer km)          vehicle.status.serviceDistance.next
 //   "displayUnit"       : String  ("km" or "miles")     vehicle.cabin.infotainment.displayUnit.distance
@@ -36,6 +35,22 @@
 //   "tyreWearKmFR"      : Number  (integer km)          smartMaintenanceTyreDiagnosis frontRight.tyreWear.dueMileage
 //   "tyreWearKmRL"      : Number  (integer km)          smartMaintenanceTyreDiagnosis rearLeft.tyreWear.dueMileage
 //   "tyreWearKmRR"      : Number  (integer km)          smartMaintenanceTyreDiagnosis rearRight.tyreWear.dueMileage
+//   --- About-car telematics (v3; grouped read-only menu, not on any page) ---
+//   "batteryVoltage"    : Float   (V)                   vehicle.electricalSystem.battery.voltage
+//   "coolantC"          : Number  (°C)                  vehicle.drivetrain.internalCombustionEngine.engine.ect
+//   "totalRangeKm"      : Number  (integer km)          vehicle.drivetrain.totalRemainingRange
+//   "cbsCount"          : Number  (count)               vehicle.status.conditionBasedServicesCount
+//   "serviceYellowKm"   : Number  (integer km)          vehicle.status.serviceDistance.yellow
+//   "deepSleep"         : Boolean                       vehicle.vehicle.deepSleepModeActive
+//   "preconditioning"   : String                        vehicle.vehicle.preConditioning.activity
+//   "teleservice"       : String                        vehicle.channel.teleservice.status
+//   "lat"               : Float   (degrees, PII)        vehicle.cabin.infotainment.navigation.currentLocation.latitude
+//   "lon"               : Float   (degrees, PII)        vehicle.cabin.infotainment.navigation.currentLocation.longitude
+//   "altitudeM"         : Number  (m)                   vehicle.cabin.infotainment.navigation.currentLocation.altitude
+//   "headingDeg"        : Number  (degrees)             vehicle.cabin.infotainment.navigation.currentLocation.heading
+//   --- F16 multi-powertrain (BEV/PHEV; null on ICE) ---
+//   "electricRangeKm"   : Number  (integer km)          vehicle.drivetrain.electricEngine.kombiRemainingElectricRange
+//   "socPercent"        : Number  (integer 0-100)       vehicle.powertrain.electric.battery.stateOfCharge.displayed
 //   "lastUpdated"       : Number  (epoch seconds)       max(timestamp) across all non-null fields
 //
 // NOT in schema — computed at render time only:

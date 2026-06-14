@@ -16,6 +16,7 @@ using Toybox.Communications;
 using Toybox.Cryptography;
 using Toybox.Lang;
 using Toybox.StringUtil;
+using Toybox.System;
 using Toybox.Time;
 using Toybox.Timer;
 
@@ -63,12 +64,34 @@ class DeviceAuthManager {
         if (_onChange != null) { _onChange.invoke(); }
     }
 
+    // B9: map an error layer to a user-friendly message — never the raw "HTTP -104".
+    //   responseCode < 0  → Connect IQ transport error (no BLE/phone link or radio fail)
+    //   401               → auth expired/invalid
+    //   429               → quota
+    //   other positive    → a real HTTP status (kept; informative, not the confusing -104)
+    static function _friendlyError(responseCode) {
+        if (responseCode == Communications.BLE_CONNECTION_UNAVAILABLE) { return "No phone connection"; }
+        if (responseCode < 0)    { return "No connection — check phone"; }
+        if (responseCode == 401) { return "Auth expired — retry"; }
+        if (responseCode == 429) { return "Daily limit reached"; }
+        return "Server error " + responseCode;
+    }
+
     // Kick off the device flow. clientId from Settings, else the baked-in personal value.
     function start() {
         var clientId = Config.clientId();
         if (clientId == null || clientId.equals("")) {
             _state = FAILED;
             _errMsg = "No client ID in settings";
+            _notify();
+            return;
+        }
+
+        // B9: pre-flight the phone link so we surface "No phone connection" up front
+        // instead of letting the request fail with a raw transport code (-104).
+        if (!System.getDeviceSettings().phoneConnected) {
+            _state = FAILED;
+            _errMsg = "No phone connection";
             _notify();
             return;
         }
@@ -100,7 +123,7 @@ class DeviceAuthManager {
     function onDeviceCodeResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
         if (responseCode != 200 || data == null || !data.hasKey("device_code")) {
             _state = FAILED;
-            _errMsg = "Device code HTTP " + responseCode;
+            _errMsg = _friendlyError(responseCode);
             _notify();
             return;
         }
@@ -177,7 +200,9 @@ class DeviceAuthManager {
             _schedulePoll();
         } else {
             _state = FAILED;
-            _errMsg = err.equals("") ? ("HTTP " + responseCode) : err;
+            // OAuth error strings (e.g. "expired_token") are meaningful; keep them.
+            // Empty error = transport/HTTP failure → friendly mapping (never raw -104).
+            _errMsg = err.equals("") ? _friendlyError(responseCode) : err;
             _notify();
         }
     }

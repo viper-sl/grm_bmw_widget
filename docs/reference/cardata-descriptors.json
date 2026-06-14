@@ -1,0 +1,1596 @@
+{
+  "_meta": {
+    "source": "BMW CarData Telematics Data Catalogue (Customer), EN",
+    "captured": "2026-06-14",
+    "note": "Descriptor strings cleaned of the catalogue's word-break artifact. 'stream' = Streamable column (MQTT). 'kind'=doc marks non-scalar payloads (lists/images/swagger refs) that are not simple telematicData values. Value enums quoted verbatim where given. 'include'=true marks the final widget subscription set (39 scalars — mirrors docs/descriptors.md); false = not subscribed. 'observed' = latest value seen in bmw_data/capture_*.json (null = never returned a value on the test vehicle). See docs/descriptors.md for the curated list and empirical findings (B10/B11/B12/B1).",
+    "widget_vehicle": "ICE BMW 218i (REDACTED-VIN) — most EV/charging descriptors will be null/absent for this vehicle but are included for completeness."
+  },
+  "categories": [
+    {
+      "name": "Basic Vehicle Data",
+      "descriptors": [
+        {
+          "d": "vehicle.sim.status",
+          "name": "SIM activation status",
+          "type": "-",
+          "values": "true, false",
+          "unit": "-",
+          "stream": false,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.vehicleIdentification.basicVehicleData",
+          "name": "Basic vehicle data",
+          "type": "-",
+          "values": "Swagger ../basicData",
+          "unit": "-",
+          "stream": false,
+          "kind": "doc",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.batteryManagement.batterySizeMax",
+          "name": "HV battery size",
+          "type": "float",
+          "values": "0-300 kWh, INVALID",
+          "unit": "kWh",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.extras.optionalEquipment.code",
+          "name": "Optional equipment list",
+          "type": "-",
+          "values": "4-digit codes, comma-separated",
+          "unit": "-",
+          "stream": false,
+          "kind": "doc",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.hvsMaxEnergyAbsolute",
+          "name": "HV battery max energy content",
+          "type": "-",
+          "values": "0-300 kWh, INVALID",
+          "unit": "kWh",
+          "stream": false,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.look.image",
+          "name": "Vehicle image",
+          "type": "-",
+          "values": "PNG file",
+          "unit": "-",
+          "stream": false,
+          "kind": "doc",
+          "observed": null
+        }
+      ]
+    },
+    {
+      "name": "Vehicle Status",
+      "descriptors": [
+        {
+          "d": "vehicle.vehicle.antiTheftAlarmSystem.alarm.activationTime",
+          "name": "AntiTheftAlarm activation time",
+          "type": "string",
+          "values": "-",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.vehicle.antiTheftAlarmSystem.alarm.armStatus",
+          "name": "AntiTheftAlarm arm status",
+          "type": "string",
+          "values": "unarmed, doorsOnly, doorsTiltCabin",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.vehicle.antiTheftAlarmSystem.alarm.isOn",
+          "name": "AntiTheftAlarm is on",
+          "type": "boolean",
+          "values": "true, false",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.channel.teleservice.status",
+          "name": "Teleservice availability",
+          "type": "string",
+          "values": "PENDING, IDLE, SUCCESSFUL, ERROR",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": {
+            "value": "Initial status",
+            "unit": null,
+            "timestamp": "2026-06-13T17:05:44.339Z"
+          }
+        },
+        {
+          "d": "vehicle.electricalSystem.battery.voltage",
+          "name": "12V battery voltage",
+          "type": "float",
+          "values": "5 V to 20 V",
+          "unit": "V",
+          "stream": true,
+          "kind": "scalar",
+          "observed": {
+            "value": "13.56",
+            "unit": "V",
+            "timestamp": "2026-06-13T17:05:44.339Z"
+          }
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.charging.profile.mode",
+          "name": "Charging profile mode",
+          "type": "string",
+          "values": "XML structure (see catalogue)",
+          "unit": "-",
+          "stream": true,
+          "kind": "doc",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.convertible.roofRetractableStatus",
+          "name": "Convertible roof retractable status (Mini)",
+          "type": "string",
+          "values": "-",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.internalCombustionEngine.engine.ect",
+          "name": "Coolant temperature",
+          "type": "int16",
+          "values": "0-150 C / 32-302 F",
+          "unit": "Celsius",
+          "stream": true,
+          "kind": "scalar",
+          "observed": {
+            "value": "93",
+            "unit": "°C",
+            "timestamp": "2026-06-13T17:05:44.339Z"
+          }
+        },
+        {
+          "d": "vehicle.channel.ngtp.timeVehicle",
+          "name": "Date and time in vehicle",
+          "type": "string",
+          "values": "00:00-23:59",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.status.serviceTime.inspectionDateLegal",
+          "name": "Date of next inspection",
+          "type": "string",
+          "values": "dd.mm.yyyy hh:mm UTC",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.vehicle.deepSleepModeActive",
+          "name": "Deep sleep mode",
+          "type": "boolean",
+          "values": "true, false",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.infotainment.displayUnit.distance",
+          "name": "Display unit (distance)",
+          "type": "string",
+          "values": "km, miles",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "km",
+            "unit": null,
+            "timestamp": "2026-06-13T17:05:44.339Z"
+          }
+        },
+        {
+          "d": "vehicle.status.serviceDistance.yellow",
+          "name": "Distance threshold for service info",
+          "type": "uint16",
+          "values": "2000 km / 1243 mi",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": {
+            "value": "2000",
+            "unit": null,
+            "timestamp": "2026-06-13T17:05:44.339Z"
+          }
+        },
+        {
+          "d": "vehicle.cabin.infotainment.navigation.destinationSet.distance",
+          "name": "Distance to nav destination",
+          "type": "uint16",
+          "values": "0-100000 km",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.status.serviceDistance.next",
+          "name": "Distance to next service",
+          "type": "uint16",
+          "values": "0-100000 km",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "21000",
+            "unit": null,
+            "timestamp": "2026-06-13T17:05:44.339Z"
+          }
+        },
+        {
+          "d": "vehicle.cabin.door.status",
+          "name": "Door status (legacy aggregate)",
+          "type": "string",
+          "values": "ASN_locked/ASN_unlocked/ASN_selective-Locked/ASN_unknown; allDoorsLocked/trunkLocked: ASN_isTrue/ASN_isFalse/ASN_isUnknown",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.electronicControlUnit.diagnosticTroubleCodes.raw",
+          "name": "Fault memory",
+          "type": "-",
+          "values": "-",
+          "unit": "-",
+          "stream": true,
+          "kind": "doc",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.door.row1.driver.position",
+          "name": "Front driver door position",
+          "type": "uint8",
+          "values": "0%-100%",
+          "unit": "percent",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.cabin.door.row1.passenger.position",
+          "name": "Front passenger door position",
+          "type": "uint8",
+          "values": "0%-100%",
+          "unit": "percent",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.cabin.door.row2.driver.position",
+          "name": "Rear driver door position",
+          "type": "uint8",
+          "values": "0%-100%",
+          "unit": "percent",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.cabin.door.row2.passenger.position",
+          "name": "Rear passenger door position",
+          "type": "uint8",
+          "values": "0%-100%",
+          "unit": "percent",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.cabin.hvac.statusAirPurification",
+          "name": "HVAC air purification status",
+          "type": "string",
+          "values": "UNFILTERED, PURIFYING_ONGOING, PURIFIED, INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": true,
+          "note": "Included in the container for a future air-purification feature; subscribed but intentionally NOT parsed/rendered yet (no parser key). Null on this ICE vehicle so far. Reviewed 2026-06-14.",
+          "observed": null
+        },
+        {
+          "d": "vehicle.electricalSystem.battery.stateOfCharge",
+          "name": "Low-voltage battery SoC",
+          "type": "-",
+          "values": "-",
+          "unit": "%",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.vehicle.travelledDistance",
+          "name": "Mileage / odometer",
+          "type": "float",
+          "values": "0-500000 km",
+          "unit": "km",
+          "stream": true,
+          "kind": "scalar",
+          "include": true,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.infotainment.isMobilePhoneConnected",
+          "name": "Mobile phone connection",
+          "type": "boolean",
+          "values": "ASN_isFalse, ASN_isTrue, ASN_isUnknown",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.isMoving",
+          "name": "Motion status",
+          "type": "boolean",
+          "values": "ASN_isFalse, ASN_isTrue, ASN_isUnknown",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.cabin.infotainment.navigation.currentLocation.heading",
+          "name": "Vehicle orientation/heading",
+          "type": "double",
+          "values": "0-359",
+          "unit": "degrees",
+          "stream": true,
+          "kind": "scalar",
+          "observed": {
+            "value": "358",
+            "unit": "degrees",
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.status.conditionBasedServicesCount",
+          "name": "Number of CBS reports",
+          "type": "uint16",
+          "values": "0-60",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": {
+            "value": "6",
+            "unit": null,
+            "timestamp": "2026-06-13T17:05:44.339Z"
+          }
+        },
+        {
+          "d": "vehicle.vehicle.preConditioning.isRemoteEngineStartAllowed",
+          "name": "Engine pre-conditioning permission",
+          "type": "boolean",
+          "values": "true, false, INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": {
+            "value": "false",
+            "unit": null,
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          },
+          "include": false
+        },
+        {
+          "d": "vehicle.cabin.hvac.preconditioning.status.comfortState",
+          "name": "Preconditioning comfort state",
+          "type": "string",
+          "values": "NOT_ACTIVE, COMFORT_HEATING, COMFORT_COOLING, COMFORT_VENTILATION, DEFROST, COMFORT_UNDEFINED",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.vehicle.preConditioning.activity",
+          "name": "Pre-conditioning status",
+          "type": "string",
+          "values": "standby, heating, cooling, ventilation, inactive",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": {
+            "value": "INACTIVE",
+            "unit": null,
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.body.trunk.window.isOpen",
+          "name": "Rear window unlocking",
+          "type": "boolean",
+          "values": "CLOSED, OPEN, INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.vehicle.preConditioning.error",
+          "name": "Preconditioning error reason",
+          "type": "string",
+          "values": "LowFuel, LowBattery, QuotaExceeded, HeaterFailure, ComponentFailure, OpenOrUnlocked, OK, INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.infotainment.navigation.remainingRange",
+          "name": "Remaining range (nav/fuel)",
+          "type": "uint16",
+          "values": "0-100000 km",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.drivetrain.engine.isActive",
+          "name": "State of ignition (isActive)",
+          "type": "boolean",
+          "values": "ASN_isFalse, ASN_isTrue, ASN_isUnknown",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.body.trunk.isOpen",
+          "name": "Status of boot lid / trunk",
+          "type": "boolean",
+          "values": "CLOSED, OPEN, INVALID (INTERMEDIATE=half-open)",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "CLOSED",
+            "unit": null,
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.cabin.convertible.roofStatus",
+          "name": "Status of convertible roof",
+          "type": "string",
+          "values": "CLOSEDSECURED, OPENSECURED, EMERGENCYLOCKED, HARDTOPMOUNTED, INTERMEDIATEPOSITION, LOADINGPOSITION",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.cabin.door.lock.status",
+          "name": "Status of doors (lock)",
+          "type": "-",
+          "values": "SECURED, UNLOCKED, SELECTIVE-LOCKED, LOCKED, INVALID, UNKNOWN",
+          "unit": "-",
+          "stream": false,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "LOCKED",
+            "unit": null,
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.drivetrain.engine.isIgnitionOn",
+          "name": "Status of engine (on/off)",
+          "type": "boolean",
+          "values": "ASN_isFalse, ASN_isTrue, ASN_isUnknown",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.cabin.door.row1.driver.isOpen",
+          "name": "Front left door",
+          "type": "boolean",
+          "values": "OPEN, CLOSED, INVALID, UNKNOWN",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "CLOSED",
+            "unit": null,
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.cabin.window.row1.driver.status",
+          "name": "Front left window",
+          "type": "string",
+          "values": "CLOSED, INTERMEDIATE, OPEN, INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": {
+            "value": "CLOSED",
+            "unit": null,
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.cabin.door.row1.passenger.isOpen",
+          "name": "Front right door",
+          "type": "boolean",
+          "values": "OPEN, CLOSED, INVALID, UNKNOWN",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "CLOSED",
+            "unit": null,
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.cabin.window.row1.passenger.status",
+          "name": "Front right window",
+          "type": "string",
+          "values": "CLOSED, INTERMEDIATE, OPEN, INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": {
+            "value": "CLOSED",
+            "unit": null,
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.body.hood.isOpen",
+          "name": "Status of hood",
+          "type": "boolean",
+          "values": "CLOSED, OPEN, INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "CLOSED",
+            "unit": null,
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.body.lights.isRunningOn",
+          "name": "Status of lights",
+          "type": "boolean",
+          "values": "ASN_isFalse, ASN_isTrue, ASN_isUnknown",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.cabin.door.row2.driver.isOpen",
+          "name": "Rear left door",
+          "type": "boolean",
+          "values": "OPEN, CLOSED, INVALID, UNKNOWN",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.window.row2.driver.status",
+          "name": "Rear left window",
+          "type": "string",
+          "values": "CLOSED, INTERMEDIATE, OPEN, INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.door.row2.passenger.isOpen",
+          "name": "Rear right door",
+          "type": "boolean",
+          "values": "OPEN, CLOSED, INVALID, UNKNOWN",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.window.row2.passenger.status",
+          "name": "Rear right window",
+          "type": "string",
+          "values": "CLOSED, INTERMEDIATE, OPEN, INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.sunroof.status",
+          "name": "Status of sunroof",
+          "type": "string",
+          "values": "CLOSED, INTERMEDIATE, OPEN, INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.sunroof.overallStatus",
+          "name": "Sunroof overall status",
+          "type": "string",
+          "values": "INVALID, OPEN, OPEN_TILT, INTERMEDIATE_TILT, CLOSED",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.sunroof.relativePosition",
+          "name": "Sunroof relative position",
+          "type": "int8",
+          "values": "-100% to 100%",
+          "unit": "percent",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.sunroof.shade.position",
+          "name": "Sunshade position",
+          "type": "uint8",
+          "values": "0%-100%",
+          "unit": "percent",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.fuelSystem.remainingFuel",
+          "name": "Tank content (litres)",
+          "type": "float",
+          "values": "0-100 L / 0-26.5 gal",
+          "unit": "L",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "44",
+            "unit": "l",
+            "timestamp": "2026-06-13T17:05:44.339Z"
+          }
+        },
+        {
+          "d": "vehicle.drivetrain.fuelSystem.level",
+          "name": "Tank level (%)",
+          "type": "uint8",
+          "values": "0%-100%, INVALID",
+          "unit": "%",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "82",
+            "unit": "%",
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.cabin.sunroof.tiltStatus",
+          "name": "Sunroof tilt status",
+          "type": "string",
+          "values": "CLOSED, INTERMEDIATE, OPEN, INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.status.serviceTime.hUandAuServiceYellow",
+          "name": "Time threshold main/exhaust inspection",
+          "type": "uint16",
+          "values": "0-10 months",
+          "unit": "months",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.status.serviceTime.yellow",
+          "name": "Time threshold for service info",
+          "type": "uint16",
+          "values": "4 weeks",
+          "unit": "weeks",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.infotainment.navigation.destinationSet.arrivalTime",
+          "name": "Time to nav destination",
+          "type": "string",
+          "values": "hh:mm",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.vehicle.timeSetting",
+          "name": "Time zone setting",
+          "type": "string",
+          "values": "wintertime, summertime, utc, manual, INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.body.trunk.door.isOpen",
+          "name": "Trunk door open status",
+          "type": "boolean",
+          "values": "true, false",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": {
+            "value": "false",
+            "unit": null,
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.body.trunk.isLocked",
+          "name": "Trunk locked status",
+          "type": "boolean",
+          "values": "true, false",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.infotainment.navigation.currentLocation.altitude",
+          "name": "Vehicle altitude",
+          "type": "double",
+          "values": "-100 m to 6000 m",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "pii": true,
+          "observed": {
+            "value": "211",
+            "unit": null,
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.cabin.infotainment.navigation.currentLocation.latitude",
+          "name": "Vehicle position latitude",
+          "type": "double",
+          "values": "-90 to +90",
+          "unit": "degrees",
+          "stream": true,
+          "kind": "scalar",
+          "pii": true,
+          "observed": {
+            "value": "REDACTED",
+            "unit": "degrees",
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.cabin.infotainment.navigation.currentLocation.longitude",
+          "name": "Vehicle position longitude",
+          "type": "double",
+          "values": "-180 to +180",
+          "unit": "degrees",
+          "stream": true,
+          "kind": "scalar",
+          "pii": true,
+          "observed": {
+            "value": "REDACTED",
+            "unit": "degrees",
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usage-Based Vehicle Data",
+      "descriptors": [
+        {
+          "d": "vehicle.vehicle.averageWeeklyDistanceShortTerm",
+          "name": "Average distance/week",
+          "type": "float",
+          "values": "1-3000 km",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.vehicle.averageWeeklyDistanceLongTerm",
+          "name": "Average distance/week (long-life)",
+          "type": "float",
+          "values": "1-3000 km",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.lastRemainingRange",
+          "name": "Last sent remaining range (elec+fuel)",
+          "type": "float",
+          "values": "0-6500",
+          "unit": "km",
+          "stream": true,
+          "kind": "scalar",
+          "note": "PHEV: e-range+CE range; ICE: CE range; BEV: likely 0. Use only for combustion cars; EVs read kombiRemainingElectricRange.",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "499",
+            "unit": "km",
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.vehicle.speedRange.lowerBound",
+          "name": "Speed range lower",
+          "type": "int16",
+          "values": "-100 to 500 km/h",
+          "unit": "km/h",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.vehicle.speedRange.upperBound",
+          "name": "Speed range upper",
+          "type": "int16",
+          "values": "-100 to 500 km/h",
+          "unit": "km/h",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        }
+      ]
+    },
+    {
+      "name": "Vehicle Events",
+      "descriptors": [
+        {
+          "d": "vehicle.channel.teleservice.lastAutomaticServiceCallTime",
+          "name": "Automatic Teleservice Call",
+          "type": "string",
+          "values": "dd.mm.yyyy hh:mm UTC",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.channel.teleservice.lastTeleserviceReportTime",
+          "name": "Teleservice report",
+          "type": "string",
+          "values": "dd.mm.yyyy hh:mm:ss UTC",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        }
+      ]
+    },
+    {
+      "name": "Electric Vehicle Data",
+      "descriptors": [
+        {
+          "d": "vehicle.electricalSystem.battery48V.stateOfHealth.displayed",
+          "name": "48V battery SoH",
+          "type": "uint16",
+          "values": "0%-250%",
+          "unit": "percent",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.charging.acAmpere",
+          "name": "AC charging current",
+          "type": "uint8",
+          "values": "0-25 A",
+          "unit": "A",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.charging.acVoltage",
+          "name": "AC charging voltage",
+          "type": "float",
+          "values": "0-300 V",
+          "unit": "V",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.charging.timeToFullyCharged",
+          "name": "Remaining charging time",
+          "type": "uint16",
+          "values": "0-65500 min, INVALID",
+          "unit": "min",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.charging.connectorStatus",
+          "name": "Charging connector status",
+          "type": "string",
+          "values": "CONNECTED, DISCONNECTED, ERROR",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.charging.method",
+          "name": "Charging method/plug type",
+          "type": "string",
+          "values": "AC_TYPE1PLUG, AC_TYPE2PLUG, NOCHARGING",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.charging.chargingMode",
+          "name": "Charging mode",
+          "type": "string",
+          "values": "NORMAL_PROGNOSE_BASED, STEP_BASED, PLC_MODE",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.charging.connectionType",
+          "name": "Charging process (inductive/conductive)",
+          "type": "string",
+          "values": "CONDUCTIVE, INDUCTIVE, SIGNAL_INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.charging.phaseNumber",
+          "name": "Charging phases",
+          "type": "string",
+          "values": "NO_CHARGING, 1-PHASES, 2-PHASES, 3-PHASES, INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.charging.status",
+          "name": "Charging status",
+          "type": "string",
+          "values": "NOCHARGING, INITIALIZATION, CHARGINGACTIVE, CHARGINGPAUSED, CHARGINGENDED, CHARGINGERROR",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.powertrain.electric.battery.stateOfCharge.displayed",
+          "name": "Charging status displayed (SoC)",
+          "type": "float",
+          "values": "0-100 %",
+          "unit": "percent",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.batteryManagement.header",
+          "name": "HV battery charging status",
+          "type": "float",
+          "values": "0%-100%",
+          "unit": "percent",
+          "stream": true,
+          "kind": "doc",
+          "note": "Leaf name 'header' looks like a mis-parsed table section-header row, not a real descriptor key — caused CU-402 on container create. Needs verification against a live catalogue.",
+          "include": false,
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.avgElectricRangeConsumption",
+          "name": "Average electric consumption",
+          "type": "float",
+          "values": "0-100 kWh/100km",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.vehicle.avgSpeed",
+          "name": "Average speed",
+          "type": "uint16",
+          "values": "0-300 km/h, INVALID",
+          "unit": "km/h",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.drivetrain.batteryManagement.maxEnergy",
+          "name": "HV battery energy content",
+          "type": "float",
+          "values": "0-300 kWh, INVALID",
+          "unit": "kWh",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.remainingElectricRange",
+          "name": "Estimate of electric range during charging",
+          "type": "float",
+          "values": "0-1000 km",
+          "unit": "km",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.charging.timeRemaining",
+          "name": "Estimate remaining charging time",
+          "type": "uint16",
+          "values": "0-200 min",
+          "unit": "min",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.totalRemainingRange",
+          "name": "Estimate of total range (elec+CE)",
+          "type": "float",
+          "values": "0-2000 km",
+          "unit": "km",
+          "stream": true,
+          "kind": "scalar",
+          "note": "PHEV total range (electric + combustion).",
+          "observed": {
+            "value": "499",
+            "unit": "km",
+            "timestamp": "2026-06-14T16:10:35.897Z"
+          }
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.charging.hvStatus",
+          "name": "HV charging system status",
+          "type": "string",
+          "values": "INVALID, CHARGING, ERROR, NOT_CHARGING, WAITING_FOR_CHARGING, FINISHED_FULLY_CHARGED, FINISHED_NOT_FULL",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.powertrain.electric.range.target",
+          "name": "Remaining electric range (target SoC)",
+          "type": "float",
+          "values": "0-4000 km/mi, INVALID",
+          "unit": "km",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.kombiRemainingElectricRange",
+          "name": "Remaining electric range",
+          "type": "float",
+          "values": "0-4000 km, INVALID",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "include": false,
+          "observed": null
+        },
+        {
+          "d": "vehicle.powertrain.electric.battery.stateOfCharge.target",
+          "name": "Target SoC",
+          "type": "uint8",
+          "values": "0-100 (10% steps), INVALID",
+          "unit": "%",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.body.chargingPort.status",
+          "name": "Status of charging plug",
+          "type": "string",
+          "values": "CONNECTED, DISCONNECTED, INVALID, -NA-",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.body.chargingPort.combinedStatus",
+          "name": "Charging port connection status",
+          "type": "string",
+          "values": "DISCONNECTED, CONNECTED, INVALID",
+          "unit": "-",
+          "stream": false,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.powertrain.electric.battery.charging.power",
+          "name": "Charging power",
+          "type": "int32",
+          "values": "-",
+          "unit": "W",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.powertrain.electric.battery.stateOfHealth.displayed",
+          "name": "HV battery SoH (SOCE)",
+          "type": "-",
+          "values": "-",
+          "unit": "-",
+          "stream": false,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.drivetrain.electricEngine.charging.windowSelection",
+          "name": "Charging window selection",
+          "type": "string",
+          "values": "CHOSEN, NOTCHOSEN, -NA-",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.powertrain.tractionBattery.charging.port.anyPosition.flap.isOpen",
+          "name": "Charging port flap open",
+          "type": "boolean",
+          "values": "true, false",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.powertrain.tractionBattery.charging.port.anyPosition.isPlugged",
+          "name": "Charging port plugged",
+          "type": "boolean",
+          "values": "true, false",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        }
+      ],
+      "note": "EV category has ~100 charging/preconditioning descriptors; the most useful state/range/SoC ones are listed. Full set is in the online catalogue. For an ICE 218i these are absent."
+    },
+    {
+      "name": "Metadata",
+      "descriptors": [
+        {
+          "d": "vehicle.cabin.infotainment.hmi.distanceUnit",
+          "name": "Infotainment distance unit",
+          "type": "string",
+          "values": "MILES, KILOMETERS",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.infotainment.navigation.currentLocation.fixStatus",
+          "name": "Navigation fix status",
+          "type": "string",
+          "values": "NO_FIX, GPS_FIX_2D, GPS_FIX_3D",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.cabin.infotainment.navigation.currentLocation.numberOfSatellites",
+          "name": "Navigation satellite count",
+          "type": "uint8",
+          "values": "-",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14).",
+          "observed": null
+        },
+        {
+          "d": "vehicle.powertrain.electric.range.displayControl",
+          "name": "Electric range display control",
+          "type": "string",
+          "values": "-",
+          "unit": "-",
+          "stream": true,
+          "kind": "scalar",
+          "include": false,
+          "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
+          "observed": null
+        }
+      ]
+    },
+    {
+      "name": "Tyre Data",
+      "descriptors": [
+        {
+          "d": "vehicle.chassis.axle.row1.wheel.left.tire.pressure",
+          "name": "Tyre pressure FL",
+          "type": "uint16",
+          "values": "0-1000 kPa, -NA-",
+          "unit": "kPa",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "230",
+            "unit": "kPa",
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.chassis.axle.row1.wheel.right.tire.pressure",
+          "name": "Tyre pressure FR",
+          "type": "uint16",
+          "values": "0-1000 kPa, -NA-",
+          "unit": "kPa",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "230",
+            "unit": "kPa",
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.chassis.axle.row2.wheel.left.tire.pressure",
+          "name": "Tyre pressure RL",
+          "type": "uint16",
+          "values": "0-1000 kPa, -NA-",
+          "unit": "kPa",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "230",
+            "unit": "kPa",
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.chassis.axle.row2.wheel.right.tire.pressure",
+          "name": "Tyre pressure RR",
+          "type": "uint16",
+          "values": "0-1000 kPa, -NA-",
+          "unit": "kPa",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "230",
+            "unit": "kPa",
+            "timestamp": "2026-06-14T16:10:13.000Z"
+          }
+        },
+        {
+          "d": "vehicle.chassis.axle.row1.wheel.left.tire.pressureTarget",
+          "name": "Tyre target FL",
+          "type": "uint16",
+          "values": "0-1000 kPa, -NA-",
+          "unit": "kPa",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "230",
+            "unit": "kPa",
+            "timestamp": "2026-06-14T16:06:09.496Z"
+          }
+        },
+        {
+          "d": "vehicle.chassis.axle.row1.wheel.right.tire.pressureTarget",
+          "name": "Tyre target FR",
+          "type": "uint16",
+          "values": "0-1000 kPa, -NA-",
+          "unit": "kPa",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "230",
+            "unit": "kPa",
+            "timestamp": "2026-06-14T16:06:09.496Z"
+          }
+        },
+        {
+          "d": "vehicle.chassis.axle.row2.wheel.left.tire.pressureTarget",
+          "name": "Tyre target RL",
+          "type": "uint16",
+          "values": "0-1000 kPa, -NA-",
+          "unit": "kPa",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "230",
+            "unit": "kPa",
+            "timestamp": "2026-06-14T16:06:09.496Z"
+          }
+        },
+        {
+          "d": "vehicle.chassis.axle.row2.wheel.right.tire.pressureTarget",
+          "name": "Tyre target RR",
+          "type": "uint16",
+          "values": "0-1000 kPa, -NA-",
+          "unit": "kPa",
+          "stream": true,
+          "kind": "scalar",
+          "confirmed": "live container v2, 2026-05-27",
+          "observed": {
+            "value": "230",
+            "unit": "kPa",
+            "timestamp": "2026-06-14T16:06:09.496Z"
+          }
+        },
+        {
+          "d": "vehicle.chassis.axle.row1.wheel.left.tire.temperature",
+          "name": "Tyre temp FL",
+          "type": "float",
+          "values": "0-50 C",
+          "unit": "Celsius",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.chassis.axle.row1.wheel.right.tire.temperature",
+          "name": "Tyre temp FR",
+          "type": "float",
+          "values": "0-50 C",
+          "unit": "Celsius",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.chassis.axle.row2.wheel.left.tire.temperature",
+          "name": "Tyre temp RL",
+          "type": "float",
+          "values": "0-50 C",
+          "unit": "Celsius",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.chassis.axle.row2.wheel.right.tire.temperature",
+          "name": "Tyre temp RR",
+          "type": "float",
+          "values": "0-50 C",
+          "unit": "Celsius",
+          "stream": true,
+          "kind": "scalar",
+          "observed": null,
+          "include": false
+        },
+        {
+          "d": "vehicle.chassis.axle.wheel.tire.diagnosis",
+          "name": "Smart Maintenance tyre diagnostics",
+          "type": "-",
+          "values": "Swagger ../smartMaintenanceTyreDiagnosis",
+          "unit": "-",
+          "stream": false,
+          "kind": "doc",
+          "note": "Separate REST endpoint, no container needed.",
+          "observed": null
+        }
+      ]
+    },
+    {
+      "name": "ConnectedDrive Contract",
+      "descriptors": [
+        {
+          "d": "vehicle.vehicleIdentification.connectedDriveContractList",
+          "name": "Active ConnectedDrive contracts",
+          "type": "-",
+          "values": "yyyy-mm-dd hh:mm:ss UTC",
+          "unit": "-",
+          "stream": false,
+          "kind": "doc",
+          "observed": null
+        }
+      ]
+    }
+  ]
+}

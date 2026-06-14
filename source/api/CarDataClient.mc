@@ -13,7 +13,9 @@ class CarDataClient {
     static const _DATA_HOST = "https://api-cardata.bmwgroup.com";
 
     var _callback;
-    var _maxTs; // parse-time accumulator: max epoch seconds across all fields
+    var _maxTs;      // parse-time accumulator: max epoch seconds across all fields
+    var _tsMemoStr;  // last timestamp string seen this parse (1-entry memo)
+    var _tsMemoEpoch;// its epoch — most descriptors in one response share a timestamp
 
     // --- Telematic Data (main poll, every 40 min) ---
 
@@ -200,7 +202,7 @@ class CarDataClient {
     // Body shape (verified): { name, purpose, technicalDescriptors:[...] }.
     // technicalDescriptors is a FLAT array of dotted strings (not objects).
 
-    static const _CONTAINER_NAME = "grm_bmw_widget_v2";
+    static const _CONTAINER_NAME = "grm_bmw_widget_v3";
 
     // List existing containers; reuse ours (match by name) if present.
     // GET /customers/containers -> {"data":{"containers":[ {id|containerId, name, ...} ]}}.
@@ -281,6 +283,25 @@ class CarDataClient {
         _callback.invoke(responseCode, cid);
     }
 
+    // --- Container delete (F14, DELETE /customers/containers/{id}, verified 200) ---
+
+    function deleteContainer(containerId, accessToken, callback) {
+        _callback = callback;
+        Communications.makeWebRequest(
+            _DATA_HOST + "/customers/containers/" + containerId,
+            null,
+            { :method       => Communications.HTTP_REQUEST_METHOD_DELETE,
+              :headers      => _buildHeaders(accessToken),
+              :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON },
+            method(:onDeleteContainerResponse)
+        );
+    }
+
+    function onDeleteContainerResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
+        data = null;
+        _callback.invoke(responseCode, null);
+    }
+
     // Cache the container id stamped with the name it was created/matched under,
     // so cachedContainerId() can detect a version bump later.
     static function _storeContainer(cid) {
@@ -304,7 +325,10 @@ class CarDataClient {
         return cid;
     }
 
-    // The 27 descriptors the widget reads (ICE 218i, container v2).
+    // The 39 descriptors the widget reads (ICE 218i, container v3).
+    // v3 vs v2: dropped engine.isIgnitionOn (never populates on this vehicle — B10),
+    // added the 12 telematics fields surfaced in the grouped "About car" menu plus
+    // hvac.statusAirPurification (subscribed for a future feature, not yet parsed).
     static function _containerDescriptors() {
         return [
             "vehicle.cabin.door.lock.status",
@@ -321,7 +345,6 @@ class CarDataClient {
             "vehicle.vehicle.travelledDistance",
             "vehicle.status.serviceDistance.next",
             "vehicle.cabin.infotainment.displayUnit.distance",
-            "vehicle.drivetrain.engine.isIgnitionOn",
             "vehicle.cabin.window.row1.driver.status",
             "vehicle.cabin.window.row1.passenger.status",
             "vehicle.cabin.window.row2.driver.status",
@@ -333,7 +356,26 @@ class CarDataClient {
             "vehicle.chassis.axle.row1.wheel.left.tire.pressureTarget",
             "vehicle.chassis.axle.row1.wheel.right.tire.pressureTarget",
             "vehicle.chassis.axle.row2.wheel.left.tire.pressureTarget",
-            "vehicle.chassis.axle.row2.wheel.right.tire.pressureTarget"
+            "vehicle.chassis.axle.row2.wheel.right.tire.pressureTarget",
+            // About-car telematics (v3)
+            "vehicle.electricalSystem.battery.voltage",
+            "vehicle.drivetrain.internalCombustionEngine.engine.ect",
+            "vehicle.drivetrain.totalRemainingRange",
+            "vehicle.status.conditionBasedServicesCount",
+            "vehicle.status.serviceDistance.yellow",
+            "vehicle.vehicle.deepSleepModeActive",
+            "vehicle.vehicle.preConditioning.activity",
+            "vehicle.channel.teleservice.status",
+            "vehicle.cabin.infotainment.navigation.currentLocation.latitude",
+            "vehicle.cabin.infotainment.navigation.currentLocation.longitude",
+            "vehicle.cabin.infotainment.navigation.currentLocation.altitude",
+            "vehicle.cabin.infotainment.navigation.currentLocation.heading",
+            // F16 multi-powertrain: electric range + HV state-of-charge (null on this ICE
+            // car, populated on BEV/PHEV — the parser runtime-selects the live field).
+            "vehicle.drivetrain.electricEngine.kombiRemainingElectricRange",
+            "vehicle.powertrain.electric.battery.stateOfCharge.displayed",
+            // Subscribed for a future air-purification feature; intentionally not parsed yet.
+            "vehicle.cabin.hvac.statusAirPurification"
         ];
     }
 
@@ -350,45 +392,33 @@ class CarDataClient {
     // Parse telematicData response → typed Vehicle State Dictionary.
     // Rules: strings cast to typed values; null → omit; kPa→bar; lastUpdated=max(epoch).
     function _parseTelematicData(raw) {
-        _maxTs = 0; // epoch seconds accumulator
+        _maxTs = 0;          // epoch seconds accumulator
+        _tsMemoStr = null;   // reset the per-parse timestamp memo
         var state = {};
         var td = raw["telematicData"];
         if (td == null) { raw = null; return state; }
 
-        var e;
-
-        // Lock status
-        e = td["vehicle.cabin.door.lock.status"];
-        if (e != null && e["value"] != null) {
+        // Lock status — only enum field that needs bespoke mapping.
+        var e = td["vehicle.cabin.door.lock.status"];
+        if (e != null) {
             var v = e["value"];
-            if (v.equals("SECURED") || v.equals("LOCKED")) {
-                state["doorsLocked"] = true;
-            } else if (v.equals("UNLOCKED") || v.equals("SELECTIVE-LOCKED")) {
-                state["doorsLocked"] = false;
-            } // INVALID/UNKNOWN → omit doorsLocked
-            _updateMaxTs(e["timestamp"]);
+            if (v != null) {
+                if (v.equals("SECURED") || v.equals("LOCKED")) {
+                    state["doorsLocked"] = true;
+                } else if (v.equals("UNLOCKED") || v.equals("SELECTIVE-LOCKED")) {
+                    state["doorsLocked"] = false;
+                } // INVALID/UNKNOWN → omit doorsLocked
+                _updateMaxTs(e["timestamp"]);
+            }
         }
 
-        // Range (ICE only — "only for combustion cars")
-        e = td["vehicle.drivetrain.lastRemainingRange"];
-        if (e != null && e["value"] != null) {
-            state["rangeKm"] = e["value"].toNumber();
-            _updateMaxTs(e["timestamp"]);
-        }
-
-        // Fuel %
-        e = td["vehicle.drivetrain.fuelSystem.level"];
-        if (e != null && e["value"] != null) {
-            state["fuelPercent"] = e["value"].toNumber();
-            _updateMaxTs(e["timestamp"]);
-        }
-
-        // Fuel litres
-        e = td["vehicle.drivetrain.fuelSystem.remainingFuel"];
-        if (e != null && e["value"] != null) {
-            state["fuelLitres"] = e["value"].toNumber();
-            _updateMaxTs(e["timestamp"]);
-        }
+        // Plain numeric / string fields (shared helpers — no per-field boilerplate).
+        _parseNumVal(td, "vehicle.drivetrain.lastRemainingRange",            state, "rangeKm");
+        _parseNumVal(td, "vehicle.drivetrain.fuelSystem.level",              state, "fuelPercent");
+        _parseNumVal(td, "vehicle.drivetrain.fuelSystem.remainingFuel",      state, "fuelLitres");
+        _parseNumVal(td, "vehicle.vehicle.travelledDistance",               state, "odometerKm");
+        _parseNumVal(td, "vehicle.status.serviceDistance.next",              state, "serviceDistanceKm");
+        _parseStrVal(td, "vehicle.cabin.infotainment.displayUnit.distance",  state, "displayUnit");
 
         // Doors / trunk / hood: OPEN -> true, anything else -> false; absent -> omit.
         _parseOpenState(td, "vehicle.cabin.door.row1.driver.isOpen",    state, "doorFLOpen");
@@ -398,45 +428,30 @@ class CarDataClient {
         _parseOpenState(td, "vehicle.body.trunk.isOpen",                state, "trunkOpen");
         _parseOpenState(td, "vehicle.body.hood.isOpen",                 state, "hoodOpen");
 
-        // Odometer
-        e = td["vehicle.vehicle.travelledDistance"];
-        if (e != null && e["value"] != null) {
-            state["odometerKm"] = e["value"].toNumber();
-            _updateMaxTs(e["timestamp"]);
-        }
+        // Ignition (engine.isIgnitionOn) intentionally NOT parsed: it never populates
+        // on this vehicle/account, even engine-on and while moving (B10, dropped in v3).
 
-        // Service distance (unit null in response → infer km)
-        e = td["vehicle.status.serviceDistance.next"];
-        if (e != null && e["value"] != null) {
-            state["serviceDistanceKm"] = e["value"].toNumber();
-            _updateMaxTs(e["timestamp"]);
-        }
+        // About-car telematics (grouped read-only menu — not on any page).
+        _parseFloatVal(td, "vehicle.electricalSystem.battery.voltage",                      state, "batteryVoltage");
+        _parseNumVal(td,   "vehicle.drivetrain.internalCombustionEngine.engine.ect",        state, "coolantC");
+        _parseNumVal(td,   "vehicle.drivetrain.totalRemainingRange",                        state, "totalRangeKm");
+        _parseNumVal(td,   "vehicle.status.conditionBasedServicesCount",                    state, "cbsCount");
+        _parseNumVal(td,   "vehicle.status.serviceDistance.yellow",                         state, "serviceYellowKm");
+        _parseBoolVal(td,  "vehicle.vehicle.deepSleepModeActive",                           state, "deepSleep");
+        _parseStrVal(td,   "vehicle.vehicle.preConditioning.activity",                      state, "preconditioning");
+        _parseStrVal(td,   "vehicle.channel.teleservice.status",                            state, "teleservice");
+        _parseFloatVal(td, "vehicle.cabin.infotainment.navigation.currentLocation.latitude",  state, "lat");
+        _parseFloatVal(td, "vehicle.cabin.infotainment.navigation.currentLocation.longitude", state, "lon");
+        _parseNumVal(td,   "vehicle.cabin.infotainment.navigation.currentLocation.altitude",   state, "altitudeM");
+        _parseNumVal(td,   "vehicle.cabin.infotainment.navigation.currentLocation.heading",    state, "headingDeg");
 
-        // Display unit (km / miles)
-        e = td["vehicle.cabin.infotainment.displayUnit.distance"];
-        if (e != null && e["value"] != null) {
-            state["displayUnit"] = e["value"];
-            _updateMaxTs(e["timestamp"]);
-        }
+        // F16 multi-powertrain: electric range + HV state-of-charge (BEV/PHEV; null on ICE).
+        _parseNumVal(td, "vehicle.drivetrain.electricEngine.kombiRemainingElectricRange", state, "electricRangeKm");
+        _parseNumVal(td, "vehicle.powertrain.electric.battery.stateOfCharge.displayed",   state, "socPercent");
 
-        // Engine running (ignition). Value format unconfirmed (OQ-2) — accept plain
-        // booleans/strings or ASN_isTrue/ASN_isFalse enum strings; ASN_isUnknown/other -> omit.
-        e = td["vehicle.drivetrain.engine.isIgnitionOn"];
-        if (e != null && e["value"] != null) {
-            var ign = e["value"];
-            if (ign instanceof Lang.Boolean) {
-                state["engineRunning"] = ign;
-                _updateMaxTs(e["timestamp"]);
-            } else if (ign.equals("true") || ign.equals("True") || ign.equals("ASN_isTrue")) {
-                state["engineRunning"] = true;
-                _updateMaxTs(e["timestamp"]);
-            } else if (ign.equals("false") || ign.equals("False") || ign.equals("ASN_isFalse")) {
-                state["engineRunning"] = false;
-                _updateMaxTs(e["timestamp"]);
-            } // ASN_isUnknown / other -> omit
-        }
-
-        // Window status: OPEN/INTERMEDIATE -> true (open), CLOSED/INVALID -> false.
+        // Window status: only OPEN -> true (open); INTERMEDIATE/CLOSED/INVALID -> false.
+        // (INTERMEDIATE is the frameless-window reseat state and occurs with the door
+        // fully closed — confirmed via live capture 2026-06-14, B11.)
         _parseWindowStatus(td, "vehicle.cabin.window.row1.driver.status",    state, "windowFLOpen");
         _parseWindowStatus(td, "vehicle.cabin.window.row1.passenger.status", state, "windowFROpen");
         _parseWindowStatus(td, "vehicle.cabin.window.row2.driver.status",    state, "windowRLOpen");
@@ -452,6 +467,16 @@ class CarDataClient {
         _parseTyrePressure(td, "vehicle.chassis.axle.row2.wheel.left.tire.pressureTarget",  state, "tyreTargetRL");
         _parseTyrePressure(td, "vehicle.chassis.axle.row2.wheel.right.tire.pressureTarget", state, "tyreTargetRR");
 
+        // F16: pick the powertrain-appropriate range for `rangeKm` (the field pages render).
+        // Powertrain is unknown at compile time, so select the populated field at runtime:
+        // totalRemainingRange (PHEV total / ICE) → kombiRemainingElectricRange (BEV) →
+        // lastRemainingRange (ICE, already in rangeKm). On this ICE car total == last.
+        if (state.hasKey("totalRangeKm")) {
+            state["rangeKm"] = state["totalRangeKm"];
+        } else if (!state.hasKey("rangeKm") && state.hasKey("electricRangeKm")) {
+            state["rangeKm"] = state["electricRangeKm"];
+        }
+
         // lastUpdated = max epoch across all non-null fields (accumulated in _updateMaxTs)
         if (_maxTs > 0) {
             state["lastUpdated"] = _maxTs;
@@ -461,44 +486,94 @@ class CarDataClient {
         return state;
     }
 
-    // Parse a door/trunk/hood isOpen entry: OPEN -> true, anything else -> false.
-    // Absent descriptor (e.g. row2 doors not in this vehicle's catalog, OQ-4) -> omit.
+    // All parse helpers share the same shape: one td lookup, one value read, early-out
+    // on absent/null (field omitted entirely), then write + bump the timestamp once.
+
+    // Door/trunk/hood isOpen: OPEN -> true, anything else -> false.
     function _parseOpenState(td, descriptor, state, key) {
         var e = td[descriptor];
-        if (e != null && e["value"] != null) {
-            state[key] = e["value"].equals("OPEN");
-            _updateMaxTs(e["timestamp"]);
-        }
+        if (e == null) { return; }
+        var v = e["value"];
+        if (v == null) { return; }
+        state[key] = v.equals("OPEN");
+        _updateMaxTs(e["timestamp"]);
     }
 
-    // Parse a window status entry: OPEN/INTERMEDIATE -> true, CLOSED/INVALID -> false.
-    // Absent descriptor (e.g. not in this vehicle's catalog, OQ-4) -> omit entirely.
+    // Window status: only OPEN -> true; INTERMEDIATE/CLOSED/INVALID -> false (B11).
     function _parseWindowStatus(td, descriptor, state, key) {
         var e = td[descriptor];
-        if (e != null && e["value"] != null) {
-            var v = e["value"];
-            state[key] = v.equals("OPEN") || v.equals("INTERMEDIATE");
-            _updateMaxTs(e["timestamp"]);
-        }
+        if (e == null) { return; }
+        var v = e["value"];
+        if (v == null) { return; }
+        state[key] = v.equals("OPEN");
+        _updateMaxTs(e["timestamp"]);
     }
 
-    // Parse a kPa tyre entry; convert to Float bar; update _maxTs.
+    // kPa tyre entry -> Float bar (kPa / 100.0).
     function _parseTyrePressure(td, descriptor, state, key) {
         var e = td[descriptor];
-        if (e != null && e["value"] != null) {
-            state[key] = e["value"].toNumber() / 100.0;
-            _updateMaxTs(e["timestamp"]);
-        }
+        if (e == null) { return; }
+        var v = e["value"];
+        if (v == null) { return; }
+        state[key] = v.toNumber() / 100.0;
+        _updateMaxTs(e["timestamp"]);
+    }
+
+    function _parseNumVal(td, descriptor, state, key) {
+        var e = td[descriptor];
+        if (e == null) { return; }
+        var v = e["value"];
+        if (v == null) { return; }
+        state[key] = v.toNumber();
+        _updateMaxTs(e["timestamp"]);
+    }
+
+    function _parseFloatVal(td, descriptor, state, key) {
+        var e = td[descriptor];
+        if (e == null) { return; }
+        var v = e["value"];
+        if (v == null) { return; }
+        state[key] = v.toFloat();
+        _updateMaxTs(e["timestamp"]);
+    }
+
+    function _parseStrVal(td, descriptor, state, key) {
+        var e = td[descriptor];
+        if (e == null) { return; }
+        var v = e["value"];
+        if (v == null) { return; }
+        state[key] = v;
+        _updateMaxTs(e["timestamp"]);
+    }
+
+    // Boolean-ish: real Booleans or "true"/"false" strings; anything else -> omit.
+    function _parseBoolVal(td, descriptor, state, key) {
+        var e = td[descriptor];
+        if (e == null) { return; }
+        var v = e["value"];
+        if (v == null) { return; }
+        if (v instanceof Lang.Boolean)              { state[key] = v; }
+        else if (v.equals("true") || v.equals("True"))   { state[key] = true; }
+        else if (v.equals("false") || v.equals("False")) { state[key] = false; }
+        else { return; }   // unrecognized -> don't touch maxTs
+        _updateMaxTs(e["timestamp"]);
     }
 
     // Update _maxTs (epoch seconds) if this timestamp is newer.
-    // Monkey C strings have no compareTo — convert to epoch and compare numbers.
+    // A single telematicData response groups most fields under one snapshot timestamp,
+    // so a 1-entry memo skips re-parsing the same string ~30×/parse (each parse builds
+    // 6 substrings + a Gregorian dict + a Moment — pure transient garbage otherwise).
     function _updateMaxTs(ts) {
         if (ts == null) { return; }
-        var epoch = _parseIso8601(ts);
-        if (epoch > _maxTs) {
-            _maxTs = epoch;
+        var epoch;
+        if (ts.equals(_tsMemoStr)) {
+            epoch = _tsMemoEpoch;
+        } else {
+            epoch = _parseIso8601(ts);
+            _tsMemoStr = ts;
+            _tsMemoEpoch = epoch;
         }
+        if (epoch > _maxTs) { _maxTs = epoch; }
     }
 
     // Convert ISO8601 UTC string "2026-05-27T17:53:20Z" → epoch seconds.

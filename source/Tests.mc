@@ -56,8 +56,8 @@ function testParse_kpaToBar(logger as Test.Logger) as Lang.Boolean {
 function testParse_nullOmitted(logger as Test.Logger) as Lang.Boolean {
     var s = new CarDataClient()._parseTelematicData(_fixture());
     Test.assertMessage(!s.hasKey("dataAge"), "dataAge never stored");
-    // trunk.isLocked + ignitionOn are null in fixture and not mapped -> absent
-    Test.assertMessage(!s.hasKey("ignitionOn"), "null ignition omitted");
+    // trunk.isLocked is null in fixture and not mapped -> absent
+    Test.assertMessage(!s.hasKey("trunkLocked"), "null trunk.isLocked omitted");
     _resetStorage();
     return true;
 }
@@ -117,7 +117,7 @@ function testParse_windowStatusVariants(logger as Test.Logger) as Lang.Boolean {
     var open = c._parseTelematicData(_windowFixture("OPEN"));
     Test.assertMessage(open["windowFLOpen"] == true, "OPEN->true");
     var intermediate = c._parseTelematicData(_windowFixture("INTERMEDIATE"));
-    Test.assertMessage(intermediate["windowFLOpen"] == true, "INTERMEDIATE->true");
+    Test.assertMessage(intermediate["windowFLOpen"] == false, "INTERMEDIATE->false (frameless reseat state, B11)");
     var closed = c._parseTelematicData(_windowFixture("CLOSED"));
     Test.assertMessage(closed["windowFLOpen"] == false, "CLOSED->false");
     var invalid = c._parseTelematicData(_windowFixture("INVALID"));
@@ -130,20 +130,55 @@ function testParse_windowStatusVariants(logger as Test.Logger) as Lang.Boolean {
 }
 
 // ============================================================
-//  FR-17 — engine running / ignition (B5, OQ-2)
+//  F16 — multi-powertrain range selection
 // ============================================================
 
 (:test)
-function testParse_engineRunningVariants(logger as Test.Logger) as Lang.Boolean {
+function testParse_rangeSelection(logger as Test.Logger) as Lang.Boolean {
     var c = new CarDataClient();
-    Test.assertMessage(c._parseTelematicData(_ignitionFixture(true))["engineRunning"] == true, "Boolean true");
-    Test.assertMessage(c._parseTelematicData(_ignitionFixture(false))["engineRunning"] == false, "Boolean false");
-    Test.assertMessage(c._parseTelematicData(_ignitionFixture("true"))["engineRunning"] == true, "\"true\"->true");
-    Test.assertMessage(c._parseTelematicData(_ignitionFixture("ASN_isTrue"))["engineRunning"] == true, "ASN_isTrue->true");
-    Test.assertMessage(c._parseTelematicData(_ignitionFixture("false"))["engineRunning"] == false, "\"false\"->false");
-    Test.assertMessage(c._parseTelematicData(_ignitionFixture("ASN_isFalse"))["engineRunning"] == false, "ASN_isFalse->false");
-    Test.assertMessage(!c._parseTelematicData(_ignitionFixture("ASN_isUnknown")).hasKey("engineRunning"), "ASN_isUnknown omitted");
-    Test.assertMessage(!c._parseTelematicData(_ignitionFixture(null)).hasKey("engineRunning"), "null omitted");
+    // ICE: only lastRemainingRange -> rangeKm = it.
+    var ice = c._parseTelematicData({ "telematicData" => {
+        "vehicle.drivetrain.lastRemainingRange" => { "value" => "653", "timestamp" => "2026-05-27T10:00:00Z", "unit" => "km" }
+    }});
+    Test.assertEqualMessage(ice["rangeKm"], 653, "ICE rangeKm = lastRemainingRange");
+
+    // PHEV/ICE: totalRemainingRange present -> wins.
+    var phev = c._parseTelematicData({ "telematicData" => {
+        "vehicle.drivetrain.lastRemainingRange"  => { "value" => "100", "timestamp" => "2026-05-27T10:00:00Z", "unit" => "km" },
+        "vehicle.drivetrain.totalRemainingRange" => { "value" => "420", "timestamp" => "2026-05-27T10:00:00Z", "unit" => "km" }
+    }});
+    Test.assertEqualMessage(phev["rangeKm"], 420, "total wins over last");
+
+    // BEV: only electric range -> rangeKm = electric.
+    var bev = c._parseTelematicData({ "telematicData" => {
+        "vehicle.drivetrain.electricEngine.kombiRemainingElectricRange" => { "value" => "310", "timestamp" => "2026-05-27T10:00:00Z", "unit" => "km" },
+        "vehicle.powertrain.electric.battery.stateOfCharge.displayed"   => { "value" => "72",  "timestamp" => "2026-05-27T10:00:00Z", "unit" => "%" }
+    }});
+    Test.assertEqualMessage(bev["rangeKm"], 310, "BEV rangeKm = electric");
+    Test.assertEqualMessage(bev["socPercent"], 72, "BEV socPercent");
+    _resetStorage();
+    return true;
+}
+
+// ============================================================
+//  About-car telematics (v3) — typed scalar parsing
+// ============================================================
+
+(:test)
+function testParse_aboutCarTelematics(logger as Test.Logger) as Lang.Boolean {
+    var c = new CarDataClient();
+    var s = c._parseTelematicData(_aboutFixture());
+    Test.assertMessage(_fEq(s["batteryVoltage"], 13.56), "battery voltage Float");
+    Test.assertEqualMessage(s["coolantC"], 93, "coolant °C Number");
+    Test.assertEqualMessage(s["totalRangeKm"], 499, "totalRangeKm Number");
+    Test.assertEqualMessage(s["cbsCount"], 6, "cbsCount Number");
+    Test.assertEqualMessage(s["teleservice"], "Initial status", "teleservice String");
+    Test.assertEqualMessage(s["preconditioning"], "INACTIVE", "preconditioning String");
+    Test.assertMessage(_fEq(s["lat"], 48.137), "lat Float");
+    Test.assertEqualMessage(s["headingDeg"], 350, "headingDeg Number");
+    // absent descriptors -> omitted entirely
+    var absent = c._parseTelematicData({ "telematicData" => {} });
+    Test.assertMessage(!absent.hasKey("batteryVoltage"), "absent battery omitted");
     _resetStorage();
     return true;
 }
@@ -492,10 +527,17 @@ function _windowFixture(status) {
     }};
 }
 
-function _ignitionFixture(value) {
+function _aboutFixture() {
+    var ts = "2026-05-27T10:00:00Z";
     return { "telematicData" => {
-        "vehicle.drivetrain.engine.isIgnitionOn" =>
-            { "value" => value, "timestamp" => "2026-05-27T10:00:00Z", "unit" => null }
+        "vehicle.electricalSystem.battery.voltage"                          => { "value" => "13.56",          "timestamp" => ts, "unit" => "V" },
+        "vehicle.drivetrain.internalCombustionEngine.engine.ect"            => { "value" => "93",             "timestamp" => ts, "unit" => "°C" },
+        "vehicle.drivetrain.totalRemainingRange"                            => { "value" => "499",            "timestamp" => ts, "unit" => "km" },
+        "vehicle.status.conditionBasedServicesCount"                        => { "value" => "6",              "timestamp" => ts, "unit" => null },
+        "vehicle.channel.teleservice.status"                                => { "value" => "Initial status", "timestamp" => ts, "unit" => null },
+        "vehicle.vehicle.preConditioning.activity"                          => { "value" => "INACTIVE",       "timestamp" => ts, "unit" => null },
+        "vehicle.cabin.infotainment.navigation.currentLocation.latitude"    => { "value" => "48.137",         "timestamp" => ts, "unit" => "degrees" },
+        "vehicle.cabin.infotainment.navigation.currentLocation.heading"     => { "value" => "350",            "timestamp" => ts, "unit" => "degrees" }
     }};
 }
 

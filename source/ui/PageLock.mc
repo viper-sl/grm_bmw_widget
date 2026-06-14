@@ -1,5 +1,5 @@
 // Page: Lock overview — matches UX mock page 3.
-// Header · "SECURED/UNLOCKED/RUNNING" status · ONE state icon (48×48) centered below it ·
+// Header · "SECURED/UNLOCKED" status · ONE state icon (48×48) centered below it ·
 // cross layout: HOOD above · door cells on the sides · TRUNK below.
 // Rear-door cells render ONLY when the vehicle reports them (FR-19, OQ-4) — a car
 // without row2 descriptors keeps the original single DOOR L/R cross.
@@ -68,16 +68,13 @@ class PageLock extends WatchUi.View {
 
         PageChrome.drawAccent(dc);
 
-        var locked  = state.hasKey("doorsLocked")   ? state["doorsLocked"]   : true;
-        var running = state.hasKey("engineRunning") ? state["engineRunning"] : false;
+        var locked = state.hasKey("doorsLocked") ? state["doorsLocked"] : true;
 
-        // Status label at top. FR-17: running takes precedence over locked/unlocked.
+        // Status label at top. (FR-17 RUNNING state removed — engine.isIgnitionOn never
+        // populates on this vehicle/account, B10; the amber RUNNING branch was unreachable.)
         var statusLabel;
         var statusColor;
-        if (running) {
-            statusLabel = "RUNNING";
-            statusColor = Theme.COLOR_WARN;
-        } else if (locked) {
+        if (locked) {
             statusLabel = "SECURED";
             statusColor = Theme.COLOR_OK_HI;
         } else {

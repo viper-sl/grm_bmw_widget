@@ -2,7 +2,8 @@
 // this out of (:release) builds; the app itself has no mock layer and always
 // talks to the live API).
 // Values match empirical live data from BMW 218i (VIN REDACTED-VIN, 2026-05-29 session).
-// Container grm_bmw_widget_v2 (27 descriptors). Mirror live API shape exactly.
+// Container grm_bmw_widget_v3 (41 descriptors). Mirror live API shape exactly.
+// (Fixture keeps the core 26-field render set; About-car + F16 telematics aren't exercised here.)
 (:debug :background)
 class MockData {
 
@@ -37,8 +38,6 @@ class MockData {
                     => { "value" => "22000",   "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
                 "vehicle.cabin.infotainment.displayUnit.distance"
                     => { "value" => "km",      "timestamp" => "2026-05-24T12:15:23Z", "unit" => null },
-                "vehicle.drivetrain.engine.isIgnitionOn"
-                    => { "value" => null,      "timestamp" => null,                   "unit" => null },
                 "vehicle.cabin.window.row1.driver.status"
                     => { "value" => "CLOSED",  "timestamp" => "2026-05-27T17:53:20Z", "unit" => null },
                 "vehicle.cabin.window.row1.passenger.status"

@@ -48,6 +48,10 @@ background service                       Glance + Pages read from here
 Descriptor reference: [`docs/reference/cardata-catalogue.md`](docs/reference/cardata-catalogue.md)
 · curated widget set: [`docs/descriptors.md`](docs/descriptors.md).
 
+**Findings & investigations** — the hard-won knowledge behind the design (verified BMW
+CarData API behaviour, real descriptor semantics, and Connect IQ / Monkey C gotchas) is
+in [`docs/findings/`](docs/findings/).
+
 ## Setup
 
 You need a **BMW CarData client ID** (free, from the BMW CarData portal). Everything
@@ -101,6 +105,7 @@ source/            Monkey C app (api/ cache/ guard/ ui/ mock/)
 resources/         strings, settings, drawables, properties
 resources-src/     icon source art
 docs/              build/test docs + BMW CarData descriptor reference
+docs/findings/     verified API behaviour, descriptor semantics, CIQ gotchas
 manifest.xml       app id, supported devices, permissions (Communications + Background)
 ```
 

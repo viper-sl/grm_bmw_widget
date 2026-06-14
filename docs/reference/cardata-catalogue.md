@@ -2,7 +2,7 @@
 
 > Source: BMW CarData Telematics Data Catalogue (Customer), EN  
 > Captured: 2026-06-14  
-> Vehicle context: ICE BMW 218i (REDACTED-VIN) — most EV/charging descriptors will be null/absent for this vehicle but are included for completeness.
+> Vehicle context: ICE BMW 218i — most EV/charging descriptors will be null/absent for this vehicle but are included for completeness.
 
 Descriptor strings cleaned of the catalogue's word-break artifact. 'stream' = Streamable column (MQTT). 'kind'=doc marks non-scalar payloads (lists/images/swagger refs) that are not simple telematicData values. Value enums quoted verbatim where given. 'include'=true marks the final widget subscription set (39 scalars — mirrors docs/descriptors.md); false = not subscribed. 'observed' = latest value seen in bmw_data/capture_*.json (null = never returned a value on the test vehicle). See docs/descriptors.md for the curated list and empirical findings (B10/B11/B12/B1).
 **125 descriptors across 8 categories.**

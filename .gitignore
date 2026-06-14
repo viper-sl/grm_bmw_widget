@@ -47,3 +47,24 @@ bin/BMWWIDGET.PRG
 # Watch dump (debugging) — not source
 temp/
 bin/MONDAY.PRG
+
+# ── Not published (kept locally, untracked) ─────────────────────────────
+# Internal planning / agent tooling (BMAD process artifacts)
+.agents/
+_bmad/
+_bmad-output/
+.github/agents/
+
+# Local simulator settings (contains personal VIN/containerId)
+/settings.xml
+
+# Personal-data tooling: capture / probe / token-inspect scripts
+/bmw_cardata_probe.py
+/bmw_token_inspect.py
+scripts/cardata/
+
+# Debug / intermediate dev docs
+docs/DEBUGGING.md
+docs/LIVE-TESTING.md
+docs/test-coverage-and-api-review.md
+docs/CAPTURE-PLAN.md

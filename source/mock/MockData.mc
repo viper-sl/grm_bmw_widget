@@ -1,7 +1,7 @@
 // UNIT-TEST fixtures only — referenced exclusively from Tests.mc ((:debug) keeps
 // this out of (:release) builds; the app itself has no mock layer and always
 // talks to the live API).
-// Values match empirical live data from BMW 218i (VIN REDACTED-VIN, 2026-05-29 session).
+// Values match empirical live data from a BMW 218i (live session, 2026-05-29).
 // Container grm_bmw_widget_v3 (41 descriptors). Mirror live API shape exactly.
 // (Fixture keeps the core 26-field render set; About-car + F16 telematics aren't exercised here.)
 (:debug :background)

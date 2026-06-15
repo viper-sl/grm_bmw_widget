@@ -5,9 +5,11 @@
 //   row 3:  70%               1d ago     (fuel orange, age dimmed)
 // Low fuel (<50%): fuel cell shows "XX% (+YYL)" instead of just "XX%" — the "+"
 // marks YY as litres still needed to fill the tank, not litres currently in it.
-// Read-only from VehicleCache. No network I/O.
+// Read-only: reads the lean KEY_GLANCE_STATE projection straight from Storage (NOT via
+// VehicleCache — see onUpdate). No network I/O.
 using Toybox.Application;
 using Toybox.Graphics;
+using Toybox.Lang;
 using Toybox.Time;
 using Toybox.WatchUi;
 
@@ -24,7 +26,12 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
 
         var w  = dc.getWidth();
         var h  = dc.getHeight();
-        var state = VehicleCache.read();
+        // Read the lean glance projection straight from Storage — deliberately NOT via
+        // VehicleCache: referencing that class would pull its full write/merge bytecode
+        // into the glance code image (the glance gets its own ~28 KB partition). The key
+        // is produced by VehicleCache._writeGlanceSummary on every cache write. Reading
+        // the full ~40-key Vehicle State here would OOM (won't fit) — the 2026-06-15 crash.
+        var state = Application.Storage.getValue(StorageKeys.KEY_GLANCE_STATE) as Lang.Dictionary or Null;
 
         // NOTE: the BMW branding shows as the launcher icon the system renders in the
         // glance carousel (launcher_icon.png was swapped to the BMW logo). Glance scope

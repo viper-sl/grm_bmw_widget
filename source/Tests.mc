@@ -480,6 +480,63 @@ function testCache_mergePreservesDoorsLocked(logger as Test.Logger) as Lang.Bool
     return true;
 }
 
+// OOM fix (2026-06-15): the glance must read a lean projection, never the full
+// Vehicle State (deserializing ~40 keys OOMs the glance memory partition on
+// fenix 6 Pro). write() projects the glance-visible subset into KEY_GLANCE_STATE.
+(:test)
+function testGlance_summaryProjection(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    VehicleCache.write({
+        "doorsLocked" => true, "rangeKm" => 653, "fuelPercent" => 80, "fuelLitres" => 40,
+        "lastUpdated" => 1000,
+        // heavy About/tyre fields that must NOT leak into the glance projection:
+        "lat" => 48.1, "lon" => 11.5, "tyrePressureFL" => 2.4, "odometerKm" => 40926,
+        "teleservice" => "IDLE"
+    });
+    var g = Application.Storage.getValue(StorageKeys.KEY_GLANCE_STATE) as Lang.Dictionary or Null;
+    Test.assertMessage(g != null, "glance projection written");
+    Test.assertEqualMessage(g["rangeKm"], 653, "rangeKm projected");
+    Test.assertMessage(g["doorsLocked"] == true, "doorsLocked projected");
+    Test.assertEqualMessage(g["fuelPercent"], 80, "fuelPercent projected");
+    Test.assertEqualMessage(g["fuelLitres"], 40, "fuelLitres projected");
+    Test.assertEqualMessage(g["lastUpdated"], 1000, "lastUpdated projected");
+    Test.assertMessage(!g.hasKey("lat"), "heavy lat excluded");
+    Test.assertMessage(!g.hasKey("tyrePressureFL"), "tyre field excluded");
+    Test.assertEqualMessage(g.size(), 5, "only the 5 glance fields");
+    _resetStorage();
+    return true;
+}
+
+// clear() (sign-out) must drop the glance projection too, else a stale glance
+// survives into the next pairing.
+(:test)
+function testGlance_clearDropsProjection(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    VehicleCache.write({ "rangeKm" => 100, "lastUpdated" => 1 });
+    Test.assertMessage(Application.Storage.getValue(StorageKeys.KEY_GLANCE_STATE) != null, "projection present after write");
+    VehicleCache.clear();
+    Test.assertMessage(Application.Storage.getValue(StorageKeys.KEY_GLANCE_STATE) == null, "projection cleared on sign-out");
+    _resetStorage();
+    return true;
+}
+
+// Upgrade backfill: a pre-upgrade install has a full state but no projection;
+// ensureGlanceSummary() (foreground) seeds it so the glance isn't blank.
+(:test)
+function testGlance_backfillFromFullState(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_VEHICLE_STATE,
+        { "rangeKm" => 200, "fuelPercent" => 50, "lastUpdated" => 5 });
+    Test.assertMessage(Application.Storage.getValue(StorageKeys.KEY_GLANCE_STATE) == null, "no projection pre-backfill");
+    VehicleCache.ensureGlanceSummary();
+    var g = Application.Storage.getValue(StorageKeys.KEY_GLANCE_STATE) as Lang.Dictionary or Null;
+    Test.assertMessage(g != null, "backfilled");
+    Test.assertEqualMessage(g["rangeKm"], 200, "rangeKm backfilled");
+    Test.assertEqualMessage(g.size(), 3, "only present glance fields backfilled");
+    _resetStorage();
+    return true;
+}
+
 // ============================================================
 //  test helpers (auth/quota/cache)
 // ============================================================

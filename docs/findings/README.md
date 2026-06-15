@@ -14,7 +14,6 @@ the internal planning artifacts it was mined from.
 
 - [../descriptors.md](../descriptors.md) — the curated descriptor subscription set (the widget's source of truth) with observed values.
 - [../reference/cardata-catalogue.md](../reference/cardata-catalogue.md) — the full BMW CarData descriptor catalogue.
-- [../BACKLOG.md](../BACKLOG.md) — per-item history; the bug/feature entries cite the captures that resolved them.
 - [../garmin-connect-iq-api.md](../garmin-connect-iq-api.md) — generic Connect IQ API/module reference.
 
 > Tested vehicle: an ICE BMW 218i (G42). Behaviour can differ by model, powertrain, and

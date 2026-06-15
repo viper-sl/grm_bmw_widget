@@ -65,6 +65,10 @@ using Toybox.Lang;
 class VehicleCache {
 
     // Returns the latest Vehicle State Dictionary, or null if not yet populated.
+    // Foreground pages only. The glance reads the lean KEY_GLANCE_STATE projection
+    // straight from Storage (see BmwWidgetGlanceView) — it must not reference this class
+    // or the write/merge bytecode below would bloat the glance's ~28 KB code image, and
+    // deserializing the full ~40-key dict there OOMs on fenix 6 Pro.
     static function read() as Lang.Dictionary or Null {
         return Application.Storage.getValue(StorageKeys.KEY_VEHICLE_STATE) as Lang.Dictionary or Null;
     }
@@ -75,36 +79,72 @@ class VehicleCache {
     // The caller is responsible for type correctness of newState's values.
     static function write(newState as Lang.Dictionary) as Void {
         var existing = Application.Storage.getValue(StorageKeys.KEY_VEHICLE_STATE) as Lang.Dictionary or Null;
+        var merged;
         if (existing == null) {
-            Application.Storage.setValue(StorageKeys.KEY_VEHICLE_STATE, newState);
-            return;
-        }
-        var merged = existing;
-        var keys = newState.keys();
-        for (var i = 0; i < keys.size(); i++) {
-            var key = keys[i] as Lang.String;
-            if (!key.equals("lastUpdated")) {
-                merged[key] = newState[key];
+            merged = newState;
+        } else {
+            merged = existing;
+            var keys = newState.keys();
+            for (var i = 0; i < keys.size(); i++) {
+                var key = keys[i] as Lang.String;
+                if (!key.equals("lastUpdated")) {
+                    merged[key] = newState[key];
+                }
+            }
+            if (newState.hasKey("lastUpdated")) {
+                var prevTs = merged.hasKey("lastUpdated") ? (merged["lastUpdated"] as Lang.Number) : 0;
+                var newTs  = newState["lastUpdated"] as Lang.Number;
+                merged["lastUpdated"] = (newTs > prevTs) ? newTs : prevTs;
             }
         }
-        if (newState.hasKey("lastUpdated")) {
-            var prevTs = merged.hasKey("lastUpdated") ? (merged["lastUpdated"] as Lang.Number) : 0;
-            var newTs  = newState["lastUpdated"] as Lang.Number;
-            merged["lastUpdated"] = (newTs > prevTs) ? newTs : prevTs;
-        }
         Application.Storage.setValue(StorageKeys.KEY_VEHICLE_STATE, merged);
+        _writeGlanceSummary(merged);
     }
 
     // Replaces the cached Vehicle State wholesale — NO merge. For flows where
     // stale fields must not survive: debug seeding, switching vehicles.
     static function replace(newState as Lang.Dictionary) as Void {
         Application.Storage.setValue(StorageKeys.KEY_VEHICLE_STATE, newState);
+        _writeGlanceSummary(newState);
     }
 
     // Drops the cached Vehicle State entirely (sign-out: the next pairing may
     // be a different vehicle, and write()'s merge would resurrect this one's data).
     static function clear() as Void {
         Application.Storage.deleteValue(StorageKeys.KEY_VEHICLE_STATE);
+        Application.Storage.deleteValue(StorageKeys.KEY_GLANCE_STATE);
+    }
+
+    // Project the glance-visible subset of `state` into KEY_GLANCE_STATE so the
+    // glance never deserializes the full Vehicle State. Absent fields are omitted
+    // (schema convention); an all-absent projection clears the key so the glance
+    // falls back to its "Press to set up" state rather than rendering blanks.
+    // The key list MUST stay in sync with the fields BmwWidgetGlanceView reads.
+    // (Local array, not a static const — static const arrays type as Object at
+    // runtime and break .size()/subscript; see findings/connectiq-gotchas.md.)
+    static function _writeGlanceSummary(state as Lang.Dictionary) as Void {
+        var keys = ["doorsLocked", "rangeKm", "fuelPercent", "fuelLitres", "lastUpdated"];
+        var summary = {};
+        for (var i = 0; i < keys.size(); i++) {
+            var k = keys[i];
+            if (state.hasKey(k)) { summary[k] = state[k]; }
+        }
+        if (summary.size() == 0) {
+            Application.Storage.deleteValue(StorageKeys.KEY_GLANCE_STATE);
+        } else {
+            Application.Storage.setValue(StorageKeys.KEY_GLANCE_STATE, summary);
+        }
+    }
+
+    // Foreground-only backfill for the upgrade transition: an install that predates
+    // KEY_GLANCE_STATE has a full Vehicle State but no projection until the next
+    // poll/sync. The widget view (64 KB heap) can safely read the full state once
+    // to seed it, so the glance isn't blank in the meantime. NEVER call this from
+    // glance or background scope — reading the full dict there is the OOM we fixed.
+    static function ensureGlanceSummary() as Void {
+        if (Application.Storage.getValue(StorageKeys.KEY_GLANCE_STATE) != null) { return; }
+        var full = Application.Storage.getValue(StorageKeys.KEY_VEHICLE_STATE) as Lang.Dictionary or Null;
+        if (full != null) { _writeGlanceSummary(full); }
     }
 
 }

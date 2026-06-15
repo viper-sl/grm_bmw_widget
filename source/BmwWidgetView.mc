@@ -34,6 +34,10 @@ class BmwWidgetView extends WatchUi.View {
     function onLayout(dc) {}
 
     function onUpdate(dc) {
+        // Seed the lean glance projection from the full state if an upgrade left it
+        // missing (foreground 64 KB heap — safe to touch the full dict here).
+        VehicleCache.ensureGlanceSummary();
+
         var tokenState = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
 
         // Re-link prompt.

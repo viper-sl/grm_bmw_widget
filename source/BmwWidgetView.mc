@@ -10,24 +10,28 @@ class BmwWidgetView extends WatchUi.View {
 
     var _autoSyncStarted;
     var _autoSyncFailed;
+    var _rateLimited;     // auto-sync failed because BMW's daily API limit was reached
     var _sync;
 
     function initialize() {
         View.initialize();
         _autoSyncStarted = false;
         _autoSyncFailed  = false;
+        _rateLimited     = false;
     }
 
     function retryAutoSync() {
         _autoSyncStarted = true;
         _autoSyncFailed  = false;
+        _rateLimited     = false;
         _sync = new ForegroundSync();
-        _sync.run(method(:onAutoSyncDone));
+        _sync.run(method(:onAutoSyncDone), false);  // auto: full fetch only once/day
         WatchUi.requestUpdate();
     }
 
     function onAutoSyncDone(success) {
         _autoSyncFailed = !success;
+        _rateLimited    = (!success && _sync != null && _sync.isRateLimited());
         WatchUi.requestUpdate();
     }
 
@@ -62,10 +66,12 @@ class BmwWidgetView extends WatchUi.View {
         if (paired && !_autoSyncStarted) {
             _autoSyncStarted = true;
             _sync = new ForegroundSync();
-            _sync.run(method(:onAutoSyncDone));
+            _sync.run(method(:onAutoSyncDone), false);  // auto: full fetch only once/day
         }
         if (_autoSyncStarted && !_autoSyncFailed) {
             _drawLoading(dc);
+        } else if (_rateLimited) {
+            _drawRateLimited(dc);
         } else {
             _drawSetupPrompt(dc);
         }
@@ -101,6 +107,19 @@ class BmwWidgetView extends WatchUi.View {
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
         dc.drawText(cx, cy + 8, Graphics.FONT_TINY, "Press START to connect",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    // Daily BMW API limit reached — distinct from "not set up". Shows cached data
+    // normally (this only renders when no page is visible yet, i.e. no cached data).
+    function _drawRateLimited(dc) {
+        var cx = dc.getWidth() / 2;
+        var cy = dc.getHeight() / 2;
+        dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
+        dc.drawText(cx, cy - 18, Graphics.FONT_SMALL, "Daily limit reached",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+        dc.drawText(cx, cy + 8, Graphics.FONT_TINY, "Try again tomorrow",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 

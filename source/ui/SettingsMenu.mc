@@ -174,6 +174,8 @@ class ManageMenuDelegate extends WatchUi.Menu2InputDelegate {
             Application.Storage.deleteValue(StorageKeys.KEY_VIN);
             Application.Storage.deleteValue(StorageKeys.KEY_CONTAINER_ID);
             Application.Storage.deleteValue(StorageKeys.KEY_CONTAINER_NAME);
+            Application.Storage.deleteValue(StorageKeys.KEY_BG_CONTAINER_ID);
+            Application.Storage.deleteValue(StorageKeys.KEY_BG_CONTAINER_NAME);
             item.setSubLabel("Signed out");
             WatchUi.requestUpdate();
 

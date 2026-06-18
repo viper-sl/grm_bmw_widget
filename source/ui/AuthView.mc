@@ -8,12 +8,14 @@ class AuthView extends WatchUi.View {
 
     var _auth;
     var _sync;
-    var _synced;   // guard: run the post-auth fetch only once
+    var _synced;       // guard: run the post-auth fetch only once
+    var _rateLimited;  // post-pair fetch failed because BMW's daily limit was reached
 
     function initialize(auth) {
         View.initialize();
         _auth = auth;
         _synced = false;
+        _rateLimited = false;
     }
 
     function onLayout(dc) {}
@@ -36,12 +38,19 @@ class AuthView extends WatchUi.View {
         if (_auth.getState() == DeviceAuthManager.SUCCESS && !_synced) {
             _synced = true;
             _sync = new ForegroundSync();
-            _sync.run(method(:onSyncDone));
+            _sync.run(method(:onSyncDone), true);  // post-pair: do a full fetch
         }
         WatchUi.requestUpdate();
     }
 
     function onSyncDone(success) {
+        // Rate-limited: pairing succeeded but BMW's daily API limit blocks the fetch.
+        // Stay on this view to show a clear message rather than dropping to a blank widget.
+        if (!success && _sync != null && _sync.isRateLimited()) {
+            _rateLimited = true;
+            WatchUi.requestUpdate();
+            return;
+        }
         // Data is now in VehicleCache (or not). Pop back to the widget either way;
         // the carousel will show pages if the fetch populated the cache.
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
@@ -81,6 +90,19 @@ class AuthView extends WatchUi.View {
         }
 
         if (st == DeviceAuthManager.SUCCESS) {
+            if (_rateLimited) {
+                // Paired OK, but the daily API limit blocks the first fetch.
+                _center(dc, cx, cy - 22, Graphics.FONT_SMALL, Theme.COLOR_OK, "Paired");
+                dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
+                dc.drawText(cx, cy + 2, Graphics.FONT_XTINY, "Daily API limit reached",
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+                dc.drawText(cx, cy + 22, Graphics.FONT_XTINY, "Data loads tomorrow",
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                dc.drawText(cx, cy + 42, Graphics.FONT_XTINY, "BACK to exit",
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                return;
+            }
             _center(dc, cx, cy - 10, Graphics.FONT_SMALL, Theme.COLOR_OK, "Paired");
             dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
             dc.drawText(cx, cy + 16, Graphics.FONT_XTINY, "Fetching data…",

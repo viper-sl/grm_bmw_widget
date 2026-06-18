@@ -120,6 +120,16 @@ class PageChrome {
         }
     }
 
+    // Small banner shown after a refresh that hit BMW's daily API rate limit.
+    // Drawn over the page's cached data so the user keeps seeing last-known values.
+    static function drawRateLimitNote(dc) {
+        var cx = dc.getWidth() / 2;
+        var y  = (dc.getHeight() * 3) / 4 + 20;
+        dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
+        dc.drawText(cx, y, Graphics.FONT_XTINY, "Daily limit — try tomorrow",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
     static function drawSelectHint(dc) {
         var hy  = dc.getHeight() / 4;
         var tip = dc.getWidth() - 22;

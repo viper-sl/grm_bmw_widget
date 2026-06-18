@@ -11,10 +11,12 @@ class PageRangeFuel extends WatchUi.View {
 
     var _sync;
     var _refreshing;
+    var _rateLimited;
 
     function initialize() {
         View.initialize();
-        _refreshing = false;
+        _refreshing  = false;
+        _rateLimited = false;
     }
 
     function onSelect() {
@@ -23,20 +25,24 @@ class PageRangeFuel extends WatchUi.View {
         if (lastSync != null && (Time.now().value() - lastSync) < ForegroundSync.COOLDOWN_SECONDS) {
             return true;
         }
-        _refreshing = true;
+        _refreshing  = true;
+        _rateLimited = false;   // clear any prior limit note on a fresh attempt
         WatchUi.requestUpdate();
         _sync = new ForegroundSync();
-        _sync.run(method(:onRefreshDone));
+        _sync.run(method(:onRefreshDone), true);  // START = manual full refresh
         return true;
     }
 
     function onRefreshDone(success) {
         _refreshing = false;
-        WatchUi.requestUpdate();
-        if (!success) {
+        if (!success && _sync != null && _sync.isRateLimited()) {
+            // Daily API limit — show a note on the page; do NOT bounce to auth.
+            _rateLimited = true;
+        } else if (!success) {
             var auth = new DeviceAuthManager();
             WatchUi.pushView(new AuthView(auth), new AuthDelegate(auth), WatchUi.SLIDE_LEFT);
         }
+        WatchUi.requestUpdate();
     }
 
     function isVisible() {
@@ -124,6 +130,7 @@ class PageRangeFuel extends WatchUi.View {
         PageChrome.drawAge(dc, state);
         PageChrome.drawNavDots(dc);
         PageChrome.drawRefreshHint(dc, _refreshing);
+        if (_rateLimited) { PageChrome.drawRateLimitNote(dc); }
     }
 
     // FR-22: instantaneous L/100km from remaining fuel + remaining range.

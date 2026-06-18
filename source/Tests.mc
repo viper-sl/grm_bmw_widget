@@ -22,6 +22,22 @@ function testParse_numericCasts(logger as Test.Logger) as Lang.Boolean {
     return true;
 }
 
+// ============================================================
+//  CarDataClient.isRateLimit — BMW daily limit = HTTP 403 + CU-429 body
+// ============================================================
+
+(:test)
+function testRateLimit_detectsCu429(logger as Test.Logger) as Lang.Boolean {
+    Test.assertMessage(CarDataClient.isRateLimit(429, null), "HTTP 429 -> rate limited");
+    Test.assertMessage(CarDataClient.isRateLimit(403, {"exveErrorId" => "CU-429"}),
+        "403 + CU-429 body -> rate limited");
+    Test.assertMessage(!CarDataClient.isRateLimit(403, {"exveErrorId" => "CU-105"}),
+        "403 + other CU code -> not rate limited");
+    Test.assertMessage(!CarDataClient.isRateLimit(403, null), "403 no body -> not rate limited");
+    Test.assertMessage(!CarDataClient.isRateLimit(200, null), "200 -> not rate limited");
+    return true;
+}
+
 (:test)
 function testParse_booleanCasts(logger as Test.Logger) as Lang.Boolean {
     var s = new CarDataClient()._parseTelematicData(_fixture());

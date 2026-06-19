@@ -1,0 +1,24 @@
+flowchart TD
+    EV["onTemporalEvent"] --> REREG{"mode 0?"}
+    REREG -->|"yes"| RR["re-register tomorrow 10:00"]
+    REREG -->|"no"| ADAPT{"mode 2 and not<br/>an adaptive hour?"}
+    RR --> ADAPT
+    ADAPT -->|"skip"| X0["Background.exit(null)"]
+    ADAPT -->|"ok"| SETUP{"VIN and bg<br/>container cached?"}
+    SETUP -->|"no"| X1["exit — open the app to bootstrap"]
+    SETUP -->|"yes"| POLL["_runPollCycle"]
+
+    POLL --> BO{"backoff gate active?"}
+    BO -->|"yes"| X2["exit"]
+    BO -->|"no"| TOK["TokenManager.ensureValidToken"]
+    TOK --> OK{"token ok?"}
+    OK -->|"no"| X3["exit"]
+    OK -->|"yes"| Q{"QuotaGuard.canFetch?<br/>(>= 40 min since last)"}
+    Q -->|"no"| X4["exit"]
+    Q -->|"yes"| FETCH["CarDataClient.fetchTelematicData<br/>(LEAN bg container)"]
+    FETCH --> RESP{"responseCode"}
+    RESP -->|"200"| W["stamp lastUpdated=now<br/>QuotaGuard.updateAfterFetch<br/>Background.exit(state)"]
+    RESP -->|"429 or 403+CU-429"| RL["QuotaGuard.onQuotaExceeded<br/>(block until 4 AM) then exit"]
+    RESP -->|"other / -403"| ERR["updateAfterFetch + backoff<br/>then exit"]
+
+    W --> OBD["onBackgroundData(state)<br/>then VehicleCache.write then requestUpdate"]

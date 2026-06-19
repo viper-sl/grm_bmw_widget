@@ -1,0 +1,15 @@
+flowchart TD
+    G["Glance: lock · range · fuel bar · age<br/>(Press to set up if no data)"] -->|"START"| V["BmwWidgetView (initial)"]
+    V -->|"NORMAL + data"| CAR["Page carousel"]
+    V -->|"NEEDS_REBOOTSTRAP"| RELINK["Re-auth prompt then AuthView"]
+    V -->|"no data"| SETUP["Press START to connect then AuthView"]
+
+    CAR -->|"up/down"| CAR
+    CAR -->|"START on Range/Lock"| REFRESH["manual full ForegroundSync"]
+    CAR -->|"MENU"| SET["SettingsMenu"]
+    SET --> MANAGE["Manage: re-auth · delete containers · sign out"]
+    SET --> ABOUT["About car (basicData + detail telematics)"]
+
+    AUTHV["AuthView (device flow)"] -->|"SUCCESS"| SYNC["full ForegroundSync"]
+    AUTHV -->|"rate limited"| RLMSG["Daily API limit reached (BACK to exit)"]
+    SYNC -->|"done"| CAR

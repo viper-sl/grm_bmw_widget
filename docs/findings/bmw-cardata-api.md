@@ -89,7 +89,8 @@ POST /customers/containers
 | `CU-401` | Parameter invalid | wrong container body shape |
 | `CU-403` | Forbidden | singular `/customer/` path |
 | `CU-105` | No permission for containerId | container deleted / wrong VIN → re-bootstrap |
-| `CU-429` | Rate limit | > ~50 calls/day |
+| `CU-124` | Max containers reached | account at the 10-container cap on `POST /containers` (HTTP 403); delete one to create. Verified live 2026-06-19. |
+| `CU-429` | Rate limit | > ~50 calls/day (HTTP **403**, not 429) |
 | `CU-127` | No LBCS data | ICE has no location-based charging (expected) |
 
 ## Bonus data (beyond the widget's core needs)

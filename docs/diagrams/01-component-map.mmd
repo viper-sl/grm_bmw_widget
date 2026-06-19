@@ -1,0 +1,58 @@
+graph TB
+    APP["BmwWidgetApp (:background)<br/>AppBase entry points"]
+
+    subgraph FG["FOREGROUND process (~1 MB)"]
+        direction TB
+        VIEW["BmwWidgetView + Delegate<br/>setup / loading / carousel host"]
+        PAGES["Pages: RangeFuel · Lock · Odometer · Tyres<br/>PageNav · PageDelegate · PageChrome"]
+        MENUS["SettingsMenu · AboutMenu · AuthView"]
+        FSYNC["ForegroundSync<br/>full cold-start + refresh chain"]
+        BOOT["CarDataBootstrap<br/>VIN · containers · basicData · tyre · delete"]
+        AUTH["DeviceAuthManager<br/>OAuth device flow + PKCE"]
+        CDEL["ContainerDeleter"]
+    end
+
+    subgraph BG["BACKGROUND service (~28 KB)"]
+        direction TB
+        SVC["BmwWidgetServiceDelegate<br/>onTemporalEvent then poll"]
+        CDC["CarDataClient (:background)<br/>lean telematic fetch + parse"]
+        TOK["TokenManager (:background)<br/>OAuth refresh FSM"]
+        QG["QuotaGuard (:background)<br/>rate gate + 24h block"]
+    end
+
+    GLANCE["BmwWidgetGlanceView (:glance)<br/>reads KEY_GLANCE_STATE directly<br/>(~28 KB partition)"]
+
+    subgraph STORE["Application.Storage (~128 KB)"]
+        VC["VehicleCache (:background)<br/>write/merge + glance projection"]
+        KEYS["StorageKeys (:background)<br/>tokens · vin · container ids · state"]
+    end
+
+    APP -->|"getInitialView"| VIEW
+    APP -->|"getGlanceView"| GLANCE
+    APP -->|"getServiceDelegate"| SVC
+    APP -->|"onBackgroundData"| VC
+
+    VIEW --> PAGES --> FSYNC
+    MENUS --> AUTH
+    MENUS --> CDEL
+    AUTH --> FSYNC
+    FSYNC --> BOOT
+    FSYNC --> CDC
+    FSYNC --> TOK
+    CDEL --> BOOT
+    BOOT -.->|"shares statics"| CDC
+
+    SVC --> CDC
+    SVC --> TOK
+    SVC --> QG
+    CDC --> VC
+    FSYNC --> VC
+    GLANCE -.->|"reads"| STORE
+    VC --> KEYS
+
+    classDef bg fill:#13315c,stroke:#4a90d9,color:#fff;
+    classDef fg fill:#1b4332,stroke:#52b788,color:#fff;
+    classDef gl fill:#5a189a,stroke:#c77dff,color:#fff;
+    class SVC,CDC,TOK,QG,VC,KEYS,APP bg;
+    class VIEW,PAGES,MENUS,FSYNC,BOOT,AUTH,CDEL fg;
+    class GLANCE gl;

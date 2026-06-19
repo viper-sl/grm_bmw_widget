@@ -39,6 +39,19 @@ function testRateLimit_detectsCu429(logger as Test.Logger) as Lang.Boolean {
 }
 
 (:test)
+function testCapError_detectsCu124(logger as Test.Logger) as Lang.Boolean {
+    Test.assertMessage(CarDataClient.isContainerCapError(403, {"exveErrorId" => "CU-124"}),
+        "403 + CU-124 -> container cap");
+    Test.assertMessage(!CarDataClient.isContainerCapError(403, {"exveErrorId" => "CU-429"}),
+        "403 + CU-429 (rate limit) -> not cap");
+    Test.assertMessage(!CarDataClient.isContainerCapError(403, {"exveErrorId" => "CU-401"}),
+        "403 + CU-401 (bad descriptor) -> not cap");
+    Test.assertMessage(!CarDataClient.isContainerCapError(429, null), "429 -> not cap");
+    Test.assertMessage(!CarDataClient.isContainerCapError(403, null), "403 no body -> not cap");
+    return true;
+}
+
+(:test)
 function testParse_booleanCasts(logger as Test.Logger) as Lang.Boolean {
     var s = new CarDataClient()._parseTelematicData(_fixture());
     Test.assertMessage(s["doorsLocked"] == true, "SECURED->true");

@@ -20,6 +20,12 @@ class CarDataBootstrap {
     var _callback;
     var _matchName;    // container name to match in onContainersResponse
     var _isBgTarget;   // true → store result as the lean bg container, false → full
+    var _capFailure;   // last createContainer failed with a cap-like error (not rate/auth/descriptor)
+
+    // True when the most recent createContainer was rejected with the container cap error
+    // (HTTP 403 + CU-124, "Maximum number of containers reached"). Onboarding uses this to
+    // offer a "delete all containers and retry" cleanup.
+    function createCapFailure() { return _capFailure == true; }
 
     // --- Basic Data (bootstrap — vehicle name + About-car snapshot) ---
 
@@ -228,6 +234,42 @@ class CarDataBootstrap {
         _callback.invoke(responseCode, cid);
     }
 
+    // Lists EVERY container id on the account (for the "delete all" maintenance action —
+    // clears orphaned old-version containers, not just the two this build tracks).
+    // Returns the rate-limit-normalized responseCode + an Array of ids via the callback.
+    function fetchContainerIds(accessToken, callback) {
+        _callback = callback;
+        Communications.makeWebRequest(
+            CarDataClient._DATA_HOST + "/customers/containers",
+            null,
+            { :method       => Communications.HTTP_REQUEST_METHOD_GET,
+              :headers      => CarDataClient._buildHeaders(accessToken),
+              :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON },
+            method(:onContainerIdsResponse)
+        );
+    }
+
+    function onContainerIdsResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
+        responseCode = CarDataClient.isRateLimit(responseCode, data) ? 429 : responseCode;
+        var ids = [];
+        if (responseCode == 200 && data != null) {
+            var d = data.hasKey("data") ? data["data"] : data;
+            var list = (d instanceof Lang.Dictionary && d.hasKey("containers")) ? d["containers"] : null;
+            if (list instanceof Lang.Array) {
+                for (var i = 0; i < list.size(); i++) {
+                    var c = list[i];
+                    if (c instanceof Lang.Dictionary) {
+                        var id = c.hasKey("containerId") ? c["containerId"]
+                               : (c.hasKey("id") ? c["id"] : null);
+                        if (id != null) { ids.add(id); }
+                    }
+                }
+            }
+        }
+        data = null;
+        _callback.invoke(responseCode, ids);
+    }
+
     // name + descriptors + isBg parameterize the full vs lean-bg container.
     function createContainer(accessToken, name, descriptors, isBg, callback) {
         _callback   = callback;
@@ -257,10 +299,15 @@ class CarDataBootstrap {
     function onCreateContainerResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
         responseCode = CarDataClient.isRateLimit(responseCode, data) ? 429 : responseCode;
         var cid = null;
+        _capFailure = false;
         if ((responseCode == 200 || responseCode == 201) && data != null) {
             cid = data.hasKey("containerId") ? data["containerId"]
                 : (data.hasKey("id") ? data["id"] : null);
             if (cid != null) { _storeResolved(cid); }
+        } else if (CarDataClient.isContainerCapError(responseCode, data)) {
+            // 403 + CU-124 "Maximum number of containers reached" → onboarding offers
+            // "delete all containers and retry".
+            _capFailure = true;
         }
         data = null;
         _callback.invoke(responseCode, cid);

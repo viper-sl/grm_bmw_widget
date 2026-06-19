@@ -139,7 +139,7 @@ class ManageMenu {
         menu.addItem(new WatchUi.MenuItem("Re-pair", "Re-authenticate", :repair, null));
         menu.addItem(new WatchUi.MenuItem("Sign out", "Clear tokens", :signout, null));
         menu.addItem(new WatchUi.MenuItem(
-            "Delete container", "Re-create on next sync", :deleteContainer, null));
+            "Delete containers", "Remove all; re-create on sync", :deleteContainer, null));
         return menu;
     }
 }
@@ -180,7 +180,7 @@ class ManageMenuDelegate extends WatchUi.Menu2InputDelegate {
             WatchUi.requestUpdate();
 
         } else if (id == :deleteContainer) {
-            // F14: delete the BMW-side container; next sync re-creates it.
+            // F14: delete ALL BMW-side containers (incl. orphans); next sync re-creates.
             _busyItem = item;
             item.setSubLabel("Deleting…");
             WatchUi.requestUpdate();

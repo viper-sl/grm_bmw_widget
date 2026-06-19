@@ -8,14 +8,19 @@ class AuthView extends WatchUi.View {
 
     var _auth;
     var _sync;
-    var _synced;       // guard: run the post-auth fetch only once
-    var _rateLimited;  // post-pair fetch failed because BMW's daily limit was reached
+    var _synced;        // guard: run the post-auth fetch only once
+    var _rateLimited;   // post-pair fetch failed because BMW's daily limit was reached
+    var _deleter;       // keeps the async ContainerDeleter alive during cleanup
+    var _cleaning;      // cleanup (delete-all) in progress
+    var _cleanupFailed; // the delete-all could not complete
 
     function initialize(auth) {
         View.initialize();
         _auth = auth;
         _synced = false;
         _rateLimited = false;
+        _cleaning = false;
+        _cleanupFailed = false;
     }
 
     function onLayout(dc) {}
@@ -51,9 +56,40 @@ class AuthView extends WatchUi.View {
             WatchUi.requestUpdate();
             return;
         }
+        // Container cap: pairing worked but a container can't be created because the BMW
+        // account is at its container limit. Ask the user before wiping all containers.
+        if (!success && _sync != null && _sync.containerCreateFailed()) {
+            WatchUi.pushView(
+                new WatchUi.Confirmation("Container limit reached. Delete all containers and retry?"),
+                new ContainerLimitDelegate(method(:onCleanupConfirmed)),
+                WatchUi.SLIDE_UP);
+            return;
+        }
         // Data is now in VehicleCache (or not). Pop back to the widget either way;
         // the carousel will show pages if the fetch populated the cache.
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
+    }
+
+    // User confirmed the cleanup: delete every container, then retry onboarding.
+    function onCleanupConfirmed() {
+        _cleaning = true;
+        _cleanupFailed = false;
+        WatchUi.requestUpdate();
+        _deleter = new ContainerDeleter();
+        _deleter.run(method(:onCleanupDone));
+    }
+
+    function onCleanupDone(success) {
+        _cleaning = false;
+        _deleter = null;
+        if (success) {
+            // Containers cleared — retry the full onboarding fetch (re-creates the pair).
+            _sync = new ForegroundSync();
+            _sync.run(method(:onSyncDone), true);
+        } else {
+            _cleanupFailed = true;
+        }
+        WatchUi.requestUpdate();
     }
 
     function onUpdate(dc) {
@@ -90,6 +126,20 @@ class AuthView extends WatchUi.View {
         }
 
         if (st == DeviceAuthManager.SUCCESS) {
+            if (_cleaning) {
+                _center(dc, cx, cy - 10, Graphics.FONT_SMALL, Theme.COLOR_TEXT, "Cleaning up…");
+                dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+                dc.drawText(cx, cy + 16, Graphics.FONT_XTINY, "deleting containers",
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                return;
+            }
+            if (_cleanupFailed) {
+                _center(dc, cx, cy - 12, Graphics.FONT_SMALL, Theme.COLOR_WARN, "Cleanup failed");
+                dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+                dc.drawText(cx, cy + 14, Graphics.FONT_XTINY, "BACK to exit, then retry",
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                return;
+            }
             if (_rateLimited) {
                 // Paired OK, but the daily API limit blocks the first fetch.
                 _center(dc, cx, cy - 22, Graphics.FONT_SMALL, Theme.COLOR_OK, "Paired");
@@ -144,6 +194,26 @@ class AuthDelegate extends WatchUi.BehaviorDelegate {
     function onBack() {
         _auth.stop();
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
+        return true;
+    }
+
+}
+
+// Yes/No dialog shown when onboarding hits the container cap. On "Yes" it invokes the
+// supplied callback (which deletes all containers and retries); "No" just dismisses.
+class ContainerLimitDelegate extends WatchUi.ConfirmationDelegate {
+
+    var _onYes;
+
+    function initialize(onYes) {
+        ConfirmationDelegate.initialize();
+        _onYes = onYes;
+    }
+
+    function onResponse(response) {
+        if (response == WatchUi.CONFIRM_YES) {
+            _onYes.invoke();
+        }
         return true;
     }
 

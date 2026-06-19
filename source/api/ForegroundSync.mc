@@ -24,6 +24,7 @@ class ForegroundSync {
     var _accessToken;
     var _tyreKm;
     var _rateLimited;     // set if any step hit BMW's daily rate limit (CU-429)
+    var _createFailed;    // set if a container create failed with a cap-like error
     var _fullFetch;       // true → fetch the FULL container (About-car etc.); false → just ensure containers
 
     function initialize() {
@@ -31,6 +32,7 @@ class ForegroundSync {
         _boot   = new CarDataBootstrap();   // foreground-only cold-start/maintenance calls
         _token  = new TokenManager();
         _rateLimited = false;
+        _createFailed = false;
         _fullFetch   = false;
     }
 
@@ -38,6 +40,10 @@ class ForegroundSync {
     // The owning view reads this to show a distinct "limit reached" message instead
     // of the generic setup/auth prompt.
     function isRateLimited() { return _rateLimited; }
+
+    // True when a container could not be created because the account is at the container
+    // cap (not a bad descriptor). Onboarding offers "delete all containers and retry".
+    function containerCreateFailed() { return _createFailed; }
 
     // Any data call returning 429 (incl. BMW's 403+CU-429, normalized upstream) means
     // the daily limit is hit: record it, block the background poll until tomorrow, and
@@ -122,7 +128,12 @@ class ForegroundSync {
 
     function onFullContainer(responseCode as Lang.Number, containerId) as Void {
         if (_stop429(responseCode)) { return; }
-        if (containerId == null) { _finish(false); return; }
+        if (containerId == null) {
+            // Couldn't resolve/create the full container — flag the cap case for onboarding.
+            _createFailed = _boot.createCapFailure();
+            _finish(false);
+            return;
+        }
         _containerId = containerId;
 
         // Step 2b: LEAN background container — ensure it exists so the background poll
@@ -150,6 +161,13 @@ class ForegroundSync {
     // the next successful sync.
     function onBgContainer(responseCode as Lang.Number, containerId) as Void {
         if (_stop429(responseCode)) { return; }
+        // A bg-container create rejected by the cap blocks onboarding too (so cleanup can be
+        // offered). A non-cap bg failure stays best-effort — the foreground still proceeds.
+        if (containerId == null && _boot.createCapFailure()) {
+            _createFailed = true;
+            _finish(false);
+            return;
+        }
         // Containers now exist. A FULL fetch (basicData + tyre + full telematic) runs only
         // on a manual START or once/day; otherwise the background poll keeps live fields
         // fresh and we stop here without spending a data call.

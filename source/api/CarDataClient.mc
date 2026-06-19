@@ -115,6 +115,19 @@ class CarDataClient {
         return false;
     }
 
+    // Container-create rejected because the BMW account is at its container cap:
+    // HTTP 403 with body exveErrorId == "CU-124" ("Maximum number of containers
+    // reached") — confirmed live 2026-06-19. Distinct from CU-429 (rate limit, also
+    // HTTP 403, normalized by isRateLimit first) and from a bad descriptor (CU-401).
+    // Onboarding offers "delete all containers and retry" only for this.
+    static function isContainerCapError(rc, data) {
+        if (rc == 403 && data instanceof Lang.Dictionary && data.hasKey("exveErrorId")) {
+            var id = data["exveErrorId"];
+            return (id != null && id.equals("CU-124"));
+        }
+        return false;
+    }
+
     static function _buildHeaders(accessToken) {
         return {
             "Authorization" => "Bearer " + accessToken,

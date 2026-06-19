@@ -1,7 +1,8 @@
-// F14 — foreground "Delete container" action.
-// Chains ensureValidToken -> DELETE the FULL container -> DELETE the lean BG container;
-// drops the local id/name for each so the next sync re-bootstraps both (A3 path).
-// The cached Vehicle State is left intact (last-known data stays visible).
+// F14 — foreground "Delete all containers" action.
+// Chains ensureValidToken -> GET /customers/containers (list ALL ids) -> DELETE each ->
+// clear the local full + bg container ids/names so the next sync re-bootstraps fresh.
+// Deletes EVERY container on the account (incl. orphaned old-version ones), not just the
+// two this build tracks. The cached Vehicle State is left intact (last-known data shows).
 using Toybox.Application;
 using Toybox.Lang;
 
@@ -11,12 +12,13 @@ class ContainerDeleter {
     var _boot;
     var _onDone;
     var _at;
-    var _bgCid;
-    var _fullOk;   // did the full-container DELETE succeed (or was there none to delete)?
+    var _ids;     // every container id on the account
+    var _idx;     // current delete index
+    var _allOk;   // did every DELETE succeed?
 
     function initialize() {
         _token  = new TokenManager();
-        _boot   = new CarDataBootstrap();   // deleteContainer now lives here (foreground-only)
+        _boot   = new CarDataBootstrap();   // list + delete live here (foreground-only)
     }
 
     function run(onDone) {
@@ -28,42 +30,37 @@ class ContainerDeleter {
         if (!success) { _finish(false); return; }
         _at = Application.Storage.getValue(StorageKeys.KEY_ACCESS_TOKEN);
         if (_at == null) { _finish(false); return; }
-        // Remember the bg container to delete after the full one.
-        _bgCid = CarDataClient.cachedBgContainerId();
-        var cid = CarDataClient.cachedContainerId();
-        if (cid == null) { cid = Application.Properties.getValue("containerId"); }
-        if (cid == null || cid.equals("")) {
-            // No full container — go straight to the bg container.
-            onFullDeleted(200, null);
-        } else {
-            _boot.deleteContainer(cid, _at, method(:onFullDeleted));
-        }
+        _boot.fetchContainerIds(_at, method(:onList));
     }
 
-    function onFullDeleted(responseCode as Lang.Number, data) as Void {
-        // 200 (verified) or 204 (no content) mean success; clear the full id/name.
-        _fullOk = (responseCode == 200 || responseCode == 204);
-        if (_fullOk) {
+    function onList(responseCode as Lang.Number, ids) as Void {
+        // Could not list (network / 429 / error) — fail so the menu shows "retry".
+        if (responseCode != 200) { _finish(false); return; }
+        _ids   = ids;
+        _idx   = 0;
+        _allOk = true;
+        _deleteNext();
+    }
+
+    function _deleteNext() as Void {
+        if (_ids == null || _idx >= _ids.size()) {
+            // All attempted — drop local ids/names for both containers so the next sync
+            // re-creates them. (A still-existing container is reused by name on re-sync.)
             Application.Storage.deleteValue(StorageKeys.KEY_CONTAINER_ID);
             Application.Storage.deleteValue(StorageKeys.KEY_CONTAINER_NAME);
-        }
-        // Then delete the lean bg container (regardless of the full result).
-        if (_bgCid != null && !_bgCid.equals("")) {
-            _boot.deleteContainer(_bgCid, _at, method(:onBgDeleted));
-        } else {
-            onBgDeleted(200, null);
-        }
-    }
-
-    function onBgDeleted(responseCode as Lang.Number, data) as Void {
-        var bgOk = (responseCode == 200 || responseCode == 204);
-        if (bgOk) {
             Application.Storage.deleteValue(StorageKeys.KEY_BG_CONTAINER_ID);
             Application.Storage.deleteValue(StorageKeys.KEY_BG_CONTAINER_NAME);
+            _finish(_allOk);
+            return;
         }
-        // Report success only if BOTH deletes actually succeeded — otherwise the menu
-        // shows "Failed — retry" instead of falsely claiming the container was deleted.
-        _finish(_fullOk && bgOk);
+        _boot.deleteContainer(_ids[_idx], _at, method(:onOneDeleted));
+    }
+
+    function onOneDeleted(responseCode as Lang.Number, data) as Void {
+        // 200 (verified) or 204 (no content) both mean success.
+        if (!(responseCode == 200 || responseCode == 204)) { _allOk = false; }
+        _idx++;
+        _deleteNext();
     }
 
     function _finish(success) {

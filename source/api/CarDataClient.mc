@@ -128,6 +128,18 @@ class CarDataClient {
         return false;
     }
 
+    // DELETE issued for a container already pending deletion: error body exveErrorId
+    // == "CU-122" ("Container already set for deletion"). Deletion is async, so a re-list
+    // can still return it; deleting again gives CU-122. It's effectively gone, so callers
+    // treat this as a successful delete. Confirmed live 2026-06-19.
+    static function isAlreadyDeleting(data) {
+        if (data instanceof Lang.Dictionary && data.hasKey("exveErrorId")) {
+            var id = data["exveErrorId"];
+            return (id != null && id.equals("CU-122"));
+        }
+        return false;
+    }
+
     static function _buildHeaders(accessToken) {
         return {
             "Authorization" => "Bearer " + accessToken,

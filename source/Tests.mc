@@ -52,6 +52,16 @@ function testCapError_detectsCu124(logger as Test.Logger) as Lang.Boolean {
 }
 
 (:test)
+function testDelete_alreadyDeletingIsOk(logger as Test.Logger) as Lang.Boolean {
+    Test.assertMessage(CarDataClient.isAlreadyDeleting({"exveErrorId" => "CU-122"}),
+        "CU-122 -> already deleting (treat as success)");
+    Test.assertMessage(!CarDataClient.isAlreadyDeleting({"exveErrorId" => "CU-124"}),
+        "CU-124 -> not already deleting");
+    Test.assertMessage(!CarDataClient.isAlreadyDeleting(null), "no body -> not already deleting");
+    return true;
+}
+
+(:test)
 function testParse_booleanCasts(logger as Test.Logger) as Lang.Boolean {
     var s = new CarDataClient()._parseTelematicData(_fixture());
     Test.assertMessage(s["doorsLocked"] == true, "SECURED->true");

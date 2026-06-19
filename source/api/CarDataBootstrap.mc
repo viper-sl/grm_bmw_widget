@@ -334,6 +334,11 @@ class CarDataBootstrap {
     }
 
     function onDeleteContainerResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
+        // Already gone (404) or already pending deletion (CU-122) → the container is
+        // effectively deleted; normalize to a success code so callers don't report failure.
+        if (responseCode == 404 || CarDataClient.isAlreadyDeleting(data)) {
+            responseCode = 204;
+        }
         data = null;
         _callback.invoke(responseCode, null);
     }

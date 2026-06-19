@@ -192,7 +192,15 @@ class ManageMenuDelegate extends WatchUi.Menu2InputDelegate {
     // F14: ContainerDeleter completion — reflect result on the menu item.
     function onContainerDeleted(success) {
         if (_busyItem != null) {
-            _busyItem.setSubLabel(success ? "Deleted" : "Failed — retry");
+            var msg;
+            if (success) {
+                msg = "Deleted";
+            } else if (_deleter != null && _deleter.isRateLimited()) {
+                msg = "Daily limit — try tomorrow";
+            } else {
+                msg = "Failed — retry";
+            }
+            _busyItem.setSubLabel(msg);
         }
         _deleter = null;
         WatchUi.requestUpdate();

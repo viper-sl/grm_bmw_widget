@@ -12,14 +12,20 @@ class ContainerDeleter {
     var _boot;
     var _onDone;
     var _at;
-    var _ids;     // every container id on the account
-    var _idx;     // current delete index
-    var _allOk;   // did every DELETE succeed?
+    var _ids;          // every container id on the account
+    var _idx;          // current delete index
+    var _allOk;        // did every DELETE succeed?
+    var _rateLimited;  // list/delete hit BMW's daily rate limit (CU-429)
 
     function initialize() {
         _token  = new TokenManager();
         _boot   = new CarDataBootstrap();   // list + delete live here (foreground-only)
+        _rateLimited = false;
     }
+
+    // True when the action stopped because BMW's daily limit was reached — the caller
+    // shows "daily limit" rather than "retry".
+    function isRateLimited() { return _rateLimited; }
 
     function run(onDone) {
         _onDone = onDone;
@@ -34,7 +40,14 @@ class ContainerDeleter {
     }
 
     function onList(responseCode as Lang.Number, ids) as Void {
-        // Could not list (network / 429 / error) — fail so the menu shows "retry".
+        if (responseCode == 429) {
+            // Daily limit reached — can't list/delete today. Back off and tell the user.
+            _rateLimited = true;
+            QuotaGuard.onQuotaExceeded();
+            _finish(false);
+            return;
+        }
+        // Could not list (network / error) — fail so the menu shows "retry".
         if (responseCode != 200) { _finish(false); return; }
         _ids   = ids;
         _idx   = 0;
@@ -57,6 +70,13 @@ class ContainerDeleter {
     }
 
     function onOneDeleted(responseCode as Lang.Number, data) as Void {
+        if (responseCode == 429) {
+            // Daily limit hit mid-delete — the remaining deletes would all fail too. Stop.
+            _rateLimited = true;
+            QuotaGuard.onQuotaExceeded();
+            _finish(false);
+            return;
+        }
         // 200 (verified) or 204 (no content) both mean success.
         if (!(responseCode == 200 || responseCode == 204)) { _allOk = false; }
         _idx++;

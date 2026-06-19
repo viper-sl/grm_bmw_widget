@@ -334,9 +334,12 @@ class CarDataBootstrap {
     }
 
     function onDeleteContainerResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
-        // Already gone (404) or already pending deletion (CU-122) → the container is
-        // effectively deleted; normalize to a success code so callers don't report failure.
-        if (responseCode == 404 || CarDataClient.isAlreadyDeleting(data)) {
+        // Rate limit (429 / 403+CU-429) → surface distinctly so the caller can show a
+        // "daily limit" message instead of "retry". Else: already gone (404) or already
+        // pending deletion (CU-122) → effectively deleted, normalize to success.
+        if (CarDataClient.isRateLimit(responseCode, data)) {
+            responseCode = 429;
+        } else if (responseCode == 404 || CarDataClient.isAlreadyDeleting(data)) {
             responseCode = 204;
         }
         data = null;

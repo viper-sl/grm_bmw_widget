@@ -81,11 +81,15 @@ class AuthView extends WatchUi.View {
 
     function onCleanupDone(success) {
         _cleaning = false;
+        var limited = (_deleter != null && _deleter.isRateLimited());
         _deleter = null;
         if (success) {
             // Containers cleared — retry the full onboarding fetch (re-creates the pair).
             _sync = new ForegroundSync();
             _sync.run(method(:onSyncDone), true);
+        } else if (limited) {
+            // Hit the daily limit while clearing — show the rate-limit message.
+            _rateLimited = true;
         } else {
             _cleanupFailed = true;
         }

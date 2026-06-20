@@ -5,10 +5,16 @@ Unit tests for the BMW status widget. All tests live in
 framework (`(:test)` annotation — test functions compile only into test builds,
 never into release).
 
-**25 tests, 0 failures.** They cover every major module *except the live
+**38 tests, 0 failures.** They cover every major module *except the live
 network data calls* (`makeWebRequest`). Network handlers are exercised by
 invoking their response callbacks directly with mock dictionaries, so the full
 parse / FSM / rotation / backoff logic runs without any HTTP traffic.
+
+Beyond parsing / token-FSM / quota / cache / glance-projection, the suite now also
+covers the BMW error-code classifiers used across the app:
+`testRateLimit_detectsCu429` (rate limit = HTTP 403 + CU-429),
+`testCapError_detectsCu124` (container cap), and
+`testDelete_alreadyDeletingIsOk` (async-delete CU-122 = success).
 
 ## Running
 
@@ -26,8 +32,8 @@ java -jar "$SDK/bin/monkeybrains.jar" \
 Expected tail:
 
 ```
-Ran 25 tests
-PASSED (passed=25, failed=0, errors=0)
+Ran 38 tests
+PASSED (passed=38, failed=0, errors=0)
 ```
 
 ## What is and isn't covered

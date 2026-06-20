@@ -13,7 +13,7 @@ Only your **BMW CarData client ID**. Everything else is automatic:
 | **clientId** | You provide it (BMW CarData portal) — in the override file below |
 | **refresh/access token** | On-watch device-flow pairing (no manual entry) |
 | **VIN** | Auto-discovered via `GET /customers/vehicles/mappings` after pairing |
-| **containerId** | Auto-created via `POST /customers/containers` on first run |
+| **container IDs** | Two auto-created via `POST /customers/containers` on first sync: a **full** one (foreground) + a **lean** one (background poll) |
 
 ## How the clientId is baked in
 
@@ -141,8 +141,8 @@ Then reinstall. Same applies to the **simulator** — wipe its store with
 1. Open the widget → "Press START to connect".
 2. START → device-flow auth shows a user code.
 3. Approve it at `customer.bmwgroup.com` in a browser.
-4. The widget then automatically: discovers your VIN → creates the data container →
-   fetches basicData + telematicData → shows your car.
+4. The widget then automatically: discovers your VIN → creates its data containers
+   (full + lean background) → fetches basicData + telematicData → shows your car.
 
 No VIN or container ID typing required.
 

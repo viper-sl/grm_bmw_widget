@@ -25,7 +25,7 @@ updates" bug. The fix: the background polls a **lean container** whose response 
 
 `(:background)`-tagged classes load into the background process; everything else is
 foreground-only. The background loads **whole classes**, so heavy foreground-only code
-(VIN discovery, container create/delete, the 39-descriptor array) lives in a separate
+(VIN discovery, container create/delete, the 41-descriptor array) lives in a separate
 class to keep it out of the background image.
 
 ```mermaid
@@ -91,7 +91,7 @@ graph TB
 
 **Why CarDataClient was split from CarDataBootstrap:** the background poll only needs the
 telematic fetch + parser. VIN discovery, container create/list/delete, basicData, tyre, and
-the 39-string descriptor array are foreground-only. Putting them in `CarDataBootstrap`
+the 41-string descriptor array are foreground-only. Putting them in `CarDataBootstrap`
 (not `(:background)`) keeps that bytecode out of the 28 KB background image. Shared statics
 (`_DATA_HOST`, `_buildHeaders`, `_CONTAINER_NAME`, `_storeContainer`, `cachedContainerId`)
 stay on `CarDataClient`.
@@ -106,7 +106,7 @@ returns exactly that container's fields in one GET. The app keeps **two**:
 ```mermaid
 graph LR
     subgraph BMW["BMW account (max 10 containers)"]
-        FULL["grm_bmw_widget_v3<br/>39 descriptors<br/>all pages + About-car detail"]
+        FULL["grm_bmw_widget_v3<br/>41 descriptors<br/>all pages + About-car detail"]
         LEAN["grm_bmw_widget_bg_v3<br/>14 LIVE descriptors<br/>lock · doors · windows · range · fuel"]
     end
 

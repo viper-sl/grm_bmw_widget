@@ -20,7 +20,7 @@ the Connect IQ platform.
 - **About car** — a grouped, read-only dump of static vehicle info plus live telematics
   (12 V battery, coolant, location, teleservice, …).
 - **On-watch settings** — update mode, tank size, service override, consumption toggle,
-  and a **Manage** submenu (re-pair / sign out / delete container).
+  and a **Manage** submenu (re-pair / sign out / delete all containers).
 
 ## Supported devices
 
@@ -29,21 +29,32 @@ fēnix 6 / 7 / 8 / E families, MARQ, and Forerunner 255 / 745 / 945 / 955 / 965 
 
 ## How it works
 
-The watch talks to BMW CarData over **OAuth 2.0 Device Authorization Grant** (on-watch
-pairing — no credential typing) and a small set of REST endpoints:
+Pairing uses **OAuth 2.0 Device Authorization Grant** (on-watch — no credential typing).
+The design is shaped by the watch running the app in **two processes with very different
+memory budgets** — the background heap is only **~28 KB**:
 
 ```
-TokenManager ─ refresh ─┐
-                        ├─ CarDataClient ── parse ──► VehicleCache (single source of truth)
-ForegroundSync / ───────┘                               │
-background service                       Glance + Pages read from here
+                            full container (41 fields)
+ForegroundSync ─ full ──────────────────────────────────►┐
+(manual START / once-a-day)   CarDataBootstrap + CarDataClient
+                                                          ├─ parse ─► VehicleCache ─► Glance + Pages
+Background service ─ live ───────────────────────────────►┘   (merge; read-only render)
+(scheduled)                 lean bg container (14 live fields)
 ```
 
-- A **background service** polls on a schedule (manual / hourly / adaptive), parses the
-  response into a compact Vehicle State dictionary, and writes it to a cache.
-- The **glance and pages** are read-only over that cache — they never do network I/O.
-- All vehicle-specific values (client ID, VIN, container ID, tokens) live only in
+- The **background service** (~28 KB) refreshes the at-a-glance **live** fields (lock,
+  doors, windows, range, fuel) from a **lean container** whose response fits that tiny
+  heap, and writes a compact Vehicle State to the cache.
+- The **foreground app** (~1 MB) does the **full** fetch — all pages plus the "About car"
+  detail — on a manual refresh (START) or once a day on open, from the **full container**.
+  `VehicleCache.write` merges, so background live updates and the last full fetch coexist.
+- The **glance and pages** are read-only over the cache — they never do network I/O.
+- All vehicle-specific values (client ID, VIN, container IDs, tokens) live only in
   Connect IQ **Settings/Storage** — the source contains **no** hardcoded credentials.
+
+**Full architecture** — process/component map, flows, token FSM, rate-limit/quota and
+storage-key reference, with diagrams: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+(rendered diagrams in [`docs/diagrams/`](docs/diagrams/)).
 
 Descriptor reference: [`docs/reference/cardata-catalogue.md`](docs/reference/cardata-catalogue.md)
 · curated widget set: [`docs/descriptors.md`](docs/descriptors.md).
@@ -62,11 +73,12 @@ else is automatic:
 | **clientId** | you provide it (portal) — in app settings, or baked into a personal build |
 | refresh / access token | on-watch device-flow pairing |
 | VIN | auto-discovered via `/customers/vehicles/mappings` |
-| containerId | auto-created via `POST /customers/containers` on first run |
+| container IDs | two auto-created via `POST /customers/containers`: a **full** one (foreground) + a **lean** one (background poll) |
 
 First run: open the widget → **START to connect** → approve the shown code at
-`customer.bmwgroup.com` → the widget discovers your VIN, creates its data container, and
-fetches your car. No VIN/container typing.
+`customer.bmwgroup.com` → the widget discovers your VIN, creates its data containers, and
+fetches your car. No VIN/container typing. (BMW caps an account at **10 containers**; if
+that's hit, onboarding offers to delete all and retry — see **Manage → Delete containers**.)
 
 ## Build
 

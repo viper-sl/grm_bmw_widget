@@ -27,11 +27,21 @@ This is the **source of truth for which descriptors the widget subscribes to**;
 > descriptors (everything that was *plausibly* capturable). This file's **40-descriptor
 > included set is the final widget target** — rebuild the container from it
 > (`build_test_container.py`, which now reads `include`) when ready to slim the live set.
-> The on-watch widget container (`CarDataClient._containerDescriptors`, **v3**) carries
-> **41** descriptors: the ICE render/About set (`isIgnitionOn` dropped as a dead prop;
-> `hvac.statusAirPurification` subscribed for a future feature, not yet parsed) **plus 2
-> EV/PHEV fields for F16** (`kombiRemainingElectricRange`, electric SoC) that are null on
-> this ICE car but let the same build support BEV/PHEV vehicles.
+> **On-watch containers (two, since the background-OOM fix — see [ARCHITECTURE.md](ARCHITECTURE.md)).**
+> Both descriptor sets now live in the foreground-only `CarDataBootstrap` (moved out of the
+> `(:background)` `CarDataClient` so the heavy array stays out of the ~28 KB background image):
+> - **Full** — `_containerDescriptors` (`grm_bmw_widget_v3`): **41** descriptors — the ICE
+>   render/About set (`isIgnitionOn` dropped as a dead prop; `hvac.statusAirPurification`
+>   subscribed for a future feature, not yet parsed) **plus 2 EV/PHEV F16 fields**
+>   (`kombiRemainingElectricRange`, electric SoC), null on this ICE car but enabling
+>   BEV/PHEV support. Fetched by the **foreground** (manual refresh / once-a-day).
+> - **Lean (background)** — `_bgContainerDescriptors` (`grm_bmw_widget_bg_v3`): **14 live**
+>   page fields only (`door.lock.status`, 4 doors `isOpen`, `trunk.isOpen`, `hood.isOpen`,
+>   4 windows `status`, `totalRemainingRange`, `fuelSystem.level`, `fuelSystem.remainingFuel`).
+>   Polled by the **background service** every cycle — its small response fits the ~28 KB
+>   background heap (the full set returned `-403 NETWORK_RESPONSE_OUT_OF_MEMORY`). `rangeKm`
+>   comes from `totalRemainingRange` via the parser's range-selection. Tyres, odometer,
+>   service distance and the About-car detail refresh only on the full (manual/daily) fetch.
 
 ## Key empirical findings (from these captures)
 

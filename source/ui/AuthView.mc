@@ -148,10 +148,10 @@ class AuthView extends WatchUi.View {
                 // Paired OK, but the daily API limit blocks the first fetch.
                 _center(dc, cx, cy - 22, Graphics.FONT_SMALL, Theme.COLOR_OK, "Paired");
                 dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
-                dc.drawText(cx, cy + 2, Graphics.FONT_XTINY, "Daily API limit reached",
+                dc.drawText(cx, cy + 2, Graphics.FONT_XTINY, "Daily limit reached",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
                 dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-                dc.drawText(cx, cy + 22, Graphics.FONT_XTINY, "Data loads tomorrow",
+                dc.drawText(cx, cy + 22, Graphics.FONT_XTINY, "Try again tomorrow",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
                 dc.drawText(cx, cy + 42, Graphics.FONT_XTINY, "BACK to exit",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);

@@ -5,8 +5,15 @@
 // two this build tracks. The cached Vehicle State is left intact (last-known data shows).
 using Toybox.Application;
 using Toybox.Lang;
+using Toybox.Time;
 
 class ContainerDeleter {
+
+    // Delete-all makes ~1 list + N delete calls; a second run soon after would burn the
+    // daily quota. The Manage button throttles to once per hour (KEY_LAST_DELETE is
+    // stamped on every run() — incl. onboarding cleanup — and checked by the button).
+    static const COOLDOWN_SECONDS = 3600;
+    static const KEY_LAST_DELETE  = "lastDeleteAll";
 
     var _token;
     var _boot;
@@ -29,6 +36,8 @@ class ContainerDeleter {
 
     function run(onDone) {
         _onDone = onDone;
+        // Start the 1h throttle window for the Manage button (a run = ~1 + N API calls).
+        Application.Storage.setValue(KEY_LAST_DELETE, Time.now().value());
         _token.ensureValidToken(method(:onToken));
     }
 

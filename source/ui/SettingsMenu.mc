@@ -9,6 +9,7 @@
 //   - About car     : read-only key/value list from basicData
 using Toybox.Application;
 using Toybox.Lang;
+using Toybox.Time;
 using Toybox.WatchUi;
 
 class SettingsMenu {
@@ -180,6 +181,16 @@ class ManageMenuDelegate extends WatchUi.Menu2InputDelegate {
             WatchUi.requestUpdate();
 
         } else if (id == :deleteContainer) {
+            // Throttle to once per hour — a delete-all is ~1 + N API calls; a quick second
+            // run would hit the daily limit (CU-429).
+            var last = Application.Storage.getValue(ContainerDeleter.KEY_LAST_DELETE);
+            var now  = Time.now().value();
+            if (last != null && (now - last) < ContainerDeleter.COOLDOWN_SECONDS) {
+                var mins = (ContainerDeleter.COOLDOWN_SECONDS - (now - last) + 59) / 60;
+                item.setSubLabel("Wait " + mins + "m (avoid limit)");
+                WatchUi.requestUpdate();
+                return;
+            }
             // F14: delete ALL BMW-side containers (incl. orphans); next sync re-creates.
             _busyItem = item;
             item.setSubLabel("Deleting…");

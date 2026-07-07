@@ -38,16 +38,17 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
             return;
         }
 
-        // Phase 1: bootstrap on first run / Storage wipe (KEY_VEHICLE_NAME absent),
-        // or on container schema migration — cachedContainerId() invalidates an id
-        // stored under an older container name, and the bootstrap chain recreates
-        // it under the current name with the expanded descriptor set.
-        if (Application.Storage.getValue(StorageKeys.KEY_VEHICLE_NAME) == null
-                || _resolveContainer() == null) {
-            _runBootstrap();
-            return; // Background.exit() called from onBootstrapComplete
+        // Steady-state poll ONLY. Bootstrap (VIN discovery, container create/list,
+        // basicData) is the foreground's job (ForegroundSync) — keeping that heavy
+        // code path unreachable from the background process so its code image stays
+        // small and the telematicData response can fit the ~28 KB background heap.
+        // (The background -403 NETWORK_RESPONSE_OUT_OF_MEMORY was the response not
+        // fitting alongside the loaded bg code.) If setup hasn't happened yet, exit;
+        // opening the app once bootstraps and every later poll just refreshes.
+        if (_resolveVin() == null || _resolveContainer() == null) {
+            Background.exit(null);
+            return;
         }
-        // Phase 2: normal poll cycle
         _runPollCycle();
     }
 
@@ -70,56 +71,6 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
         return false;
     }
 
-    // Cold-start chain (each step exits on failure, else advances):
-    //   token -> VIN (discover if missing) -> container (create if missing) -> basicData
-    // On first run only a refresh token exists (in Properties) — mint an access token
-    // via ensureValidToken BEFORE any API call.
-    function _runBootstrap() {
-        _tokenManager.ensureValidToken(method(:onBootstrapTokenReady));
-    }
-
-    function onBootstrapTokenReady(success as Lang.Boolean) as Void {
-        if (!success || _tokenManager.getAccessToken() == null) {
-            Background.exit(null);
-            return;
-        }
-        // Step 1: VIN — use a resolved one if present, else discover via /mappings.
-        if (_resolveVin() == null) {
-            _carDataClient.fetchMappings(_tokenManager.getAccessToken(), method(:onBootstrapVin));
-        } else {
-            onBootstrapVin(200, _resolveVin());
-        }
-    }
-
-    function onBootstrapVin(responseCode as Lang.Number, vin) as Void {
-        if (vin == null) { Background.exit(null); return; }
-        // Step 2: container — known one, else discover existing, else create.
-        if (_resolveContainer() != null) {
-            onBootstrapContainer(200, _resolveContainer());
-        } else {
-            _carDataClient.fetchContainers(_tokenManager.getAccessToken(), method(:onBootstrapContainerList));
-        }
-    }
-
-    function onBootstrapContainerList(responseCode as Lang.Number, containerId) as Void {
-        if (containerId != null) {
-            onBootstrapContainer(200, containerId);
-        } else {
-            _carDataClient.createContainer(_tokenManager.getAccessToken(), method(:onBootstrapContainer));
-        }
-    }
-
-    function onBootstrapContainer(responseCode as Lang.Number, containerId) as Void {
-        if (containerId == null) { Background.exit(null); return; }
-        // Step 3: basicData (vehicle name + About-car snapshot).
-        _carDataClient.fetchBasicData(_resolveVin(), _tokenManager.getAccessToken(), method(:onBootstrapComplete));
-    }
-
-    function onBootstrapComplete(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
-        // CarDataClient.onBasicDataResponse already wrote KEY_VEHICLE_NAME + basicData.
-        Background.exit(null);
-    }
-
     // VIN/container resolution: auto-discovered (Storage) takes precedence over a
     // manually-entered value (Properties), so the auto path "wins" once it runs.
     function _resolveVin() {
@@ -129,9 +80,11 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
         return v;
     }
 
+    // Background polls the LEAN container (cachedBgContainerId) so the response fits
+    // the ~28 KB background heap. It's created by the foreground (ForegroundSync); if
+    // absent (fresh install / pre-update), onTemporalEvent exits until the app is opened.
     function _resolveContainer() {
-        var c = CarDataClient.cachedContainerId();
-        if (c == null) { c = Application.Properties.getValue("containerId"); }
+        var c = CarDataClient.cachedBgContainerId();
         if (c != null && c.equals("")) { c = null; }
         return c;
     }
@@ -168,6 +121,9 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
 
     function onDataFetchComplete(responseCode as Lang.Number, state as Lang.Dictionary or Null) as Void {
         if (responseCode == 200 && state != null) {
+            // "last upd" = fetch time (temporary): stamp at fetch completion so the
+            // age resets when the background poll succeeds, not just on field changes.
+            state["lastUpdated"] = Time.now().value();
             QuotaGuard.updateAfterFetch();
             Background.exit(state);
         } else if (responseCode == 429) {

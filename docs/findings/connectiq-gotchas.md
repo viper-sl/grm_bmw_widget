@@ -7,15 +7,16 @@ Pro (System 5)**. These shaped the architecture as much as the BMW API did.
 
 | Limit | Value | Impact |
 |---|---|---|
-| Background process memory | **~32 KB** (fēnix 6 / 6X Pro) | The tightest budget in the app: the CarData fetch + JSON parse + cache write all run here. The prime constraint for any perf work. |
+| Background process memory | **~28 KB** (fēnix 6 Pro — measured 28488 B total, ~9 KB free at fetch) | The tightest budget in the app: the CarData fetch + JSON deserialize run here. A response too large to deserialize returns **`-403 NETWORK_RESPONSE_OUT_OF_MEMORY`** (a silent error code, not a crash) — this was the "background never updates" bug. Fix: the background polls a **lean container** (14 live fields, ~5 KB response) instead of the full 41-field one; the bg loads whole classes, so the heavy bootstrap/parse helpers were split into a foreground-only `CarDataBootstrap` to shrink the bg image. See [ARCHITECTURE.md](../ARCHITECTURE.md). |
 | Glance memory | **~28 KB usable** (32 KB nominal, fēnix 6 Pro — measured) | Its **own** small partition, separate from the foreground budget. `Storage.getValue` of the full ~40-key Vehicle State here OOMs (`Failed invoking <symbol>`, decoded to `BmwWidgetGlanceView.onUpdate → VehicleCache.read`, 2026-06-15) — **not** because of code size but because the deserialization transient spikes peak over the ceiling. Fix: the glance reads a **lean ~5-field projection** (`VehicleCache.readGlance` → `KEY_GLANCE_STATE`) written by every cache writer. |
 | Widget (foreground) memory | **~1 MB** (fēnix 6 Pro — measured: 1019 KB, peak ~90 KB in use) | Pages/menus read the full Vehicle State here — trivially within budget. Only the glance is constrained. (The old "~64 KB" figure was wrong for this device.) |
 | `Application.Storage` | **~128 KB total, ~8 KB per key** | The Vehicle State dict and any buffer must fit. A multi-entry buffer in one key overflows the per-key cap. |
 | Filesystem | **no arbitrary file-write API** for 3rd-party apps | Persistence is `Application.Storage` (key/value) or FIT files (numeric only). A literal on-watch JSON log isn't possible. |
 
 **Consequences baked into the design:** parse-and-discard (null the raw response right
-after parsing; never retain the full JSON), keep the cache lean, and treat the 32 KB
-background ceiling — not CPU — as the scaling limit.
+after parsing; never retain the full JSON), keep the cache lean, split foreground-only
+code out of the `(:background)` image, poll a lean container in the background, and treat
+the ~28 KB background ceiling — not CPU — as the scaling limit.
 
 ## Dual-scope (`:background`) rule — the #1 startup crasher
 

@@ -1,0 +1,13 @@
+flowchart TD
+    subgraph detect["Detection: CarDataClient.isRateLimit(rc, data)"]
+        D1["rc == 429"] --> HIT["treat as 429"]
+        D2["rc == 403 AND body<br/>exveErrorId == CU-429"] --> HIT
+    end
+
+    HIT --> QE["QuotaGuard.onQuotaExceeded()<br/>KEY_NEXT_ALLOWED = 4 AM next day"]
+
+    subgraph gates["Gates (independent Storage keys)"]
+        G1["QuotaGuard.canFetch()<br/>KEY_NEXT_ALLOWED: +40 min per fetch,<br/>set to 4 AM on CU-429"]
+        G2["Error backoff<br/>KEY_BACKOFF_UNTIL: doubles to 4 h cap<br/>on transient / -403 errors"]
+        G3["FG cooldown<br/>KEY_LAST_FG: 60 s between full refreshes"]
+    end

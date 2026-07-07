@@ -1,0 +1,10 @@
+flowchart TD
+    R["resolve container"] --> C{"cached id?"}
+    C -->|"no"| FETCHC["GET /containers"]
+    C -->|"yes, name matches"| USE["use it"]
+    C -->|"yes, name mismatch"| INVAL["delete stale id then null"]
+    INVAL --> FETCHC
+    FETCHC --> M{"name match on server?"}
+    M -->|"yes"| STORE["store + use"]
+    M -->|"no"| CREATE["POST /containers (create)"]
+    CREATE --> STORE

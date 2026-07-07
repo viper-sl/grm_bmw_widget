@@ -1,0 +1,16 @@
+flowchart TD
+    RUN["run(onDone, isManual)"] --> FULLQ["_fullFetch = isManual OR dailyDue<br/>(dailyDue = lastFull null or older than 24h)"]
+    FULLQ --> CD{"_fullFetch and within<br/>60s cooldown?"}
+    CD -->|"yes"| F0["_finish(false)"]
+    CD -->|"no"| TOK["ensureValidToken"]
+    TOK --> VIN["resolve VIN (else GET /mappings)"]
+    VIN --> FC["resolve/create FULL container"]
+    FC --> BC["resolve/create LEAN bg container"]
+    BC --> GATE{"_fullFetch?"}
+    GATE -->|"no"| DONE1["_finish(true)<br/>containers ensured; bg keeps live fields fresh"]
+    GATE -->|"yes"| BD["fetchBasicData"]
+    BD --> TY["fetchTyreDiagnosis (best-effort)"]
+    TY --> TEL["fetchTelematicData (FULL container)"]
+    TEL --> TR{"200?"}
+    TR -->|"yes"| WRITE["merge tyre wear<br/>stamp lastUpdated=now<br/>VehicleCache.write<br/>KEY_LAST_FG + KEY_LAST_FULL = now<br/>re-arm updateMode then _finish(true)"]
+    TR -->|"no"| F1["_finish(false)"]

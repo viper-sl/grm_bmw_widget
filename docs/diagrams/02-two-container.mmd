@@ -1,0 +1,13 @@
+graph LR
+    subgraph BMW["BMW account (max 10 containers)"]
+        FULL["grm_bmw_widget_v3<br/>41 descriptors<br/>all pages + About-car detail"]
+        LEAN["grm_bmw_widget_bg_v3<br/>14 LIVE descriptors<br/>lock · doors · windows · range · fuel"]
+    end
+
+    FG2["FOREGROUND<br/>manual START / once-a-day"] -->|"GET full"| FULL
+    BGP["BACKGROUND poll<br/>every cycle"] -->|"GET lean"| LEAN
+
+    FULL --> CACHE["VehicleCache (merge)"]
+    LEAN --> CACHE
+    CACHE --> GLANCEv["Glance"]
+    CACHE --> PAGESv["Pages"]

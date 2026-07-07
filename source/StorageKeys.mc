@@ -14,4 +14,9 @@ class StorageKeys {
     static const KEY_VIN              = "vin";
     static const KEY_CONTAINER_ID     = "containerId";
     static const KEY_CONTAINER_NAME   = "containerName";
+    // Second, lean container polled by the background service (fewer descriptors →
+    // a response small enough to deserialize in the ~28 KB background heap). The full
+    // container above stays the foreground's, so the About-car detail survives.
+    static const KEY_BG_CONTAINER_ID   = "bgContainerId";
+    static const KEY_BG_CONTAINER_NAME = "bgContainerName";
 }

@@ -1,0 +1,10 @@
+flowchart TD
+    START["onStart then _applyUpdateMode()"] --> MODE{"updateMode?"}
+    MODE -->|"0 manual / default"| M0["register next 10:00 Moment<br/>one-shot, re-armed each fire"]
+    MODE -->|"1 hourly"| M1["register Duration 3600s"]
+    MODE -->|"2 adaptive"| M2["register Duration 1800s<br/>(gated in the service delegate)"]
+
+    M0 --> FIRE["OS fires onTemporalEvent"]
+    M1 --> FIRE
+    M2 --> FIRE
+    FIRE --> SVC["BmwWidgetServiceDelegate"]

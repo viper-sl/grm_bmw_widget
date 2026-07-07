@@ -1,0 +1,15 @@
+stateDiagram-v2
+    [*] --> first_run: tokenState == null
+    first_run --> NORMAL: refresh 200 (rotate)
+    first_run --> UNCONFIGURED: no client id / refresh token
+    first_run --> NEEDS_REBOOTSTRAP: 400 invalid_grant
+
+    NORMAL --> NORMAL: access token still valid
+    NORMAL --> NEEDS_REFRESH: access token expired
+    NEEDS_REFRESH --> NORMAL: refresh 200 (rotate)
+    NEEDS_REFRESH --> NEEDS_REBOOTSTRAP: 400 invalid_grant
+    NEEDS_REFRESH --> NEEDS_REFRESH: transient 5xx (backoff)
+
+    UNCONFIGURED --> [*]: callback(false)
+    NEEDS_REBOOTSTRAP --> pairing: user re-runs device flow
+    pairing --> NORMAL: device-flow success

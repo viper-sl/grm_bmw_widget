@@ -22,6 +22,45 @@ function testParse_numericCasts(logger as Test.Logger) as Lang.Boolean {
     return true;
 }
 
+// ============================================================
+//  CarDataClient.isRateLimit — BMW daily limit = HTTP 403 + CU-429 body
+// ============================================================
+
+(:test)
+function testRateLimit_detectsCu429(logger as Test.Logger) as Lang.Boolean {
+    Test.assertMessage(CarDataClient.isRateLimit(429, null), "HTTP 429 -> rate limited");
+    Test.assertMessage(CarDataClient.isRateLimit(403, {"exveErrorId" => "CU-429"}),
+        "403 + CU-429 body -> rate limited");
+    Test.assertMessage(!CarDataClient.isRateLimit(403, {"exveErrorId" => "CU-105"}),
+        "403 + other CU code -> not rate limited");
+    Test.assertMessage(!CarDataClient.isRateLimit(403, null), "403 no body -> not rate limited");
+    Test.assertMessage(!CarDataClient.isRateLimit(200, null), "200 -> not rate limited");
+    return true;
+}
+
+(:test)
+function testCapError_detectsCu124(logger as Test.Logger) as Lang.Boolean {
+    Test.assertMessage(CarDataClient.isContainerCapError(403, {"exveErrorId" => "CU-124"}),
+        "403 + CU-124 -> container cap");
+    Test.assertMessage(!CarDataClient.isContainerCapError(403, {"exveErrorId" => "CU-429"}),
+        "403 + CU-429 (rate limit) -> not cap");
+    Test.assertMessage(!CarDataClient.isContainerCapError(403, {"exveErrorId" => "CU-401"}),
+        "403 + CU-401 (bad descriptor) -> not cap");
+    Test.assertMessage(!CarDataClient.isContainerCapError(429, null), "429 -> not cap");
+    Test.assertMessage(!CarDataClient.isContainerCapError(403, null), "403 no body -> not cap");
+    return true;
+}
+
+(:test)
+function testDelete_alreadyDeletingIsOk(logger as Test.Logger) as Lang.Boolean {
+    Test.assertMessage(CarDataClient.isAlreadyDeleting({"exveErrorId" => "CU-122"}),
+        "CU-122 -> already deleting (treat as success)");
+    Test.assertMessage(!CarDataClient.isAlreadyDeleting({"exveErrorId" => "CU-124"}),
+        "CU-124 -> not already deleting");
+    Test.assertMessage(!CarDataClient.isAlreadyDeleting(null), "no body -> not already deleting");
+    return true;
+}
+
 (:test)
 function testParse_booleanCasts(logger as Test.Logger) as Lang.Boolean {
     var s = new CarDataClient()._parseTelematicData(_fixture());

@@ -15,28 +15,73 @@ using Toybox.Lang;
 class ForegroundSync {
 
     var _client;
+    var _boot;
     var _token;
     var _onDone;
     var _vin;
-    var _containerId;
+    var _containerId;     // FULL container (foreground telematic + About-car detail)
+    var _bgContainerId;   // lean container the background service polls
     var _accessToken;
     var _tyreKm;
+    var _rateLimited;     // set if any step hit BMW's daily rate limit (CU-429)
+    var _createFailed;    // set if a container create failed with a cap-like error
+    var _fullFetch;       // true → fetch the FULL container (About-car etc.); false → just ensure containers
 
     function initialize() {
-        _client = new CarDataClient();
+        _client = new CarDataClient();      // lean (:background) telematic poll
+        _boot   = new CarDataBootstrap();   // foreground-only cold-start/maintenance calls
         _token  = new TokenManager();
+        _rateLimited = false;
+        _createFailed = false;
+        _fullFetch   = false;
     }
 
-    static const COOLDOWN_SECONDS = 60;   // minimum gap between foreground refreshes
-    static const KEY_LAST_FG = "lastForegroundSync";
+    // True when the sync failed because BMW's daily API rate limit was reached.
+    // The owning view reads this to show a distinct "limit reached" message instead
+    // of the generic setup/auth prompt.
+    function isRateLimited() { return _rateLimited; }
 
-    function run(onDone) {
-        _onDone = onDone;
-        // 1-minute cooldown guard — prevents rapid re-taps from hammering the API.
-        var lastSync = Application.Storage.getValue(KEY_LAST_FG);
-        if (lastSync != null && (Time.now().value() - lastSync) < COOLDOWN_SECONDS) {
+    // True when a container could not be created because the account is at the container
+    // cap (not a bad descriptor). Onboarding offers "delete all containers and retry".
+    function containerCreateFailed() { return _createFailed; }
+
+    // Any data call returning 429 (incl. BMW's 403+CU-429, normalized upstream) means
+    // the daily limit is hit: record it, block the background poll until tomorrow, and
+    // stop the chain. Returns true when it handled (rate-limited) the step.
+    function _stop429(responseCode) {
+        if (responseCode == 429) {
+            _rateLimited = true;
+            QuotaGuard.onQuotaExceeded();
+            // Start the foreground cooldown so a rate-limited refresh can't be re-tapped
+            // immediately and re-run the token/container chain on every press.
+            Application.Storage.setValue(KEY_LAST_FG, Time.now().value());
             _finish(false);
-            return;
+            return true;
+        }
+        return false;
+    }
+
+    static const COOLDOWN_SECONDS = 60;         // minimum gap between full foreground refreshes
+    static const FULL_INTERVAL_SECONDS = 86400; // auto full (About-car) fetch at most once/day
+    static const KEY_LAST_FG   = "lastForegroundSync";
+    static const KEY_LAST_FULL = "lastFullFetch";
+
+    // isManual: a START-button refresh always does a FULL fetch (all pages + About-car).
+    // Auto (on app open) does a full fetch only once per day; otherwise it just ensures the
+    // containers exist and lets the background poll keep the live fields fresh.
+    function run(onDone, isManual) {
+        _onDone = onDone;
+        var now = Time.now().value();
+        var lastFull = Application.Storage.getValue(KEY_LAST_FULL);
+        var dailyDue = (lastFull == null) || (now - lastFull >= FULL_INTERVAL_SECONDS);
+        _fullFetch = isManual || dailyDue;
+        // 1-minute cooldown guard for full fetches — prevents rapid re-taps hammering the API.
+        if (_fullFetch) {
+            var lastSync = Application.Storage.getValue(KEY_LAST_FG);
+            if (lastSync != null && (now - lastSync) < COOLDOWN_SECONDS) {
+                _finish(false);
+                return;
+            }
         }
         // Access tokens last ~1h; ensure a valid one (refresh if needed) first.
         _token.ensureValidToken(method(:onToken));
@@ -50,52 +95,103 @@ class ForegroundSync {
         // Step 1: VIN — resolve, else discover.
         _vin = _resolveVin();
         if (_vin == null) {
-            _client.fetchMappings(_accessToken, method(:onVin));
+            _boot.fetchMappings(_accessToken, method(:onVin));
         } else {
             onVin(200, _vin);
         }
     }
 
     function onVin(responseCode as Lang.Number, vin) as Void {
+        if (_stop429(responseCode)) { return; }
         if (vin == null) { _finish(false); return; }
         _vin = vin;
 
-        // Step 2: container — use a known one, else discover existing, else create.
-        _containerId = _resolveContainer();
+        // Step 2a: FULL container (foreground telematic incl. About-car detail) —
+        // use a known one, else discover existing, else create.
+        _containerId = _resolveFullContainer();
         if (_containerId != null) {
-            onContainer(200, _containerId);
+            onFullContainer(200, _containerId);
         } else {
-            _client.fetchContainers(_accessToken, method(:onContainerList));
+            _boot.fetchContainers(_accessToken, CarDataClient._CONTAINER_NAME, false, method(:onFullContainerList));
         }
     }
 
-    // Reuse an existing container if the account already has one; otherwise create it.
-    function onContainerList(responseCode as Lang.Number, containerId) as Void {
+    function onFullContainerList(responseCode as Lang.Number, containerId) as Void {
+        if (_stop429(responseCode)) { return; }
         if (containerId != null) {
-            onContainer(200, containerId);
+            onFullContainer(200, containerId);
         } else {
-            _client.createContainer(_accessToken, method(:onContainer));
+            _boot.createContainer(_accessToken, CarDataClient._CONTAINER_NAME,
+                CarDataBootstrap._containerDescriptors(), false, method(:onFullContainer));
         }
     }
 
-    function onContainer(responseCode as Lang.Number, containerId) as Void {
-        if (containerId == null) { _finish(false); return; }
+    function onFullContainer(responseCode as Lang.Number, containerId) as Void {
+        if (_stop429(responseCode)) { return; }
+        if (containerId == null) {
+            // Couldn't resolve/create the full container — flag the cap case for onboarding.
+            _createFailed = _boot.createCapFailure();
+            _finish(false);
+            return;
+        }
         _containerId = containerId;
 
-        // Step 3: basicData (best-effort), then telematic.
-        _client.fetchBasicData(_vin, _accessToken, method(:onBasic));
+        // Step 2b: LEAN background container — ensure it exists so the background poll
+        // has a small-enough response to deserialize. Resolve, else discover, else create.
+        _bgContainerId = _resolveBgContainer();
+        if (_bgContainerId != null) {
+            onBgContainer(200, _bgContainerId);
+        } else {
+            _boot.fetchContainers(_accessToken, CarDataClient._BG_CONTAINER_NAME, true, method(:onBgContainerList));
+        }
+    }
+
+    function onBgContainerList(responseCode as Lang.Number, containerId) as Void {
+        if (_stop429(responseCode)) { return; }
+        if (containerId != null) {
+            onBgContainer(200, containerId);
+        } else {
+            _boot.createContainer(_accessToken, CarDataClient._BG_CONTAINER_NAME,
+                CarDataBootstrap._bgContainerDescriptors(), true, method(:onBgContainer));
+        }
+    }
+
+    // Best-effort: a failed bg container must NOT block the foreground sync (which still
+    // shows data now). If it failed, the background poll simply has no container until
+    // the next successful sync.
+    function onBgContainer(responseCode as Lang.Number, containerId) as Void {
+        if (_stop429(responseCode)) { return; }
+        // A bg-container create rejected by the cap blocks onboarding too (so cleanup can be
+        // offered). A non-cap bg failure stays best-effort — the foreground still proceeds.
+        if (containerId == null && _boot.createCapFailure()) {
+            _createFailed = true;
+            _finish(false);
+            return;
+        }
+        // Containers now exist. A FULL fetch (basicData + tyre + full telematic) runs only
+        // on a manual START or once/day; otherwise the background poll keeps live fields
+        // fresh and we stop here without spending a data call.
+        if (!_fullFetch) {
+            _finish(true);
+            return;
+        }
+        // Step 3: basicData (best-effort), then tyre, then full telematic.
+        _boot.fetchBasicData(_vin, _accessToken, method(:onBasic));
     }
 
     function onBasic(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
-        _client.fetchTyreDiagnosis(_vin, _accessToken, method(:onTyreDiag));
+        if (_stop429(responseCode)) { return; }
+        _boot.fetchTyreDiagnosis(_vin, _accessToken, method(:onTyreDiag));
     }
 
     function onTyreDiag(responseCode as Lang.Number, tyreKm as Lang.Dictionary or Null) as Void {
+        if (_stop429(responseCode)) { return; }
         _tyreKm = tyreKm;  // best-effort — proceed regardless of success
         _client.fetchTelematicData(_vin, _containerId, _accessToken, method(:onTelematic));
     }
 
     function onTelematic(responseCode as Lang.Number, state as Lang.Dictionary or Null) as Void {
+        if (_stop429(responseCode)) { return; }
         if (responseCode == 200 && state != null) {
             // Merge tyre wear km (from separate endpoint) into the telematic state before writing.
             if (_tyreKm != null) {
@@ -104,19 +200,19 @@ class ForegroundSync {
                     if (_tyreKm.hasKey(wkeys[i])) { state[wkeys[i]] = _tyreKm[wkeys[i]]; }
                 }
             }
+            // "last upd" tracks the latest successful FETCH time (temporary, until the
+            // pipeline stabilizes) — stamp now so the age resets on every fetch.
+            state["lastUpdated"] = Time.now().value();
             VehicleCache.write(state);
             QuotaGuard.updateAfterFetch();
             Application.Storage.setValue(KEY_LAST_FG, Time.now().value());
+            Application.Storage.setValue(KEY_LAST_FULL, Time.now().value());
             // Re-assert the background poll schedule. Manual mode's daily 10:00
             // event is one-shot; if its re-registration in onTemporalEvent ever
             // failed silently, the chain stays broken until the app re-registers —
             // any successful manual refresh is a natural point to re-arm it.
             Application.getApp()._applyUpdateMode();
             _finish(true);
-        } else if (responseCode == 429) {
-            // Manual refresh hit the quota — apply the same 24h block as the background service.
-            QuotaGuard.onQuotaExceeded();
-            _finish(false);
         } else {
             _finish(false);
         }
@@ -130,9 +226,16 @@ class ForegroundSync {
         return v;
     }
 
-    function _resolveContainer() {
+    function _resolveFullContainer() {
         var c = CarDataClient.cachedContainerId();
         if (c == null) { c = Application.Properties.getValue("containerId"); }
+        if (c != null && c.equals("")) { c = null; }
+        return c;
+    }
+
+    // Auto-created/-discovered only — no manual Settings fallback for the bg container.
+    function _resolveBgContainer() {
+        var c = CarDataClient.cachedBgContainerId();
         if (c != null && c.equals("")) { c = null; }
         return c;
     }

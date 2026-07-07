@@ -16,10 +16,12 @@ class PageLock extends WatchUi.View {
 
     var _sync;
     var _refreshing;
+    var _rateLimited;
 
     function initialize() {
         View.initialize();
-        _refreshing = false;
+        _refreshing  = false;
+        _rateLimited = false;
         try { _iconClosed = WatchUi.loadResource(Rez.Drawables.ClosedIcon); } catch (e) { _iconClosed = null; }
         try { _iconOpen   = WatchUi.loadResource(Rez.Drawables.OpenIcon);   } catch (e) { _iconOpen   = null; }
     }
@@ -30,20 +32,23 @@ class PageLock extends WatchUi.View {
         if (lastSync != null && (Time.now().value() - lastSync) < ForegroundSync.COOLDOWN_SECONDS) {
             return true;
         }
-        _refreshing = true;
+        _refreshing  = true;
+        _rateLimited = false;
         WatchUi.requestUpdate();
         _sync = new ForegroundSync();
-        _sync.run(method(:onRefreshDone));
+        _sync.run(method(:onRefreshDone), true);  // START = manual full refresh
         return true;
     }
 
     function onRefreshDone(success) {
         _refreshing = false;
-        WatchUi.requestUpdate();
-        if (!success) {
+        if (!success && _sync != null && _sync.isRateLimited()) {
+            _rateLimited = true;   // daily limit — show note, don't bounce to auth
+        } else if (!success) {
             var auth = new DeviceAuthManager();
             WatchUi.pushView(new AuthView(auth), new AuthDelegate(auth), WatchUi.SLIDE_LEFT);
         }
+        WatchUi.requestUpdate();
     }
 
     // FR-16: a Cache that has previously held doorsLocked keeps showing this page (with
@@ -114,6 +119,7 @@ class PageLock extends WatchUi.View {
         PageChrome.drawAgeProminent(dc, state);
         PageChrome.drawNavDots(dc);
         PageChrome.drawRefreshHint(dc, _refreshing);
+        if (_rateLimited) { PageChrome.drawRateLimitNote(dc); }
     }
 
     function _drawWindowBadge(dc, x, y, radius) {

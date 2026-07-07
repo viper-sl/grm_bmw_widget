@@ -69,6 +69,9 @@ class DeviceAuthManager {
     //   401               → auth expired/invalid
     //   429               → quota
     //   other positive    → a real HTTP status (kept; informative, not the confusing -104)
+    // NOTE: BMW's DATA-API rate limit is HTTP 403 + body CU-429 (see CarDataClient.
+    // isRateLimit). This auth host (customer.bmwgroup.com) is quota-EXEMPT, so the plain
+    // HTTP-429 check below is sufficient here — a CU-429 body can't occur on this flow.
     static function _friendlyError(responseCode) {
         if (responseCode == Communications.BLE_CONNECTION_UNAVAILABLE) { return "No phone connection"; }
         if (responseCode < 0)    { return "No connection — check phone"; }

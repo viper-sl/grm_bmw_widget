@@ -26,7 +26,7 @@ class SettingsMenu {
             "Tank Size", tank.toString() + " L", :tankSize, null));
 
         menu.addItem(new WatchUi.MenuItem(
-            "Next Service", nextMaintenanceLabel(), :nextMaintenance, null));
+            "Next Service", nextServiceLabel(), :nextService, null));
 
         // F13: enable/disable the Range & Fuel L/100km estimate.
         menu.addItem(new WatchUi.MenuItem(
@@ -77,16 +77,19 @@ class SettingsMenu {
         return "Manual · button";
     }
 
-    // FR-23: 0 = use BMW's serviceDistanceKm; >0 = user override (km).
-    static function nextMaintenanceKm() {
-        var v = Application.Properties.getValue("nextMaintenanceKm");
+    // FR-23 (reworked): 0 = use BMW's serviceDistanceKm; >0 = the odometer
+    // value (in THOUSANDS of km) at which the next service is due —
+    // e.g. 50 means "service at 50,000 km". The page shows the remaining
+    // distance (target − current odometer).
+    static function nextServiceOdoK() {
+        var v = Application.Properties.getValue("nextServiceOdoK");
         return (v == null) ? 0 : v;
     }
 
-    static function nextMaintenanceLabel() {
-        var km = nextMaintenanceKm();
-        if (km == 0) { return "Auto (BMW)"; }
-        return km.toString() + " km";
+    static function nextServiceLabel() {
+        var k = nextServiceOdoK();
+        if (k == 0) { return "Auto (BMW)"; }
+        return "at " + k.toString() + "k km";
     }
 
 }
@@ -118,13 +121,11 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
             item.setSubLabel(t.toString() + " L");
             WatchUi.requestUpdate();
 
-        } else if (id == :nextMaintenance) {
-            // FR-23: cycle in 1000 km steps, 0 ("Auto (BMW)") .. 50000, then wrap to 0.
-            var n = SettingsMenu.nextMaintenanceKm() + 1000;
-            if (n > 50000) { n = 0; }
-            Application.Properties.setValue("nextMaintenanceKm", n);
-            item.setSubLabel(SettingsMenu.nextMaintenanceLabel());
-            WatchUi.requestUpdate();
+        } else if (id == :nextService) {
+            // FR-23 (reworked): exact 3-digit input (thousands of km) via the
+            // custom entry view — e.g. 027 = 27k km, 128 = 128k km, 000 = Auto.
+            var v = new ServiceOdoInputView();
+            WatchUi.pushView(v, new ServiceOdoInputDelegate(v, item), WatchUi.SLIDE_LEFT);
 
         } else if (id == :consumption) {
             // F13: toggle the L/100km estimate on the Range & Fuel page.

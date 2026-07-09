@@ -34,11 +34,17 @@ class PageOdometer extends WatchUi.View {
         PageChrome.drawValue(dc, state["odometerKm"].toString(),
             Graphics.FONT_NUMBER_MEDIUM, cy - PageChrome.s(dc, 8), Theme.COLOR_WHITE);
 
-        // FR-23: a user-set "next maintenance" override (km) replaces BMW's
-        // serviceDistanceKm for display when set (>0).
-        var override = SettingsMenu.nextMaintenanceKm();
-        var svcKm = (override > 0) ? override
-                  : (state.hasKey("serviceDistanceKm") ? state["serviceDistanceKm"] : null);
+        // FR-23 (reworked): the user sets the odometer value (in thousands of
+        // km) at which the next service is due; remaining = target − current
+        // odometer (clamped at 0 when overdue). 0 = Auto: BMW's serviceDistanceKm.
+        var targetK = SettingsMenu.nextServiceOdoK();
+        var svcKm = null;
+        if (targetK > 0) {
+            svcKm = targetK * 1000 - state["odometerKm"];
+            if (svcKm < 0) { svcKm = 0; }
+        } else if (state.hasKey("serviceDistanceKm")) {
+            svcKm = state["serviceDistanceKm"];
+        }
 
         if (svcKm != null) {
             var svcColor = _serviceColor(svcKm);

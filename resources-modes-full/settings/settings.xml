@@ -36,8 +36,8 @@
         <listEntry value="2">@Strings.UpdateModeAdaptive</listEntry>
       </settingConfig>
     </setting>
-    <setting propertyKey="@Properties.nextMaintenanceKm" title="@Strings.NextMaintenanceLabel">
-      <settingConfig type="numeric" min="0" max="50000"/>
+    <setting propertyKey="@Properties.nextServiceOdoK" title="@Strings.NextServiceOdoLabel">
+      <settingConfig type="numeric" min="0" max="999"/>
     </setting>
     <setting propertyKey="@Properties.showConsumption" title="@Strings.ShowConsumptionLabel">
       <settingConfig type="boolean"/>

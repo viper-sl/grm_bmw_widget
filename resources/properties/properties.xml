@@ -6,6 +6,6 @@
   <property id="refreshToken" type="String"/>
   <property id="tankLitres" type="Number">52</property>
   <property id="updateMode" type="Number">0</property><!-- 0 = manual (default), 1 = auto (every 30 min) -->
-  <property id="nextMaintenanceKm" type="Number">0</property><!-- 0 = use BMW's serviceDistanceKm; >0 = user override -->
+  <property id="nextServiceOdoK" type="Number">0</property><!-- 0 = use BMW's serviceDistanceKm; >0 = odometer value (in THOUSANDS of km) at which next service is due, e.g. 50 = 50,000 km -->
   <property id="showConsumption" type="Boolean">true</property><!-- F13: show the ~L/100km estimate on Range & Fuel -->
 </properties>

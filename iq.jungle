@@ -7,22 +7,24 @@ project.manifest = manifest-iq.xml
 # ── Capability tiers (keep in sync with monkey.jungle) ──────────────────────
 # base (API < 6.0 "legacy") — manual-only scheduling; no updateMode setting.
 # The seven API 6.0+ "full" devices keep all update modes.
+# Design refresh rides the same split: legacy excludes (:designNew) (keeps the
+# original look); the seven full-tier devices exclude (:designClassic).
 # NOTE: device-level values REPLACE base values for that key (override, not merge).
 base.sourcePath = source
 base.resourcePath = resources;resources-modes-legacy
-base.excludeAnnotations = bgPoll
+base.excludeAnnotations = bgPoll;designNew
 
-fenix843mm.excludeAnnotations = manualOnly
+fenix843mm.excludeAnnotations = manualOnly;designClassic
 fenix843mm.resourcePath = resources;resources-modes-full
-fenix847mm.excludeAnnotations = manualOnly
+fenix847mm.excludeAnnotations = manualOnly;designClassic
 fenix847mm.resourcePath = resources;resources-modes-full
-fenix8pro47mm.excludeAnnotations = manualOnly
+fenix8pro47mm.excludeAnnotations = manualOnly;designClassic
 fenix8pro47mm.resourcePath = resources;resources-modes-full
-fenix8solar47mm.excludeAnnotations = manualOnly
+fenix8solar47mm.excludeAnnotations = manualOnly;designClassic
 fenix8solar47mm.resourcePath = resources;resources-modes-full
-fenix8solar51mm.excludeAnnotations = manualOnly
+fenix8solar51mm.excludeAnnotations = manualOnly;designClassic
 fenix8solar51mm.resourcePath = resources;resources-modes-full
-fenixe.excludeAnnotations = manualOnly
+fenixe.excludeAnnotations = manualOnly;designClassic
 fenixe.resourcePath = resources;resources-modes-full
-fr970.excludeAnnotations = manualOnly
+fr970.excludeAnnotations = manualOnly;designClassic
 fr970.resourcePath = resources;resources-modes-full

@@ -19,7 +19,7 @@ covers the BMW error-code classifiers used across the app:
 ## Running
 
 ```sh
-SDK="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-9.1.0-2026-03-09-6a872a80b"
+SDK="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-9.2.0-2026-06-09-92a1605b2"
 
 # build a test binary (-t compiles the (:test) code)
 java -jar "$SDK/bin/monkeybrains.jar" \
@@ -27,6 +27,18 @@ java -jar "$SDK/bin/monkeybrains.jar" \
 
 # run it in the simulator (simulator must be open first)
 "$SDK/bin/monkeydo" bin/test.prg fenix6pro -t
+```
+
+**Run the suite on BOTH capability tiers.** The jungle's tier split
+(`base.excludeAnnotations = bgPoll`) means a fenix6pro (legacy) build never
+compiles the `(:bgPoll)` code — hourly/adaptive scheduling and
+`_adaptiveShouldFetch` — so a legacy-only run cannot catch full-tier
+regressions (even syntax errors there). Repeat on a full-tier device:
+
+```sh
+java -jar "$SDK/bin/monkeybrains.jar" \
+  -o bin/test8.prg -f monkey.jungle -y developer_key -d fenix8pro47mm_sim -w -t
+"$SDK/bin/monkeydo" bin/test8.prg fenix8pro47mm -t
 ```
 
 Expected tail:

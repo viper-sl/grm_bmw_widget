@@ -30,9 +30,9 @@ class PageOdometer extends WatchUi.View {
         PageChrome.drawAccent(dc);
         PageChrome.drawHeader(dc, null);
 
-        PageChrome.drawLabel(dc, "ODOMETER (KM)", cy - 58);
+        PageChrome.drawLabel(dc, "ODOMETER (KM)", cy - PageChrome.s(dc, 58));
         PageChrome.drawValue(dc, state["odometerKm"].toString(),
-            Graphics.FONT_NUMBER_MEDIUM, cy - 8, Theme.COLOR_WHITE);
+            Graphics.FONT_NUMBER_MEDIUM, cy - PageChrome.s(dc, 8), Theme.COLOR_WHITE);
 
         // FR-23: a user-set "next maintenance" override (km) replaces BMW's
         // serviceDistanceKm for display when set (>0).
@@ -43,9 +43,9 @@ class PageOdometer extends WatchUi.View {
         if (svcKm != null) {
             var svcColor = _serviceColor(svcKm);
             var pct = svcKm.toFloat() / 5000.0;
-            PageChrome.drawBar(dc, pct, cy + 44, svcColor);
+            PageChrome.drawBar(dc, pct, cy + PageChrome.s(dc, 44), svcColor);
             dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
-            dc.drawText(cx, cy + 68, Graphics.FONT_XTINY,
+            dc.drawText(cx, cy + PageChrome.s(dc, 68), Graphics.FONT_XTINY,
                 "SERVICE IN " + _short(svcKm),
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }

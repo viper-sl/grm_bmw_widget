@@ -74,15 +74,15 @@ class PageRangeFuel extends WatchUi.View {
         var barColor = lowFuel ? Theme.COLOR_WARN : Theme.COLOR_ACCENT;
 
         // ── Range value (big) ──────────────────────────────────────────────
-        PageChrome.drawLabel(dc, "RANGE (KM)", cy - 58);
+        PageChrome.drawLabel(dc, "RANGE (KM)", cy - PageChrome.s(dc, 58));
         PageChrome.drawValue(dc, (rangeKm != null) ? rangeKm.toString() : "--",
-            Graphics.FONT_NUMBER_MEDIUM, cy - 8, Theme.COLOR_WHITE);
+            Graphics.FONT_NUMBER_MEDIUM, cy - PageChrome.s(dc, 8), Theme.COLOR_WHITE);
 
         // ── Bar ───────────────────────────────────────────────────────────
         // cy-8 = range value center (~122). FONT_NUMBER_MEDIUM height ≈ 60px → bottom ≈ 152.
         // Bar starts at cy+30=160, 8px below value bottom → no overlap.
         var pct = (rangeKm != null) ? (rangeKm.toFloat() / 700.0) : 0.0;
-        PageChrome.drawBar(dc, pct, cy + 26, barColor);
+        PageChrome.drawBar(dc, pct, cy + PageChrome.s(dc, 26), barColor);
 
         // ── Fuel / battery percent — 14px below bar bottom ─────────────────
         // F16: ICE shows FUEL %, EV/PHEV (no fuel %) shows BATTERY %.
@@ -100,7 +100,7 @@ class PageRangeFuel extends WatchUi.View {
             fuelColor = Theme.COLOR_MUTED;
         }
         dc.setColor(fuelColor, Theme.COLOR_BG);
-        dc.drawText(cx, cy + 50, Graphics.FONT_TINY, fuelStr,
+        dc.drawText(cx, cy + PageChrome.s(dc, 50), Graphics.FONT_TINY, fuelStr,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // ── Liters line (ICE only) — 20px below fuel% center ───────────────
@@ -112,7 +112,7 @@ class PageRangeFuel extends WatchUi.View {
             if (fill < 0) { fill = 0; }
             var litStr   = "   " + inTank.toNumber().toString() + "L in  | " + fill.toNumber().toString() + "L to fill";
             dc.setColor(lowFuel ? Theme.COLOR_WARN : Theme.COLOR_MUTED, Theme.COLOR_BG);
-            dc.drawText(cx, cy + 70, Graphics.FONT_XTINY, litStr,
+            dc.drawText(cx, cy + PageChrome.s(dc, 70), Graphics.FONT_XTINY, litStr,
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
@@ -122,7 +122,7 @@ class PageRangeFuel extends WatchUi.View {
         var consumption = consumptionPer100Km(fuelLitres, rangeKm);
         if (consumption != null && showConsumption()) {
             dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
-            dc.drawText(cx, cy + 86, Graphics.FONT_XTINY,
+            dc.drawText(cx, cy + PageChrome.s(dc, 86), Graphics.FONT_XTINY,
                 "~" + PageChrome.oneDecimal(consumption) + " L/100KM (EST)",
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }

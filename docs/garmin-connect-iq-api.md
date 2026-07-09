@@ -80,7 +80,7 @@ Based on the current project (`grm_bmw_widget`), the most relevant Toybox module
 
 ## SDK Version
 
-This reference applies to Connect IQ SDK **v9.1.0** (2026-03-09).
+This reference applies to Connect IQ SDK **v9.2.0** (2026-06-09).
 
 ## Further Reading
 

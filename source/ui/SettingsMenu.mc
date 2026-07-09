@@ -18,8 +18,7 @@ class SettingsMenu {
     static function build() {
         var menu = new WatchUi.Menu2({ :title => "Settings" });
 
-        menu.addItem(new WatchUi.MenuItem(
-            "Update Mode", modeLabel(), :updateMode, null));
+        _addUpdateModeItem(menu);
 
         var tankProp = Application.Properties.getValue("tankLitres");
         var tank = (tankProp != null) ? tankProp : 52;
@@ -37,6 +36,22 @@ class SettingsMenu {
         menu.addItem(new WatchUi.MenuItem("Manage", "Auth · container", :manage, null));
         menu.addItem(new WatchUi.MenuItem("About car", null, :about, null));
         return menu;
+    }
+
+    // TIER SPLIT: exactly one variant survives each device build (see monkey.jungle).
+    // Full tier offers the on-watch Update Mode selector; legacy tier hides it —
+    // those devices are always manual + one daily 10:00 refresh, so showing a
+    // selector whose choices do nothing would mislead. (modeLabel()/the :updateMode
+    // handler stay un-annotated: dead-but-tiny on legacy, foreground heap is ~1 MB.)
+    (:bgPoll)
+    static function _addUpdateModeItem(menu) {
+        menu.addItem(new WatchUi.MenuItem(
+            "Update Mode", modeLabel(), :updateMode, null));
+    }
+
+    (:manualOnly)
+    static function _addUpdateModeItem(menu) {
+        // Legacy tier: no user-selectable update mode.
     }
 
     // F13: consumption-estimate row toggle (default on).

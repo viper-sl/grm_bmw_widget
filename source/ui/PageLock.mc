@@ -87,19 +87,19 @@ class PageLock extends WatchUi.View {
             statusColor = Theme.COLOR_WARN;
         }
         dc.setColor(statusColor, Theme.COLOR_BG);
-        dc.drawText(cx, 52, Graphics.FONT_SMALL, statusLabel,
+        dc.drawText(cx, PageChrome.s(dc, 52), Graphics.FONT_SMALL, statusLabel,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // Icon + cross shifted down to sit between the status label and age text
-        var mid = cy + 16;
+        var mid = cy + PageChrome.s(dc, 16);
         var icon = locked ? _iconClosed : _iconOpen;
         if (icon != null) {
-            dc.drawBitmap(cx - 24, mid - 24, icon);
+            dc.drawBitmap(cx - icon.getWidth() / 2, mid - icon.getHeight() / 2, icon);
         }
 
         // Cross layout: HOOD above · door cells on sides · TRUNK below.
-        _cell(dc, cx, mid - 46, "HOOD",  state, "hoodOpen", null, 0);
-        _cell(dc, cx, mid + 46, "TRUNK", state, "trunkOpen", null, 0);
+        _cell(dc, cx, mid - PageChrome.s(dc, 46), "HOOD",  state, "hoodOpen", null, 0);
+        _cell(dc, cx, mid + PageChrome.s(dc, 46), "TRUNK", state, "trunkOpen", null, 0);
 
         // FR-19: rear doors only if this vehicle reports them — then each side
         // stacks front above rear; otherwise the original single DOOR L/R cells.
@@ -107,13 +107,13 @@ class PageLock extends WatchUi.View {
         // that door's window is open/intermediate.
         var hasRear = state.hasKey("doorRLOpen") || state.hasKey("doorRROpen");
         if (hasRear) {
-            _cell(dc, cx - 60, mid - 22, "DOOR FL", state, "doorFLOpen", "windowFLOpen", -18);
-            _cell(dc, cx + 60, mid - 22, "DOOR FR", state, "doorFROpen", "windowFROpen", 18);
-            _cell(dc, cx - 60, mid + 24, "DOOR RL", state, "doorRLOpen", "windowRLOpen", -18);
-            _cell(dc, cx + 60, mid + 24, "DOOR RR", state, "doorRROpen", "windowRROpen", 18);
+            _cell(dc, cx - PageChrome.s(dc, 60), mid - PageChrome.s(dc, 22), "DOOR FL", state, "doorFLOpen", "windowFLOpen", -PageChrome.s(dc, 18));
+            _cell(dc, cx + PageChrome.s(dc, 60), mid - PageChrome.s(dc, 22), "DOOR FR", state, "doorFROpen", "windowFROpen", PageChrome.s(dc, 18));
+            _cell(dc, cx - PageChrome.s(dc, 60), mid + PageChrome.s(dc, 24), "DOOR RL", state, "doorRLOpen", "windowRLOpen", -PageChrome.s(dc, 18));
+            _cell(dc, cx + PageChrome.s(dc, 60), mid + PageChrome.s(dc, 24), "DOOR RR", state, "doorRROpen", "windowRROpen", PageChrome.s(dc, 18));
         } else {
-            _cell(dc, cx - 60, mid, "DOOR L", state, "doorFLOpen", "windowFLOpen", -18);
-            _cell(dc, cx + 60, mid, "DOOR R", state, "doorFROpen", "windowFROpen", 18);
+            _cell(dc, cx - PageChrome.s(dc, 60), mid, "DOOR L", state, "doorFLOpen", "windowFLOpen", -PageChrome.s(dc, 18));
+            _cell(dc, cx + PageChrome.s(dc, 60), mid, "DOOR R", state, "doorFROpen", "windowFROpen", PageChrome.s(dc, 18));
         }
 
         PageChrome.drawAgeProminent(dc, state);
@@ -134,21 +134,21 @@ class PageLock extends WatchUi.View {
     // draw a red "W" badge offset by badgeDx on the same row as the status dot.
     function _cell(dc, x, y, name, state, key, windowKey, badgeDx) {
         dc.setColor(Theme.COLOR_WHITE, Theme.COLOR_BG);
-        dc.drawText(x, y - 12, Graphics.FONT_XTINY, name,
+        dc.drawText(x, y - PageChrome.s(dc, 12), Graphics.FONT_XTINY, name,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         var isOpen = state.hasKey(key) ? state[key] : false;
         if (isOpen) {
             dc.setColor(Theme.COLOR_ERROR, Theme.COLOR_BG);
-            dc.drawCircle(x, y + 10, 7);
-            dc.fillCircle(x, y + 10, 3);
+            dc.drawCircle(x, y + PageChrome.s(dc, 10), PageChrome.s(dc, 7));
+            dc.fillCircle(x, y + PageChrome.s(dc, 10), PageChrome.s(dc, 3));
         } else {
             dc.setColor(Theme.COLOR_OK, Theme.COLOR_BG);
-            dc.fillCircle(x, y + 10, 7);
+            dc.fillCircle(x, y + PageChrome.s(dc, 10), PageChrome.s(dc, 7));
         }
 
         if (windowKey != null && state.hasKey(windowKey) && state[windowKey]) {
-            _drawWindowBadge(dc, x + badgeDx, y + 10, 8);
+            _drawWindowBadge(dc, x + badgeDx, y + PageChrome.s(dc, 10), PageChrome.s(dc, 8));
         }
     }
 

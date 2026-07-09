@@ -40,12 +40,12 @@ class PageTyres extends WatchUi.View {
         PageChrome.drawHeader(dc, null);
 
         var label = (_mode == 1) ? "TARGET (BAR)" : (_mode == 2) ? "WEAR (KM)" : "TYRES (BAR)";
-        PageChrome.drawLabel(dc, label, cy - 56);
+        PageChrome.drawLabel(dc, label, cy - PageChrome.s(dc, 56));
 
-        var colL = cx - 44;
-        var colR = cx + 44;
-        var row1 = cy - 16;
-        var row2 = cy + 36;
+        var colL = cx - PageChrome.s(dc, 44);
+        var colR = cx + PageChrome.s(dc, 44);
+        var row1 = cy - PageChrome.s(dc, 16);
+        var row2 = cy + PageChrome.s(dc, 36);
 
         _cell(dc, colL, row1, "FRONT L", state, "tyrePressureFL", "tyreTargetFL", "tyreWearKmFL");
         _cell(dc, colR, row1, "FRONT R", state, "tyrePressureFR", "tyreTargetFR", "tyreWearKmFR");
@@ -59,18 +59,18 @@ class PageTyres extends WatchUi.View {
 
     function _cell(dc, x, y, name, state, pKey, tKey, wKey) {
         dc.setColor(Theme.COLOR_WHITE, Theme.COLOR_BG);
-        dc.drawText(x, y - 12, Graphics.FONT_XTINY, name,
+        dc.drawText(x, y - PageChrome.s(dc, 12), Graphics.FONT_XTINY, name,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         if (_mode == 2) {
             var km = state.hasKey(wKey) ? state[wKey] : null;
             if (km == null) {
                 dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-                dc.drawText(x, y + 12, Graphics.FONT_TINY, "--",
+                dc.drawText(x, y + PageChrome.s(dc, 12), Graphics.FONT_TINY, "--",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             } else {
                 dc.setColor(km < 5000 ? Theme.COLOR_WARN : Theme.COLOR_OK, Theme.COLOR_BG);
-                dc.drawText(x, y + 12, Graphics.FONT_TINY, km.toString(),
+                dc.drawText(x, y + PageChrome.s(dc, 12), Graphics.FONT_TINY, km.toString(),
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             }
             return;
@@ -82,7 +82,7 @@ class PageTyres extends WatchUi.View {
 
         if (value == null) {
             dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-            dc.drawText(x, y + 12, Graphics.FONT_TINY, "--",
+            dc.drawText(x, y + PageChrome.s(dc, 12), Graphics.FONT_TINY, "--",
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             return;
         }
@@ -95,7 +95,7 @@ class PageTyres extends WatchUi.View {
             color = low ? Theme.COLOR_WARN : Theme.COLOR_OK;
         }
         dc.setColor(color, Theme.COLOR_BG);
-        dc.drawText(x, y + 12, Graphics.FONT_TINY, PageChrome.oneDecimal(value),
+        dc.drawText(x, y + PageChrome.s(dc, 12), Graphics.FONT_TINY, PageChrome.oneDecimal(value),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 

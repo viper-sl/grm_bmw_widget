@@ -11,8 +11,30 @@ using Toybox.Application;
 (:background)
 class Config {
 
+    // Resolution order:
+    //   1. "clientId" Property — store build: user-entered via GCM settings;
+    //      personal build: baked default from resources-livetest.
+    //   2. "clientIdBaked" Property — personal build only (declared ONLY in
+    //      resources-livetest/properties, never in settings.xml). The sim and
+    //      GCM persist a settings store that can override the "clientId"
+    //      default with an empty string ("Empty clientId overrides XML
+    //      default" gotcha); clientIdBaked has no settings surface, so
+    //      nothing can clobber it. Store builds don't declare it — the
+    //      getValue throws and the catch falls through.
     static function clientId() {
-        return Application.Properties.getValue("clientId");
+        var v = Application.Properties.getValue("clientId");
+        if (v != null && !v.equals("")) {
+            return v;
+        }
+        try {
+            var baked = Application.Properties.getValue("clientIdBaked");
+            if (baked != null && !baked.equals("")) {
+                return baked;
+            }
+        } catch (e) {
+            // property not declared (store build) — fall through
+        }
+        return v;
     }
 
 }

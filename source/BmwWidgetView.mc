@@ -88,13 +88,17 @@ class BmwWidgetView extends WatchUi.View {
     function onNextPage()     { return false; }
     function onPreviousPage() { return false; }
 
+    // NOTE: prompt screens draw stacked lines with TRANSPARENT text background —
+    // the usual (fg, Theme.COLOR_BG) pair makes drawText erase its line box,
+    // clipping the neighbor line's descenders on tall AMOLED fonts (the cut-off
+    // "g" bug). dc.clear() above already painted the background.
     function _drawLoading(dc) {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
-        dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
+        dc.setColor(Theme.COLOR_TEXT, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, cy - PageChrome.s(dc, 8), Graphics.FONT_SMALL, "Loading…",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
+        dc.setColor(Theme.COLOR_DIM, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, cy + PageChrome.s(dc, 14), Graphics.FONT_XTINY, "fetching vehicle data",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
@@ -102,10 +106,10 @@ class BmwWidgetView extends WatchUi.View {
     function _drawSetupPrompt(dc) {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
-        dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
+        dc.setColor(Theme.COLOR_TEXT, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, cy - PageChrome.s(dc, 18), Graphics.FONT_SMALL, "BMW Widget",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+        dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, cy + PageChrome.s(dc, 8), Graphics.FONT_TINY, "Press START to connect",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
@@ -115,10 +119,10 @@ class BmwWidgetView extends WatchUi.View {
     function _drawRateLimited(dc) {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
-        dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
+        dc.setColor(Theme.COLOR_WARN, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, cy - PageChrome.s(dc, 18), Graphics.FONT_SMALL, "Daily limit reached",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+        dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, cy + PageChrome.s(dc, 8), Graphics.FONT_TINY, "Try again tomorrow",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
@@ -126,10 +130,10 @@ class BmwWidgetView extends WatchUi.View {
     function _drawRelinkPrompt(dc) {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
-        dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
+        dc.setColor(Theme.COLOR_WARN, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, cy - PageChrome.s(dc, 18), Graphics.FONT_SMALL, "Re-auth needed",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+        dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, cy + PageChrome.s(dc, 8), Graphics.FONT_TINY, "Press START to re-pair",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }

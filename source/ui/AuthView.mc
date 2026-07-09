@@ -112,16 +112,16 @@ class AuthView extends WatchUi.View {
 
         if (st == DeviceAuthManager.PENDING) {
             // Title
-            dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+            dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
             dc.drawText(cx, cy - PageChrome.s(dc, 58), Graphics.FONT_XTINY, "Pair on bmw site",
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             // The code the user types on the BMW pairing page. Use a TEXT font, not
             // FONT_NUMBER_* — user codes are alphanumeric and number fonts have no letters.
-            dc.setColor(Theme.COLOR_ACCENT, Theme.COLOR_BG);
+            dc.setColor(Theme.COLOR_ACCENT, Graphics.COLOR_TRANSPARENT);
             dc.drawText(cx, cy - PageChrome.s(dc, 16), Graphics.FONT_LARGE, _auth.getUserCode(),
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             // Hint
-            dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+            dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
             dc.drawText(cx, cy + PageChrome.s(dc, 30), Graphics.FONT_XTINY, "Waiting for approval…",
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.drawText(cx, cy + PageChrome.s(dc, 50), Graphics.FONT_XTINY, "customer.bmwgroup.com",
@@ -132,14 +132,14 @@ class AuthView extends WatchUi.View {
         if (st == DeviceAuthManager.SUCCESS) {
             if (_cleaning) {
                 _center(dc, cx, cy - PageChrome.s(dc, 10), Graphics.FONT_SMALL, Theme.COLOR_TEXT, "Cleaning up…");
-                dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+                dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
                 dc.drawText(cx, cy + PageChrome.s(dc, 16), Graphics.FONT_XTINY, "deleting containers",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
                 return;
             }
             if (_cleanupFailed) {
                 _center(dc, cx, cy - PageChrome.s(dc, 12), Graphics.FONT_SMALL, Theme.COLOR_WARN, "Cleanup failed");
-                dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+                dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
                 dc.drawText(cx, cy + PageChrome.s(dc, 14), Graphics.FONT_XTINY, "BACK to exit, then retry",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
                 return;
@@ -147,10 +147,10 @@ class AuthView extends WatchUi.View {
             if (_rateLimited) {
                 // Paired OK, but the daily API limit blocks the first fetch.
                 _center(dc, cx, cy - PageChrome.s(dc, 22), Graphics.FONT_SMALL, Theme.COLOR_OK, "Paired");
-                dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
+                dc.setColor(Theme.COLOR_WARN, Graphics.COLOR_TRANSPARENT);
                 dc.drawText(cx, cy + PageChrome.s(dc, 2), Graphics.FONT_XTINY, "Daily limit reached",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-                dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+                dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
                 dc.drawText(cx, cy + PageChrome.s(dc, 22), Graphics.FONT_XTINY, "Try again tomorrow",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
                 dc.drawText(cx, cy + PageChrome.s(dc, 42), Graphics.FONT_XTINY, "BACK to exit",
@@ -158,7 +158,7 @@ class AuthView extends WatchUi.View {
                 return;
             }
             _center(dc, cx, cy - PageChrome.s(dc, 10), Graphics.FONT_SMALL, Theme.COLOR_OK, "Paired");
-            dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+            dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
             dc.drawText(cx, cy + PageChrome.s(dc, 16), Graphics.FONT_XTINY, "Fetching data…",
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             return;
@@ -168,7 +168,7 @@ class AuthView extends WatchUi.View {
         _center(dc, cx, cy - PageChrome.s(dc, 12), Graphics.FONT_SMALL, Theme.COLOR_WARN, "Auth failed");
         var msg = _auth.getError();
         if (msg != null) {
-            dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+            dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
             dc.drawText(cx, cy + PageChrome.s(dc, 14), Graphics.FONT_XTINY, msg,
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.drawText(cx, cy + PageChrome.s(dc, 34), Graphics.FONT_XTINY, "BACK to retry",
@@ -177,7 +177,8 @@ class AuthView extends WatchUi.View {
     }
 
     function _center(dc, x, y, font, color, text) {
-        dc.setColor(color, Theme.COLOR_BG);
+        // TRANSPARENT bg: avoid line-box erasure clipping neighbors (see BmwWidgetView)
+        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
         dc.drawText(x, y, font, text,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }

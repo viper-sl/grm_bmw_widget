@@ -27,6 +27,12 @@ class BmwWidgetApp extends Application.AppBase {
     // CIQ registerForTemporalEvent only supports a fixed interval, so adaptive gating
     // lives in the service delegate, not here. Default manual.
     // Wrapped: Background APIs throw in glance scope.
+    //
+    // TIER SPLIT: exactly one variant survives each device build (see monkey.jungle).
+    //   (:bgPoll)     — full tier (API 6.0+ devices): all three modes.
+    //   (:manualOnly) — legacy tier (API < 6.0): always manual + daily 10:00,
+    //                   even if a mode 1/2 value survives from an older install.
+    (:bgPoll)
     function _applyUpdateMode() {
         try {
             var mode = Application.Properties.getValue("updateMode");
@@ -40,6 +46,16 @@ class BmwWidgetApp extends Application.AppBase {
                 // the next day's 10:00 occurrence.
                 Background.registerForTemporalEvent(_nextTenAmMoment());
             }
+        } catch (e instanceof Lang.Exception) {
+            // glance scope — background registration unavailable; ignore
+        }
+    }
+
+    (:manualOnly)
+    function _applyUpdateMode() {
+        try {
+            // Legacy tier: manual + daily 10:00 regardless of any persisted mode.
+            Background.registerForTemporalEvent(_nextTenAmMoment());
         } catch (e instanceof Lang.Exception) {
             // glance scope — background registration unavailable; ignore
         }

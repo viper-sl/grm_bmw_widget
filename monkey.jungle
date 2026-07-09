@@ -1,9 +1,26 @@
 project.manifest = manifest.xml
 
+# ── Capability tiers ─────────────────────────────────────────────────────────
+# base (API < 6.0 "legacy") — manual-only scheduling: (:bgPoll) code is excluded
+# and the manual-only settings (no updateMode entry) are used.
+# The seven API 6.0+ "full" devices keep all update modes: they exclude
+# (:manualOnly) instead and get the full settings.
+# NOTE: device-level values REPLACE base values for that key (override, not merge).
 base.sourcePath = source
-base.resourcePath = resources
+base.resourcePath = resources;resources-modes-legacy
+base.excludeAnnotations = bgPoll
 
-fenix6pro.sourcePath = $(base.sourcePath)
-fenix6pro.resourcePath = $(base.resourcePath)
-fr255.sourcePath = $(base.sourcePath)
-fr255.resourcePath = $(base.resourcePath)
+fenix843mm.excludeAnnotations = manualOnly
+fenix843mm.resourcePath = resources;resources-modes-full
+fenix847mm.excludeAnnotations = manualOnly
+fenix847mm.resourcePath = resources;resources-modes-full
+fenix8pro47mm.excludeAnnotations = manualOnly
+fenix8pro47mm.resourcePath = resources;resources-modes-full
+fenix8solar47mm.excludeAnnotations = manualOnly
+fenix8solar47mm.resourcePath = resources;resources-modes-full
+fenix8solar51mm.excludeAnnotations = manualOnly
+fenix8solar51mm.resourcePath = resources;resources-modes-full
+fenixe.excludeAnnotations = manualOnly
+fenixe.resourcePath = resources;resources-modes-full
+fr970.excludeAnnotations = manualOnly
+fr970.resourcePath = resources;resources-modes-full

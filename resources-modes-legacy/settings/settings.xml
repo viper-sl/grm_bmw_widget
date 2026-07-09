@@ -1,4 +1,11 @@
 <?xml version="1.0"?>
+<!-- LEGACY TIER (API < 6.0 devices — see monkey.jungle) settings.
+     No updateMode setting: these devices are always manual + one daily 10:00
+     background refresh (the (:manualOnly) code path ignores any persisted mode).
+     SYNC BURDEN: this file and resources-modes-full/settings/settings.xml are
+     full copies that must stay in sync; they differ ONLY in the updateMode
+     setting (absent here, present on full) and the group comment that
+     mentions it. -->
 <settings>
 
   <!-- ── Required ────────────────────────────────────────────────────── -->
@@ -10,7 +17,7 @@
 
   <!-- ── Optional ─────────────────────────────────────────────────────
        VIN, containerId and refreshToken are auto-discovered on first run.
-       Tank size and update mode control widget behaviour.              -->
+       Tank size controls widget behaviour.                             -->
   <group id="optional" title="@Strings.GroupOptional">
     <setting propertyKey="@Properties.vin" title="@Strings.VinLabel">
       <settingConfig type="alphaNumeric"/>
@@ -23,13 +30,6 @@
     </setting>
     <setting propertyKey="@Properties.tankLitres" title="@Strings.TankLitresLabel">
       <settingConfig type="numeric" min="20" max="120"/>
-    </setting>
-    <setting propertyKey="@Properties.updateMode" title="@Strings.UpdateModeLabel">
-      <settingConfig type="list">
-        <listEntry value="0">@Strings.UpdateModeManual</listEntry>
-        <listEntry value="1">@Strings.UpdateModeAuto</listEntry>
-        <listEntry value="2">@Strings.UpdateModeAdaptive</listEntry>
-      </settingConfig>
     </setting>
     <setting propertyKey="@Properties.nextMaintenanceKm" title="@Strings.NextMaintenanceLabel">
       <settingConfig type="numeric" min="0" max="50000"/>

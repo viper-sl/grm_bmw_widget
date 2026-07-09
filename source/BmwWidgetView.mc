@@ -92,10 +92,10 @@ class BmwWidgetView extends WatchUi.View {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
         dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
-        dc.drawText(cx, cy - 8, Graphics.FONT_SMALL, "Loading…",
+        dc.drawText(cx, cy - PageChrome.s(dc, 8), Graphics.FONT_SMALL, "Loading…",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
-        dc.drawText(cx, cy + 14, Graphics.FONT_XTINY, "fetching vehicle data",
+        dc.drawText(cx, cy + PageChrome.s(dc, 14), Graphics.FONT_XTINY, "fetching vehicle data",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
@@ -103,10 +103,10 @@ class BmwWidgetView extends WatchUi.View {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
         dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
-        dc.drawText(cx, cy - 18, Graphics.FONT_SMALL, "BMW Widget",
+        dc.drawText(cx, cy - PageChrome.s(dc, 18), Graphics.FONT_SMALL, "BMW Widget",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-        dc.drawText(cx, cy + 8, Graphics.FONT_TINY, "Press START to connect",
+        dc.drawText(cx, cy + PageChrome.s(dc, 8), Graphics.FONT_TINY, "Press START to connect",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
@@ -116,10 +116,10 @@ class BmwWidgetView extends WatchUi.View {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
         dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
-        dc.drawText(cx, cy - 18, Graphics.FONT_SMALL, "Daily limit reached",
+        dc.drawText(cx, cy - PageChrome.s(dc, 18), Graphics.FONT_SMALL, "Daily limit reached",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-        dc.drawText(cx, cy + 8, Graphics.FONT_TINY, "Try again tomorrow",
+        dc.drawText(cx, cy + PageChrome.s(dc, 8), Graphics.FONT_TINY, "Try again tomorrow",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
@@ -127,10 +127,10 @@ class BmwWidgetView extends WatchUi.View {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
         dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
-        dc.drawText(cx, cy - 18, Graphics.FONT_SMALL, "Re-auth needed",
+        dc.drawText(cx, cy - PageChrome.s(dc, 18), Graphics.FONT_SMALL, "Re-auth needed",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
-        dc.drawText(cx, cy + 8, Graphics.FONT_TINY, "Press START to re-pair",
+        dc.drawText(cx, cy + PageChrome.s(dc, 8), Graphics.FONT_TINY, "Press START to re-pair",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 

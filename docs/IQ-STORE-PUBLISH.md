@@ -45,9 +45,10 @@ run (see the README).
 **requires every listed device to have its SDK profile installed locally** (Connect IQ
 SDK Manager → Devices). A device without an installed profile fails the build.
 
-To keep `--iq` building out of the box, `manifest-iq.xml` currently has **only the
-locally-installed devices uncommented** (`fenix6pro`, `fr255`); the full fēnix 6/7/8/E,
-MARQ, and Forerunner list is present but commented out.
+To keep `--iq` building out of the box, `manifest-iq.xml` has **only the
+locally-installed devices uncommented** (21 products as of 2026-07: fēnix 6/6 Pro/6X Pro,
+the fēnix 7 family, the fēnix 8/E family, MARQ 2, FR255/965/970); the remaining
+15 (fēnix 6S variants, most MARQ, FR745-955) are commented out pending SDK profiles.
 
 To widen store coverage:
 

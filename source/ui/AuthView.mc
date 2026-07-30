@@ -111,20 +111,24 @@ class AuthView extends WatchUi.View {
         }
 
         if (st == DeviceAuthManager.PENDING) {
-            // Title
+            // Title + full verification URL (domain / path on two lines so the
+            // whole customer.bmwgroup.com/oneid/#/link fits from 260px to 454px).
             dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy - PageChrome.s(dc, 58), Graphics.FONT_XTINY, "Pair on bmw site",
+            dc.drawText(cx, cy - PageChrome.s(dc, 64), Graphics.FONT_XTINY, "Enter code at",
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.setColor(Theme.COLOR_TEXT, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, cy - PageChrome.s(dc, 48), Graphics.FONT_XTINY, "customer.bmwgroup.com",
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(cx, cy - PageChrome.s(dc, 34), Graphics.FONT_XTINY, "/oneid/#/link",
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             // The code the user types on the BMW pairing page. Use a TEXT font, not
             // FONT_NUMBER_* — user codes are alphanumeric and number fonts have no letters.
             dc.setColor(Theme.COLOR_ACCENT, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy - PageChrome.s(dc, 16), Graphics.FONT_LARGE, _auth.getUserCode(),
+            dc.drawText(cx, cy - PageChrome.s(dc, 6), Graphics.FONT_LARGE, _auth.getUserCode(),
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             // Hint
             dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy + PageChrome.s(dc, 30), Graphics.FONT_XTINY, "Waiting for approval…",
-                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.drawText(cx, cy + PageChrome.s(dc, 50), Graphics.FONT_XTINY, "customer.bmwgroup.com",
+            dc.drawText(cx, cy + PageChrome.s(dc, 42), Graphics.FONT_XTINY, "Waiting for approval…",
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             return;
         }
@@ -165,15 +169,60 @@ class AuthView extends WatchUi.View {
         }
 
         // FAILED
-        _center(dc, cx, cy - PageChrome.s(dc, 12), Graphics.FONT_SMALL, Theme.COLOR_WARN, "Auth failed");
+        _center(dc, cx, cy - PageChrome.s(dc, 40), Graphics.FONT_SMALL, Theme.COLOR_WARN, "Auth failed");
         var msg = _auth.getError();
         if (msg != null) {
+            // Word-wrap: BMW's error_description is a full sentence and clips on
+            // the round screen as one line. Draw it over as many lines as needed.
             dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy + PageChrome.s(dc, 14), Graphics.FONT_XTINY, msg,
-                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.drawText(cx, cy + PageChrome.s(dc, 34), Graphics.FONT_XTINY, "BACK to retry",
+            var lineH = dc.getFontHeight(Graphics.FONT_XTINY);
+            var bottom = _drawWrapped(dc, cx, cy - PageChrome.s(dc, 14),
+                (dc.getWidth() * 82) / 100, Graphics.FONT_XTINY, msg);
+            dc.setColor(Theme.COLOR_DIM, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, bottom + lineH, Graphics.FONT_XTINY, "BACK to retry",
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
+    }
+
+    // Greedy word-wrap. Draws `text` centered at x, top-anchored at y, wrapping
+    // to maxW. Returns the y of the last line drawn (for placing text below it).
+    function _drawWrapped(dc, x, y, maxW, font, text) {
+        var words = _split(text, " ");
+        var lineH = dc.getFontHeight(font);
+        var line = "";
+        var cursorY = y;
+        for (var i = 0; i < words.size(); i++) {
+            var candidate = line.equals("") ? words[i] : line + " " + words[i];
+            if (dc.getTextWidthInPixels(candidate, font) > maxW && !line.equals("")) {
+                dc.drawText(x, cursorY, font, line,
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                cursorY += lineH;
+                line = words[i];
+            } else {
+                line = candidate;
+            }
+        }
+        if (!line.equals("")) {
+            dc.drawText(x, cursorY, font, line,
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+        return cursorY;
+    }
+
+    // Minimal splitter (Monkey C strings have no split()).
+    function _split(s, sep) {
+        var out = [];
+        var cur = "";
+        for (var i = 0; i < s.length(); i++) {
+            var c = s.substring(i, i + 1);
+            if (c.equals(sep)) {
+                if (!cur.equals("")) { out.add(cur); cur = ""; }
+            } else {
+                cur += c;
+            }
+        }
+        if (!cur.equals("")) { out.add(cur); }
+        return out;
     }
 
     function _center(dc, x, y, font, color, text) {

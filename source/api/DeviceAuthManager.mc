@@ -23,6 +23,10 @@ using Toybox.Timer;
 class DeviceAuthManager {
 
     static const _AUTH_HOST   = "https://customer.bmwgroup.com";
+    // Where the user enters the pairing code (shown on the auth screen). BMW's
+    // OneID account-linking page; used when the device-code response omits a
+    // verification_uri.
+    static const _VERIFY_URL  = "https://customer.bmwgroup.com/oneid/#/link";
     static const _DEVICE_URL  = "https://customer.bmwgroup.com/gcdm/oauth/device/code";
     static const _TOKEN_URL   = "https://customer.bmwgroup.com/gcdm/oauth/token";
     static const _SCOPE       = "authenticate_user openid cardata:streaming:read cardata:api:read";
@@ -80,6 +84,21 @@ class DeviceAuthManager {
         return "Server error " + responseCode;
     }
 
+    // Prefer BMW's own OAuth error text over a bare HTTP code. On a 400 the body
+    // is {"error":"...","error_description":"..."} — the description says exactly
+    // why the request was rejected (e.g. an under-encoded scope/grant_type from
+    // the phone bridge, which the sim never hits). Falls back to the friendly
+    // mapping when there's no body (transport failure).
+    static function _serverError(responseCode, data) {
+        if (data != null) {
+            var d = data.hasKey("error_description") ? data["error_description"] : null;
+            if (d != null && !d.equals("")) { return d; }
+            var e = data.hasKey("error") ? data["error"] : null;
+            if (e != null && !e.equals("")) { return e; }
+        }
+        return _friendlyError(responseCode);
+    }
+
     // Kick off the device flow. clientId from Settings, else the baked-in personal value.
     function start() {
         var clientId = Config.clientId();
@@ -126,7 +145,7 @@ class DeviceAuthManager {
     function onDeviceCodeResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
         if (responseCode != 200 || data == null || !data.hasKey("device_code")) {
             _state = FAILED;
-            _errMsg = _friendlyError(responseCode);
+            _errMsg = _serverError(responseCode, data);
             _notify();
             return;
         }
@@ -135,7 +154,7 @@ class DeviceAuthManager {
         _userCode        = data.hasKey("user_code") ? data["user_code"] : "?";
         _verificationUri = data.hasKey("verification_uri_complete")
                             ? data["verification_uri_complete"]
-                            : (data.hasKey("verification_uri") ? data["verification_uri"] : _AUTH_HOST);
+                            : (data.hasKey("verification_uri") ? data["verification_uri"] : _VERIFY_URL);
         _interval        = data.hasKey("interval") ? data["interval"] : 5;
         var expiresIn    = data.hasKey("expires_in") ? data["expires_in"] : 300;
         _expiresAt       = Time.now().value() + expiresIn;
@@ -203,9 +222,10 @@ class DeviceAuthManager {
             _schedulePoll();
         } else {
             _state = FAILED;
-            // OAuth error strings (e.g. "expired_token") are meaningful; keep them.
-            // Empty error = transport/HTTP failure → friendly mapping (never raw -104).
-            _errMsg = err.equals("") ? _friendlyError(responseCode) : err;
+            // BMW's error_description (then error, then friendly code) — never a
+            // bare "-104". At the token step a device-only 400 here points at the
+            // grant_type/code_verifier encoding differing over the phone bridge.
+            _errMsg = _serverError(responseCode, data);
             _notify();
         }
     }

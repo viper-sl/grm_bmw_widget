@@ -18,6 +18,28 @@ class BmwWidgetApp extends Application.AppBase {
         _applyUpdateMode();
     }
 
+    // GCM / on-watch settings changed while the app was already loaded.
+    // Without this hook the running instance keeps its first-run state — most
+    // importantly a tokenState left at "UNCONFIGURED" by a launch that happened
+    // BEFORE a clientId was set. That lockout then makes every later token path
+    // short-circuit to failure even once a valid clientId arrives, so pairing
+    // behaves differently depending on whether the clientId was set before or
+    // after the first run. Clearing it here makes both orderings equivalent.
+    function onSettingsChanged() {
+        var clientId = Config.clientId();
+        if (clientId != null && !clientId.equals("")) {
+            var ts = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
+            // "UNCONFIGURED" = never had creds. Now we do — drop it so the fresh
+            // first-run/auth path applies. Leave NORMAL and NEEDS_REBOOTSTRAP
+            // (those are real paired / re-link states, not a missing-creds lockout).
+            if (ts != null && ts.equals("UNCONFIGURED")) {
+                Application.Storage.deleteValue(StorageKeys.KEY_TOKEN_STATE);
+            }
+        }
+        _applyUpdateMode();
+        WatchUi.requestUpdate();
+    }
+
     // updateMode: 0 = manual (no hourly/adaptive poll; user refreshes via OK on the
     //                 image page, plus one daily 10:00 fetch — FR-25 — to keep the
     //                 OAuth token pair alive)

@@ -5,6 +5,6 @@ flowchart LR
     STATE --> STAMP["lastUpdated = now<br/>(fetch time, temporary)"]
     STAMP --> WRITE["VehicleCache.write(state)"]
     WRITE --> MERGE["merge into KEY_VEHICLE_STATE<br/>omitted fields kept; lastUpdated = max"]
-    MERGE --> PROJ["_writeGlanceSummary then<br/>KEY_GLANCE_STATE = doorsLocked,<br/>rangeKm, fuelPercent, fuelLitres, lastUpdated"]
+    MERGE --> PROJ["_writeGlanceSummary then<br/>KEY_GLANCE_STATE = doorsLocked,<br/>rangeKm, fuelPercent, lastUpdated"]
     MERGE --> PAGESr["Pages read VehicleCache.read()<br/>(full state, 1 MB heap)"]
     PROJ --> GLANCEr["Glance reads KEY_GLANCE_STATE<br/>directly (NOT via VehicleCache)"]

@@ -9,6 +9,10 @@
 //   "rangeKm"           : Number  (integer km)          best-available range (F16): totalRemainingRange / kombiRemainingElectricRange / lastRemainingRange
 //   "fuelPercent"       : Number  (integer 0-100)       vehicle.drivetrain.fuelSystem.level
 //   "fuelLitres"        : Number  (integer L)           vehicle.drivetrain.fuelSystem.remainingFuel
+//                         NOT RENDERED — BMW only republishes this around a refuel, so it
+//                         goes stale while fuelPercent stays fresh (captures show it frozen
+//                         for >22 h), and write()'s merge then preserves the stale value
+//                         forever. All displayed litres come from FuelMath (percent × tank).
 //   "doorsLocked"       : Boolean                       vehicle.cabin.door.lock.status (SECURED/LOCKED=true)
 //   "doorFLOpen"        : Boolean                       vehicle.cabin.door.row1.driver.isOpen
 //   "doorFROpen"        : Boolean                       vehicle.cabin.door.row1.passenger.isOpen
@@ -123,7 +127,9 @@ class VehicleCache {
     // (Local array, not a static const — static const arrays type as Object at
     // runtime and break .size()/subscript; see findings/connectiq-gotchas.md.)
     static function _writeGlanceSummary(state as Lang.Dictionary) as Void {
-        var keys = ["doorsLocked", "rangeKm", "fuelPercent", "fuelLitres", "lastUpdated"];
+        // "fuelLitres" is deliberately absent: the glance derives its "+NNL to fill"
+        // from fuelPercent via FuelMath (the raw field is stale — see the schema note).
+        var keys = ["doorsLocked", "rangeKm", "fuelPercent", "lastUpdated"];
         var summary = {};
         for (var i = 0; i < keys.size(); i++) {
             var k = keys[i];

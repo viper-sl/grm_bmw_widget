@@ -688,3 +688,36 @@ function _fEq(a, b) {
 function _fixture() {
     return MockData.telematicFixture();
 }
+
+// ============================================================
+//  Map page — build-variant page slot and visibility gate
+//  (:mapPage) so these compile out on map-incapable devices along
+//  with PageMap itself; otherwise the (:test) build would dangle.
+// ============================================================
+
+(:test, :mapPage)
+function testMapPage_pageCountIncludesMapSlot(logger as Test.Logger) as Lang.Boolean {
+    Test.assertEqualMessage(PageNav._pageCount(), 5,
+        "map-capable build must expose 5 carousel slots");
+    return true;
+}
+
+(:test, :mapPage)
+function testMapPage_visibilityRequiresBothCoordinates(logger as Test.Logger) as Lang.Boolean {
+    var page = new PageMap();
+
+    VehicleCache.replace({ "lastUpdated" => 1000 });
+    Test.assertMessage(!page.isVisible(), "no coords -> hidden");
+
+    VehicleCache.replace({ "lastUpdated" => 1000, "lat" => 48.137 });
+    Test.assertMessage(!page.isVisible(), "lat without lon -> hidden");
+
+    VehicleCache.replace({ "lastUpdated" => 1000, "lon" => 11.576 });
+    Test.assertMessage(!page.isVisible(), "lon without lat -> hidden");
+
+    VehicleCache.replace({ "lastUpdated" => 1000, "lat" => 48.137, "lon" => 11.576 });
+    Test.assertMessage(page.isVisible(), "both coords -> visible");
+
+    _resetStorage();
+    return true;
+}

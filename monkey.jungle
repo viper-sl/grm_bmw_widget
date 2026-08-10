@@ -10,19 +10,33 @@ project.manifest = manifest.xml
 # NOTE: device-level values REPLACE base values for that key (override, not merge).
 base.sourcePath = source
 base.resourcePath = resources;resources-modes-legacy
-base.excludeAnnotations = bgPoll;designNew
+base.excludeAnnotations = bgPoll;designNew;noMapPage
 
-fenix843mm.excludeAnnotations = manualOnly;designClassic
+# ── Map page tier (third, orthogonal axis) ───────────────────────────────────
+# WatchUi.MapView needs onboard cartography. 32 of the 36 declared products have
+# it; these four do not, so (:mapPage) is excluded there and (:noMapPage) is
+# excluded everywhere else. Same dual-annotation shape as designNew/designClassic.
+# NOTE: values REPLACE, so each line restates that device's full base list.
+fenix6.excludeAnnotations = bgPoll;designNew;mapPage
+fr255.excludeAnnotations = bgPoll;designNew;mapPage
+# TODO(map): fenix6s and fr745 are declared in manifest-iq.xml and are ALSO
+# map-incapable, but their device profiles are not installed locally and a jungle
+# qualifier for an uninstalled device breaks EVERY build. Install them via the
+# SDK Manager, then uncomment — REQUIRED before store submission:
+# fenix6s.excludeAnnotations = bgPoll;designNew;mapPage
+# fr745.excludeAnnotations = bgPoll;designNew;mapPage
+
+fenix843mm.excludeAnnotations = manualOnly;designClassic;noMapPage
 fenix843mm.resourcePath = resources;resources-modes-full
-fenix847mm.excludeAnnotations = manualOnly;designClassic
+fenix847mm.excludeAnnotations = manualOnly;designClassic;noMapPage
 fenix847mm.resourcePath = resources;resources-modes-full
-fenix8pro47mm.excludeAnnotations = manualOnly;designClassic
+fenix8pro47mm.excludeAnnotations = manualOnly;designClassic;noMapPage
 fenix8pro47mm.resourcePath = resources;resources-modes-full
-fenix8solar47mm.excludeAnnotations = manualOnly;designClassic
+fenix8solar47mm.excludeAnnotations = manualOnly;designClassic;noMapPage
 fenix8solar47mm.resourcePath = resources;resources-modes-full
-fenix8solar51mm.excludeAnnotations = manualOnly;designClassic
+fenix8solar51mm.excludeAnnotations = manualOnly;designClassic;noMapPage
 fenix8solar51mm.resourcePath = resources;resources-modes-full
-fenixe.excludeAnnotations = manualOnly;designClassic
+fenixe.excludeAnnotations = manualOnly;designClassic;noMapPage
 fenixe.resourcePath = resources;resources-modes-full
-fr970.excludeAnnotations = manualOnly;designClassic
+fr970.excludeAnnotations = manualOnly;designClassic;noMapPage
 fr970.resourcePath = resources;resources-modes-full

@@ -20,10 +20,8 @@ class SettingsMenu {
 
         _addUpdateModeItem(menu);
 
-        var tankProp = Application.Properties.getValue("tankLitres");
-        var tank = (tankProp != null) ? tankProp : 52;
         menu.addItem(new WatchUi.MenuItem(
-            "Tank Size", tank.toString() + " L", :tankSize, null));
+            "Tank Size", FuelMath.tankLitres().toString() + " L", :tankSize, null));
 
         menu.addItem(new WatchUi.MenuItem(
             "Next Service", nextServiceLabel(), :nextService, null));
@@ -143,8 +141,7 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
     }
 
     function _tank() {
-        var t = Application.Properties.getValue("tankLitres");
-        return (t == null) ? 52 : t;
+        return FuelMath.tankLitres();
     }
 
 }

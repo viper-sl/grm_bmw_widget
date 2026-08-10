@@ -5,6 +5,8 @@
 //   row 3:  70%               1d ago     (fuel orange, age dimmed)
 // Low fuel (<50%): fuel cell shows "XX% (+YYL)" instead of just "XX%" — the "+"
 // marks YY as litres still needed to fill the tank, not litres currently in it.
+// YY comes from FuelMath (percent × tank setting), the same source the Range &
+// Fuel page uses, so the glance and the page always quote the same litres.
 // Read-only: reads the lean KEY_GLANCE_STATE projection straight from Storage (NOT via
 // VehicleCache — see onUpdate). No network I/O.
 using Toybox.Application;
@@ -59,7 +61,6 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
 
         var rangeKm     = state.hasKey("rangeKm") ? state["rangeKm"] : null;
         var fuelPercent = state.hasKey("fuelPercent") ? state["fuelPercent"] : null;
-        var fuelLitres  = state.hasKey("fuelLitres")  ? state["fuelLitres"]  : null;
 
         // ── row 1: lock state (left) + range (right) — pure white ──
         // B1: always draw a label. When doorsLocked is known, LOCKED/OPEN; when it's
@@ -102,12 +103,13 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
 
         // ── row 3: fuel (left, ORANGE) + age (right, DIMMED) ──
         var fuelStr;
-        if (fuelPercent != null && fuelPercent < 50 && fuelLitres != null) {
-            var tankProp = Application.Properties.getValue("tankLitres");
-            var tank = (tankProp != null) ? tankProp : 52;
-            var toFill = tank - fuelLitres;
-            if (toFill < 0) { toFill = 0; }
-            fuelStr = fuelPercent.toString() + "% (+" + toFill.toString() + "L)";
+        if (fuelPercent != null && fuelPercent < 50) {
+            // Derived from the percent via FuelMath — same math the Range & Fuel
+            // page uses, so the two surfaces can't disagree. (They used to: this
+            // read the raw "fuelLitres" field, which BMW leaves frozen at the last
+            // refuel — see the FuelMath header.)
+            fuelStr = fuelPercent.toString()
+                + "% (+" + FuelMath.litresToFill(fuelPercent).toString() + "L)";
         } else if (fuelPercent != null) {
             fuelStr = fuelPercent.toString() + "%";
         } else {

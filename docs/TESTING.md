@@ -5,7 +5,7 @@ Unit tests for the BMW status widget. All tests live in
 framework (`(:test)` annotation — test functions compile only into test builds,
 never into release).
 
-**38 tests, 0 failures.** They cover every major module *except the live
+**39 tests, 0 failures.** They cover every major module *except the live
 network data calls* (`makeWebRequest`). Network handlers are exercised by
 invoking their response callbacks directly with mock dictionaries, so the full
 parse / FSM / rotation / backoff logic runs without any HTTP traffic.
@@ -58,6 +58,7 @@ PASSED (passed=38, failed=0, errors=0)
 | Quota / rate-limit gate | ✅ | seed Storage, assert `canFetch` / advances |
 | Vehicle State persistence | ✅ | `VehicleCache` write→read round-trip |
 | UI formatters | ✅ | `PageChrome.oneDecimal`, `_ageString` |
+| Fuel litres math (glance ≡ page) | ✅ | `FuelMath` derived from `fuelPercent` × tank (B12) |
 | **Live HTTP fetches** | ⛔ by design | network excluded; only the response handlers are tested |
 | View `onUpdate` rendering | ⛔ | requires a graphics context; not unit-testable |
 

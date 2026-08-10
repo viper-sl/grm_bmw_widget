@@ -264,6 +264,41 @@ function testFuelConsumptionPer100Km(logger as Test.Logger) as Lang.Boolean {
     return true;
 }
 
+// ============================================================
+//  FuelMath — the glance and the Range & Fuel page must quote identical litres.
+//  Regression: the glance read the raw (stale) "fuelLitres" and showed
+//  "41% (+8L)" while the page derived "31L to fill" for the same 41 % / 52 L car.
+// ============================================================
+
+(:test)
+function testFuelMath_derivesLitresFromPercent(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Application.Properties.setValue("tankLitres", 52);
+    Test.assertEqualMessage(FuelMath.tankLitres(), 52, "tank from property");
+    // 41 % of 52 L = 21.32 → truncated to 21 in tank, 31 to fill (NOT the 8 the
+    // stale 44 L field produced).
+    Test.assertEqualMessage(FuelMath.litresInTank(41), 21, "41% of 52L in tank");
+    Test.assertEqualMessage(FuelMath.litresToFill(41), 31, "41% of 52L -> 31L to fill");
+    // The two halves always account for the whole tank.
+    Test.assertEqualMessage(FuelMath.litresInTank(41) + FuelMath.litresToFill(41), 52,
+        "in + toFill == tank");
+    // Boundaries: empty, full, and an over-100 % reading right after a brim fill.
+    Test.assertEqualMessage(FuelMath.litresToFill(0), 52, "empty -> full tank to fill");
+    Test.assertEqualMessage(FuelMath.litresToFill(100), 0, "full -> nothing to fill");
+    Test.assertEqualMessage(FuelMath.litresToFill(105), 0, "over-full clamps at 0");
+    Test.assertMessage(FuelMath.litresInTank(null) == null, "unknown percent -> null");
+    Test.assertMessage(FuelMath.litresToFill(null) == null, "unknown percent -> null");
+    // A different tank size flows through both.
+    Application.Properties.setValue("tankLitres", 60);
+    Test.assertEqualMessage(FuelMath.litresInTank(50), 30, "50% of 60L");
+    Test.assertEqualMessage(FuelMath.litresToFill(50), 30, "50% of 60L to fill");
+    // _resetStorage() clears Storage but NOT Properties — restore the default so
+    // the tank size doesn't leak into later tests.
+    Application.Properties.setValue("tankLitres", FuelMath.DEFAULT_TANK_LITRES);
+    _resetStorage();
+    return true;
+}
+
 (:test)
 function testOneDecimal(logger as Test.Logger) as Lang.Boolean {
     Test.assertEqualMessage(PageChrome.oneDecimal(2.3), "2.3", "2.3");
@@ -537,11 +572,13 @@ function testGlance_summaryProjection(logger as Test.Logger) as Lang.Boolean {
     Test.assertEqualMessage(g["rangeKm"], 653, "rangeKm projected");
     Test.assertMessage(g["doorsLocked"] == true, "doorsLocked projected");
     Test.assertEqualMessage(g["fuelPercent"], 80, "fuelPercent projected");
-    Test.assertEqualMessage(g["fuelLitres"], 40, "fuelLitres projected");
     Test.assertEqualMessage(g["lastUpdated"], 1000, "lastUpdated projected");
     Test.assertMessage(!g.hasKey("lat"), "heavy lat excluded");
     Test.assertMessage(!g.hasKey("tyrePressureFL"), "tyre field excluded");
-    Test.assertEqualMessage(g.size(), 5, "only the 5 glance fields");
+    // fuelLitres is BMW's stale last-refuel value; the glance derives litres from
+    // fuelPercent via FuelMath instead, so it must not be projected.
+    Test.assertMessage(!g.hasKey("fuelLitres"), "stale fuelLitres excluded");
+    Test.assertEqualMessage(g.size(), 4, "only the 4 glance fields");
     _resetStorage();
     return true;
 }

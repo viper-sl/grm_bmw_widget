@@ -281,7 +281,7 @@ flowchart LR
     STATE --> STAMP["lastUpdated = now<br/>(fetch time, temporary)"]
     STAMP --> WRITE["VehicleCache.write(state)"]
     WRITE --> MERGE["merge into KEY_VEHICLE_STATE<br/>omitted fields kept; lastUpdated = max"]
-    MERGE --> PROJ["_writeGlanceSummary then<br/>KEY_GLANCE_STATE = doorsLocked,<br/>rangeKm, fuelPercent, fuelLitres, lastUpdated"]
+    MERGE --> PROJ["_writeGlanceSummary then<br/>KEY_GLANCE_STATE = doorsLocked,<br/>rangeKm, fuelPercent, lastUpdated"]
     MERGE --> PAGESr["Pages read VehicleCache.read()<br/>(full state, 1 MB heap)"]
     PROJ --> GLANCEr["Glance reads KEY_GLANCE_STATE<br/>directly (NOT via VehicleCache)"]
 ```
@@ -289,7 +289,9 @@ flowchart LR
 **Why the glance reads `KEY_GLANCE_STATE` directly:** referencing `VehicleCache` from the
 `(:glance)` view would pull its write/merge bytecode into the glance image, and
 deserializing the full ~40-key state in the ~28 KB glance partition OOMs (the 2026-06-15
-crash). The lean 5-field projection is written by **every** cache writer.
+crash). The lean 4-field projection is written by **every** cache writer. `fuelLitres` is
+deliberately *not* projected — the glance derives its "+NNL to fill" from `fuelPercent` via
+`FuelMath`, because BMW leaves `remainingFuel` frozen at the last refuel (B12).
 
 > **"last upd" = fetch time (temporary):** both fetch paths overwrite `lastUpdated` with the
 > wall clock at fetch completion, so the age resets to ~now on every successful poll rather

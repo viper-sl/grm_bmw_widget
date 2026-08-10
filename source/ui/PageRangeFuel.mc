@@ -104,13 +104,12 @@ class PageRangeFuel extends WatchUi.View {
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // ── Liters line (ICE only) — 20px below fuel% center ───────────────
+        // Litres come from FuelMath (percent × tank setting), never from the
+        // Vehicle State's "fuelLitres" — BMW freezes that field at the last refuel.
+        var inTank = FuelMath.litresInTank(fuelPercent);
         if (fuelPercent != null) {
-            var tankProp = Application.Properties.getValue("tankLitres");
-            var tank     = (tankProp != null) ? tankProp : 52;
-            var inTank   = (tank * fuelPercent) / 100;
-            var fill     = tank - inTank;
-            if (fill < 0) { fill = 0; }
-            var litStr   = "   " + inTank.toNumber().toString() + "L in  | " + fill.toNumber().toString() + "L to fill";
+            var litStr = "   " + inTank.toString() + "L in  | "
+                + FuelMath.litresToFill(fuelPercent).toString() + "L to fill";
             dc.setColor(lowFuel ? Theme.COLOR_WARN : Theme.COLOR_MUTED, Theme.COLOR_BG);
             dc.drawText(cx, cy + PageChrome.s(dc, 70), Graphics.FONT_XTINY, litStr,
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
@@ -118,8 +117,10 @@ class PageRangeFuel extends WatchUi.View {
 
         // ── Fuel consumption estimate (FR-22) — instantaneous L/100km, not trip-based ──
         // F13: hidden when the showConsumption setting is off (default on).
-        var fuelLitres = state.hasKey("fuelLitres") ? state["fuelLitres"] : null;
-        var consumption = consumptionPer100Km(fuelLitres, rangeKm);
+        // Uses the derived litres for the same reason as the line above: fed the raw
+        // "fuelLitres" it reported the litres-at-last-refuel over the current range,
+        // which inflated the estimate more and more as the tank drained.
+        var consumption = consumptionPer100Km(inTank, rangeKm);
         if (consumption != null && showConsumption()) {
             dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
             dc.drawText(cx, cy + PageChrome.s(dc, 86), Graphics.FONT_XTINY,

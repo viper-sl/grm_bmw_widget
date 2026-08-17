@@ -346,7 +346,7 @@ class CarDataBootstrap {
         _callback.invoke(responseCode, null);
     }
 
-    // The 39 descriptors the widget reads (ICE 218i, container v3).
+    // The 41 descriptors the widget reads (ICE 218i, container v3).
     // v3 vs v2: dropped engine.isIgnitionOn (never populates on this vehicle — B10),
     // added the 12 telematics fields surfaced in the grouped "About car" menu plus
     // hvac.statusAirPurification (subscribed for a future feature, not yet parsed).

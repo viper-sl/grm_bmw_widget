@@ -15,7 +15,6 @@ the internal planning artifacts it was mined from.
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) — the current architecture: process/component map, two-container model, flows, token FSM, rate-limit/quota, storage keys (with diagrams in [../diagrams/](../diagrams/)).
 - [../descriptors.md](../descriptors.md) — the curated descriptor subscription set (the widget's source of truth) with observed values.
 - [../reference/cardata-catalogue.md](../reference/cardata-catalogue.md) — the full BMW CarData descriptor catalogue.
-- [../garmin-connect-iq-api.md](../garmin-connect-iq-api.md) — generic Connect IQ API/module reference.
 
 > Tested vehicle: an ICE BMW 218i (G42). Behaviour can differ by model, powertrain, and
 > account/contract tier — treat "never populates / always null" as *observed on this

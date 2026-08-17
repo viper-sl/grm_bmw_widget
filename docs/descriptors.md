@@ -17,16 +17,32 @@ This is the **source of truth for which descriptors the widget subscribes to**;
 | `✓confirmed` | Descriptor returned a non-null value in a real `telematicData` response (live container, 2026-05-27). |
 | 3rd column | Latest **observed value** across all `bmw_data/capture_*.json` runs, or `NULL` if it has never returned a value on this vehicle. |
 
-## Summary (40 included / 78 excluded)
+## Summary (41 included / 77 excluded)
 
-- **40 included** descriptors — 32 have returned a live value, **8 are included but never observed in the 7 captures** (the discovery container omitted some; e.g. `travelledDistance` is `✓confirmed` from container v2 but wasn't in the probe set). Deliberate keeps: rear doors+windows, `trunk.isLocked`, `deepSleepModeActive`, odometer; `hvac.statusAirPurification` is subscribed for a **future air-purification feature** — intentionally not parsed/rendered yet.
-- **78 excluded** — overwhelmingly EV/PHEV charging, sunroof/convertible, and detail fields not surfaced by the widget.
+> **Source of truth is the code**, not this file:
+> [`CarDataBootstrap._containerDescriptors`](../source/api/CarDataBootstrap.mc#L353-L401)
+> defines what the widget actually subscribes to. This list and the `include` flags in
+> [reference/cardata-descriptors.json](reference/cardata-descriptors.json) are kept in
+> sync with it (re-checked 2026-08-17); if they ever disagree, the array wins.
+
+- **41 included** descriptors — the ICE render/About set plus the 2 EV/PHEV range fields
+  (`kombiRemainingElectricRange`, electric SoC), which are null on this ICE car but enable
+  BEV/PHEV support. Several are included but never observed in the 7 captures (the
+  discovery container omitted some; e.g. `travelledDistance` is `✓confirmed` from container
+  v2 but wasn't in the probe set). Deliberate keeps: rear doors+windows, `trunk.isLocked`,
+  `deepSleepModeActive`, odometer; `hvac.statusAirPurification` is subscribed for a
+  **future air-purification feature** — intentionally not parsed/rendered yet.
+- **77 excluded** — overwhelmingly EV/PHEV charging, sunroof/convertible, and detail fields
+  not surfaced by the widget. Includes `trunk.door.isOpen`, which duplicates
+  `body.trunk.isOpen` (the one the parser reads).
 - Observed values sourced from the 7 captures (`secured-baseline`, `engine-on`, `moving`; 2026-06-13/14) against test container (62-descriptor discovery container).
+- **Location observations are redacted** — `currentLocation.*` is flagged PII in the
+  catalogue and the captured values were the real vehicle position.
 
 > **Note on the live container:** the discovery container carries 62
-> descriptors (everything that was *plausibly* capturable). This file's **40-descriptor
-> included set is the final widget target** — rebuild the container from it
-> (`build_test_container.py`, which now reads `include`) when ready to slim the live set.
+> descriptors (everything that was *plausibly* capturable). This file's **41-descriptor
+> included set is the widget's full container** — `build_test_container.py` reads the
+> `include` flags to rebuild it.
 > **On-watch containers (two, since the background-OOM fix — see [ARCHITECTURE.md](ARCHITECTURE.md)).**
 > Both descriptor sets now live in the foreground-only `CarDataBootstrap` (moved out of the
 > `(:background)` `CarDataClient` so the heavy array stays out of the ~28 KB background image):
@@ -79,7 +95,7 @@ vehicle.cabin.hvac.statusAirPurification                               | HVAC ai
 vehicle.vehicle.travelledDistance                                      | Mileage / odometer ✓confirmed | NULL
 -vehicle.cabin.infotainment.isMobilePhoneConnected                      | Mobile phone connection | NULL
 -vehicle.isMoving                                                       | Motion status | NULL
-vehicle.cabin.infotainment.navigation.currentLocation.heading          | Vehicle orientation/heading | 358 degrees
+vehicle.cabin.infotainment.navigation.currentLocation.heading          | Vehicle orientation/heading | REDACTED (PII)
 vehicle.status.conditionBasedServicesCount                             | Number of CBS reports | 6
 -vehicle.vehicle.preConditioning.isRemoteEngineStartAllowed             | Engine pre-conditioning permission | false
 -vehicle.cabin.hvac.preconditioning.status.comfortState                 | Preconditioning comfort state | NULL
@@ -113,11 +129,11 @@ vehicle.drivetrain.fuelSystem.level                                    | Tank le
 -vehicle.status.serviceTime.yellow                                      | Time threshold for service info | NULL
 -vehicle.cabin.infotainment.navigation.destinationSet.arrivalTime       | Time to nav destination | NULL
 -vehicle.vehicle.timeSetting                                            | Time zone setting | NULL
-vehicle.body.trunk.door.isOpen                                         | Trunk door open status | false
+-vehicle.body.trunk.door.isOpen                                         | Trunk door open status | false
 vehicle.body.trunk.isLocked                                            | Trunk locked status ✓confirmed | NULL
-vehicle.cabin.infotainment.navigation.currentLocation.altitude         | Vehicle altitude | 211
-vehicle.cabin.infotainment.navigation.currentLocation.latitude         | Vehicle position latitude | REDACTED degrees
-vehicle.cabin.infotainment.navigation.currentLocation.longitude        | Vehicle position longitude | REDACTED degrees
+vehicle.cabin.infotainment.navigation.currentLocation.altitude         | Vehicle altitude | REDACTED (PII)
+vehicle.cabin.infotainment.navigation.currentLocation.latitude         | Vehicle position latitude | REDACTED (PII)
+vehicle.cabin.infotainment.navigation.currentLocation.longitude        | Vehicle position longitude | REDACTED (PII)
 -vehicle.vehicle.averageWeeklyDistanceShortTerm                         | Average distance/week | NULL
 -vehicle.vehicle.averageWeeklyDistanceLongTerm                          | Average distance/week (long-life) | NULL
 vehicle.drivetrain.lastRemainingRange                                  | Last sent remaining range (elec+fuel) ✓confirmed | 499 km
@@ -135,7 +151,7 @@ vehicle.drivetrain.lastRemainingRange                                  | Last se
 -vehicle.drivetrain.electricEngine.charging.connectionType              | Charging process (inductive/conductive) | NULL
 -vehicle.drivetrain.electricEngine.charging.phaseNumber                 | Charging phases | NULL
 -vehicle.drivetrain.electricEngine.charging.status                      | Charging status | NULL
--vehicle.powertrain.electric.battery.stateOfCharge.displayed            | Charging status displayed (SoC) | NULL
+vehicle.powertrain.electric.battery.stateOfCharge.displayed             | Charging status displayed (SoC) | NULL
 -vehicle.drivetrain.batteryManagement.header                            | HV battery charging status | NULL
 -vehicle.drivetrain.avgElectricRangeConsumption                         | Average electric consumption | NULL
 -vehicle.vehicle.avgSpeed                                               | Average speed | NULL
@@ -145,7 +161,7 @@ vehicle.drivetrain.lastRemainingRange                                  | Last se
 vehicle.drivetrain.totalRemainingRange                                 | Estimate of total range (elec+CE) | 499 km
 -vehicle.drivetrain.electricEngine.charging.hvStatus                    | HV charging system status | NULL
 -vehicle.powertrain.electric.range.target                               | Remaining electric range (target SoC) | NULL
--vehicle.drivetrain.electricEngine.kombiRemainingElectricRange          | Remaining electric range | NULL
+vehicle.drivetrain.electricEngine.kombiRemainingElectricRange           | Remaining electric range | NULL
 -vehicle.powertrain.electric.battery.stateOfCharge.target               | Target SoC | NULL
 -vehicle.body.chargingPort.status                                       | Status of charging plug | NULL
 -vehicle.body.chargingPort.combinedStatus                               | Charging port connection status | NULL

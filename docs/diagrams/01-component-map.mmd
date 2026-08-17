@@ -4,7 +4,7 @@ graph TB
     subgraph FG["FOREGROUND process (~1 MB)"]
         direction TB
         VIEW["BmwWidgetView + Delegate<br/>setup / loading / carousel host"]
-        PAGES["Pages: RangeFuel · Lock · Odometer · Tyres<br/>PageNav · PageDelegate · PageChrome"]
+        PAGES["Pages: RangeFuel · Lock · Odometer · Tyres · Map<br/>PageNav · PageDelegate · MapPageDelegate · PageChrome"]
         MENUS["SettingsMenu · AboutMenu · AuthView"]
         FSYNC["ForegroundSync<br/>full cold-start + refresh chain"]
         BOOT["CarDataBootstrap<br/>VIN · containers · basicData · tyre · delete"]

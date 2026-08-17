@@ -2,7 +2,7 @@
 
 A Garmin watch **widget** that shows your BMW's live status — range, fuel, lock state,
 doors/windows, tyres, odometer and service info — pulled from the official
-[BMW CarData](https://bmw-cardata.bmwgroup.com/) REST API. Written in **Monkey C** for
+[BMW CarData](https://bmw-cardata.bmwgroup.com/customer/public/api-specification) REST API. Written in **Monkey C** for
 the Connect IQ platform.
 
 > Personal/hobby project. Not affiliated with or endorsed by BMW or Garmin.
@@ -223,8 +223,7 @@ monkeyc -f monkey.jungle -d fenix6pro -o bin/BmwStatus.prg -y developer_key
 
 **Store package** — signed `.iq` for all supported devices, from
 [`iq.jungle`](iq.jungle) → `manifest-iq.xml`, which carries a **different app ID** so
-the published widget and a personal sideload coexist on one watch. See
-[`docs/IQ-STORE-PUBLISH.md`](docs/IQ-STORE-PUBLISH.md):
+the published widget and a personal sideload coexist on one watch:
 
 ```sh
 ./build-personal.sh --iq       # → bin/BMWWIDGET.iq

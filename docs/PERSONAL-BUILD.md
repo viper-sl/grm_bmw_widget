@@ -17,25 +17,25 @@ Only your **BMW CarData client ID**. Everything else is automatic:
 
 ## How the clientId is baked in
 
-The personal build puts your clientId in **source** (not just a settings default),
-so it works even when stale/empty persisted settings would otherwise override the
-XML default — which happens on a real watch where old SETTINGS can't easily be cleared.
+Through a **resource override only** — never through source. `livetest.jungle` adds the
+gitignored `resources-livetest/` to the resource path, and a later path wins, so its
+property defaults bake into the `.prg`. All builds share the same `source/`.
 
-- `source/Config.mc` → `Config.clientId()` returns the Settings value if present,
-  else the baked-in `personalClientId()`.
-- `source/PersonalClientId.mc` — committed **stub** (`:stubcid`) returning `""`.
-- `source-personal/PersonalClientIdReal.mc` — **gitignored**, your real value (`:realcid`).
-- `livetest.jungle` adds `source-personal/` and excludes `:stubcid`.
+> **Do not "improve" this into a source-baked clientId.** That was tried (an annotated
+> `PersonalClientId` stub plus an extra `source-personal/` sourcePath) and it produced a
+> `.prg` the fēnix 6 installer **rejects** — the poisoned-slot symptom below (`f8=-1`).
+> A plain resource override matches the known-good store-build structure. See the note at
+> the top of [`source/Config.mc`](../source/Config.mc).
 
-Regenerate the gitignored real one after changing clientId:
-```sh
-CID=$(python3 -c 'import json;print(json.load(open("bmw_tokens.json"))["client_id"])')
-mkdir -p source-personal
-cat > source-personal/PersonalClientIdReal.mc <<MC
-(:realcid :background)
-function personalClientId() { return "$CID"; }
-MC
-```
+Two properties, because a persisted empty setting can shadow an XML default
+([`Config.clientId()`](../source/Config.mc)):
+
+- **`clientId`** — the normal setting; on a store build the user types it in Garmin
+  Connect Mobile, on a personal build it comes from the override file.
+- **`clientIdBaked`** — declared **only** in `resources-livetest/properties/properties.xml`,
+  never in `settings.xml`, so it has no settings surface and nothing can clobber it with
+  an empty string. `Config.clientId()` falls back to it; on a store build the property
+  isn't declared, the `getValue` throws, and the `catch` falls through.
 
 ## Setup (one-time)
 
@@ -56,8 +56,9 @@ MC
      <property id="updateMode" type="Number">0</property>
    </properties>
    ```
-   (Or regenerate it from `bmw_tokens.json` — see the `python3` snippet in
-   [LIVE-TESTING.md](LIVE-TESTING.md).)
+   (`clientIdBaked` is the settings-proof copy — see above. Only `clientId` /
+   `clientIdBaked` need real values; VIN, container and refresh token are discovered
+   on-watch.)
 
 2. These are all **gitignored** and must never be committed:
    `resources-livetest/`, `livetest.jungle`, `bin/personal.prg`, `bin/livetest.prg`,
@@ -66,18 +67,24 @@ MC
 ## Build & run
 
 ```sh
-./build-personal.sh            # build + load into the running simulator
-./build-personal.sh --device   # build bin/personal-device.prg for a real watch
+./build-personal.sh              # → bin/personal.prg, loaded into the running simulator
+./build-personal.sh --device     # → bin/BMWWIDGET.PRG for a real watch (auto-copied if mounted)
+./build-personal.sh --fr255-sim  # → bin/personal-fr255.prg (legacy-tier check)
+./build-personal.sh --iq         # → bin/BMWWIDGET.iq (signed, all devices)
 ```
 
-The two modes use **different compile targets** — `fenix6pro_sim` for the simulator,
-`fenix6pro` for the physical watch — so they produce separate `.prg` files. The
-device build is signed with your `developer_key`.
+The two main modes use **different compile targets** — `<device>_sim` for the simulator,
+`<device>` for the physical watch — so they produce separate `.prg` files. The target
+defaults to **`fenix8pro47mm`**; override it with `CIQ_DEVICE` (e.g.
+`CIQ_DEVICE=fenix6pro ./build-personal.sh`). The device build is signed with your
+`developer_key`.
 
-### Sideload onto a real fēnix 6 Pro
+### Sideload onto a real watch
 
 1. Connect the watch by USB — it mounts as a USB drive ("GARMIN").
-2. Copy `bin/personal-device.prg` into the watch's `GARMIN/APPS/` folder.
+2. Copy `bin/BMWWIDGET.PRG` into the watch's `GARMIN/APPS/` folder as
+   `GRM_BMW_WIDGET.PRG`. `--device` does this for you when the watch is mounted, and also
+   clears the stale `SETTINGS`/`DATA` files that cause the empty-clientId trap below.
 3. Safely eject and unplug.
 4. On the watch, scroll the widget glance loop to **BMW Status**.
 
@@ -150,12 +157,15 @@ Then reinstall. Same applies to the **simulator** — wipe its store with
 
 No VIN or container ID typing required.
 
-## Store build vs. personal build
+## The three builds
 
-| | Store build (`monkey.jungle`) | Personal build (`livetest.jungle`) |
-|---|---|---|
-| Resources | `resources` only | `resources` + `resources-livetest` (your clientId) |
-| Credentials | user enters in phone settings | baked from the override |
-| Use | publishable, generic | your watch only |
+| | Store (`iq.jungle`) | Generic (`monkey.jungle`) | Personal (`livetest.jungle`) |
+|---|---|---|---|
+| Manifest | `manifest-iq.xml` (own app ID) | `manifest.xml` | `manifest.xml` |
+| Resources | `resources` + `resources-modes-*` | same | + `resources-livetest` (your clientId) |
+| Credentials | user enters in Garmin Connect | user enters | baked from the override |
+| Output | `bin/BMWWIDGET.iq` | `bin/*.prg` | `bin/personal.prg` / `bin/BMWWIDGET.PRG` |
 
-The two share **all source** — only the resource override differs.
+All three share **all source** — only the manifest and resource paths differ. The store
+app ID is deliberately distinct so a published install and your sideload can coexist on
+one watch.

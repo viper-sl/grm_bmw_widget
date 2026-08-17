@@ -71,3 +71,13 @@ docs/CAPTURE-PLAN.md
 
 # Internal backlog tracking
 docs/BACKLOG.md
+
+# Personal publishing runbook (dashboard steps, key custody) — kept local
+docs/IQ-STORE-PUBLISH.md
+docs/STORE-LISTING.md
+
+# Auto-generated copy of Garmin's public API docs — no project content, rots fast
+docs/garmin-connect-iq-api.md
+
+# Simulator/watch screenshots — screen_6 shows the car's real parked location
+screen_*.png

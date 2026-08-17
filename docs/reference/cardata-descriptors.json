@@ -2,7 +2,7 @@
   "_meta": {
     "source": "BMW CarData Telematics Data Catalogue (Customer), EN",
     "captured": "2026-06-14",
-    "note": "Descriptor strings cleaned of the catalogue's word-break artifact. 'stream' = Streamable column (MQTT). 'kind'=doc marks non-scalar payloads (lists/images/swagger refs) that are not simple telematicData values. Value enums quoted verbatim where given. 'include'=true marks the final widget subscription set (39 scalars — mirrors docs/descriptors.md); false = not subscribed. 'observed' = latest value seen in bmw_data/capture_*.json (null = never returned a value on the test vehicle). See docs/descriptors.md for the curated list and empirical findings (B10/B11/B12/B1).",
+    "note": "Descriptor strings cleaned of the catalogue's word-break artifact. 'stream' = Streamable column (MQTT). 'kind'=doc marks non-scalar payloads (lists/images/swagger refs) that are not simple telematicData values. Value enums quoted verbatim where given. 'include'=true marks the widget's full-container subscription set (41 scalars — mirrors CarDataBootstrap._containerDescriptors, the source of truth); false = not subscribed. 'observed' = latest value seen in bmw_data/capture_*.json (null = never returned a value on the test vehicle). See docs/descriptors.md for the curated list and empirical findings (B10/B11/B12/B1). Observed values for PII-flagged (location) descriptors are redacted.",
     "widget_vehicle": "ICE BMW 218i — most EV/charging descriptors will be null/absent for this vehicle but are included for completeness."
   },
   "categories": [
@@ -29,7 +29,8 @@
           "unit": "-",
           "stream": false,
           "kind": "doc",
-          "observed": null
+          "observed": null,
+          "include": false
         },
         {
           "d": "vehicle.drivetrain.batteryManagement.batterySizeMax",
@@ -51,7 +52,8 @@
           "unit": "-",
           "stream": false,
           "kind": "doc",
-          "observed": null
+          "observed": null,
+          "include": false
         },
         {
           "d": "vehicle.drivetrain.electricEngine.hvsMaxEnergyAbsolute",
@@ -73,7 +75,8 @@
           "unit": "-",
           "stream": false,
           "kind": "doc",
-          "observed": null
+          "observed": null,
+          "include": false
         }
       ]
     },
@@ -128,7 +131,8 @@
             "value": "Initial status",
             "unit": null,
             "timestamp": "2026-06-13T17:05:44.339Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.electricalSystem.battery.voltage",
@@ -142,7 +146,8 @@
             "value": "13.56",
             "unit": "V",
             "timestamp": "2026-06-13T17:05:44.339Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.drivetrain.electricEngine.charging.profile.mode",
@@ -152,7 +157,8 @@
           "unit": "-",
           "stream": true,
           "kind": "doc",
-          "observed": null
+          "observed": null,
+          "include": false
         },
         {
           "d": "vehicle.cabin.convertible.roofRetractableStatus",
@@ -178,7 +184,8 @@
             "value": "93",
             "unit": "°C",
             "timestamp": "2026-06-13T17:05:44.339Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.channel.ngtp.timeVehicle",
@@ -211,7 +218,8 @@
           "unit": "-",
           "stream": true,
           "kind": "scalar",
-          "observed": null
+          "observed": null,
+          "include": true
         },
         {
           "d": "vehicle.cabin.infotainment.displayUnit.distance",
@@ -226,7 +234,8 @@
             "value": "km",
             "unit": null,
             "timestamp": "2026-06-13T17:05:44.339Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.status.serviceDistance.yellow",
@@ -240,7 +249,8 @@
             "value": "2000",
             "unit": null,
             "timestamp": "2026-06-13T17:05:44.339Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.cabin.infotainment.navigation.destinationSet.distance",
@@ -267,7 +277,8 @@
             "value": "21000",
             "unit": null,
             "timestamp": "2026-06-13T17:05:44.339Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.cabin.door.status",
@@ -288,7 +299,8 @@
           "unit": "-",
           "stream": true,
           "kind": "doc",
-          "observed": null
+          "observed": null,
+          "include": false
         },
         {
           "d": "vehicle.cabin.door.row1.driver.position",
@@ -404,7 +416,8 @@
             "value": "358",
             "unit": "degrees",
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.status.conditionBasedServicesCount",
@@ -418,7 +431,8 @@
             "value": "6",
             "unit": null,
             "timestamp": "2026-06-13T17:05:44.339Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.vehicle.preConditioning.isRemoteEngineStartAllowed",
@@ -459,7 +473,8 @@
             "value": "INACTIVE",
             "unit": null,
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.body.trunk.window.isOpen",
@@ -519,7 +534,8 @@
             "value": "CLOSED",
             "unit": null,
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.cabin.convertible.roofStatus",
@@ -545,7 +561,8 @@
             "value": "LOCKED",
             "unit": null,
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.drivetrain.engine.isIgnitionOn",
@@ -572,7 +589,8 @@
             "value": "CLOSED",
             "unit": null,
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.cabin.window.row1.driver.status",
@@ -586,7 +604,8 @@
             "value": "CLOSED",
             "unit": null,
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.cabin.door.row1.passenger.isOpen",
@@ -601,7 +620,8 @@
             "value": "CLOSED",
             "unit": null,
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.cabin.window.row1.passenger.status",
@@ -615,7 +635,8 @@
             "value": "CLOSED",
             "unit": null,
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.body.hood.isOpen",
@@ -630,7 +651,8 @@
             "value": "CLOSED",
             "unit": null,
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.body.lights.isRunningOn",
@@ -651,7 +673,8 @@
           "unit": "-",
           "stream": true,
           "kind": "scalar",
-          "observed": null
+          "observed": null,
+          "include": true
         },
         {
           "d": "vehicle.cabin.window.row2.driver.status",
@@ -661,7 +684,8 @@
           "unit": "-",
           "stream": true,
           "kind": "scalar",
-          "observed": null
+          "observed": null,
+          "include": true
         },
         {
           "d": "vehicle.cabin.door.row2.passenger.isOpen",
@@ -671,7 +695,8 @@
           "unit": "-",
           "stream": true,
           "kind": "scalar",
-          "observed": null
+          "observed": null,
+          "include": true
         },
         {
           "d": "vehicle.cabin.window.row2.passenger.status",
@@ -681,7 +706,8 @@
           "unit": "-",
           "stream": true,
           "kind": "scalar",
-          "observed": null
+          "observed": null,
+          "include": true
         },
         {
           "d": "vehicle.cabin.sunroof.status",
@@ -744,7 +770,8 @@
             "value": "44",
             "unit": "l",
             "timestamp": "2026-06-13T17:05:44.339Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.drivetrain.fuelSystem.level",
@@ -759,7 +786,8 @@
             "value": "82",
             "unit": "%",
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.cabin.sunroof.tiltStatus",
@@ -833,7 +861,8 @@
             "value": "false",
             "unit": null,
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": false
         },
         {
           "d": "vehicle.body.trunk.isLocked",
@@ -844,7 +873,8 @@
           "stream": true,
           "kind": "scalar",
           "confirmed": "live container v2, 2026-05-27",
-          "observed": null
+          "observed": null,
+          "include": true
         },
         {
           "d": "vehicle.cabin.infotainment.navigation.currentLocation.altitude",
@@ -856,10 +886,10 @@
           "kind": "scalar",
           "pii": true,
           "observed": {
-            "value": "211",
-            "unit": null,
-            "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+            "value": "REDACTED",
+            "note": "PII — scrubbed before publication"
+          },
+          "include": true
         },
         {
           "d": "vehicle.cabin.infotainment.navigation.currentLocation.latitude",
@@ -872,9 +902,9 @@
           "pii": true,
           "observed": {
             "value": "REDACTED",
-            "unit": "degrees",
-            "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+            "note": "PII — scrubbed before publication"
+          },
+          "include": true
         },
         {
           "d": "vehicle.cabin.infotainment.navigation.currentLocation.longitude",
@@ -887,9 +917,9 @@
           "pii": true,
           "observed": {
             "value": "REDACTED",
-            "unit": "degrees",
-            "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+            "note": "PII — scrubbed before publication"
+          },
+          "include": true
         }
       ]
     },
@@ -934,7 +964,8 @@
             "value": "499",
             "unit": "km",
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.vehicle.speedRange.lowerBound",
@@ -1119,7 +1150,7 @@
           "unit": "percent",
           "stream": true,
           "kind": "scalar",
-          "include": false,
+          "include": true,
           "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
           "observed": null
         },
@@ -1207,7 +1238,8 @@
             "value": "499",
             "unit": "km",
             "timestamp": "2026-06-14T16:10:35.897Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.drivetrain.electricEngine.charging.hvStatus",
@@ -1242,7 +1274,7 @@
           "stream": true,
           "kind": "scalar",
           "note": "Excluded from test container — not needed for widget (reviewed 2026-06-14, EV/charging or low-value field on this ICE vehicle).",
-          "include": false,
+          "include": true,
           "observed": null
         },
         {
@@ -1413,7 +1445,8 @@
             "value": "230",
             "unit": "kPa",
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.chassis.axle.row1.wheel.right.tire.pressure",
@@ -1428,7 +1461,8 @@
             "value": "230",
             "unit": "kPa",
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.chassis.axle.row2.wheel.left.tire.pressure",
@@ -1443,7 +1477,8 @@
             "value": "230",
             "unit": "kPa",
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.chassis.axle.row2.wheel.right.tire.pressure",
@@ -1458,7 +1493,8 @@
             "value": "230",
             "unit": "kPa",
             "timestamp": "2026-06-14T16:10:13.000Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.chassis.axle.row1.wheel.left.tire.pressureTarget",
@@ -1473,7 +1509,8 @@
             "value": "230",
             "unit": "kPa",
             "timestamp": "2026-06-14T16:06:09.496Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.chassis.axle.row1.wheel.right.tire.pressureTarget",
@@ -1488,7 +1525,8 @@
             "value": "230",
             "unit": "kPa",
             "timestamp": "2026-06-14T16:06:09.496Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.chassis.axle.row2.wheel.left.tire.pressureTarget",
@@ -1503,7 +1541,8 @@
             "value": "230",
             "unit": "kPa",
             "timestamp": "2026-06-14T16:06:09.496Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.chassis.axle.row2.wheel.right.tire.pressureTarget",
@@ -1518,7 +1557,8 @@
             "value": "230",
             "unit": "kPa",
             "timestamp": "2026-06-14T16:06:09.496Z"
-          }
+          },
+          "include": true
         },
         {
           "d": "vehicle.chassis.axle.row1.wheel.left.tire.temperature",
@@ -1573,7 +1613,8 @@
           "stream": false,
           "kind": "doc",
           "note": "Separate REST endpoint, no container needed.",
-          "observed": null
+          "observed": null,
+          "include": false
         }
       ]
     },
@@ -1588,7 +1629,8 @@
           "unit": "-",
           "stream": false,
           "kind": "doc",
-          "observed": null
+          "observed": null,
+          "include": false
         }
       ]
     }

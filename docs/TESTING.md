@@ -5,12 +5,12 @@ Unit tests for the BMW status widget. All tests live in
 framework (`(:test)` annotation — test functions compile only into test builds,
 never into release).
 
-**39 tests, 0 failures.** They cover every major module *except the live
-network data calls* (`makeWebRequest`). Network handlers are exercised by
+**41 tests, 0 failures** (verified 2026-08-17). They cover every major module *except the
+live network data calls* (`makeWebRequest`). Network handlers are exercised by
 invoking their response callbacks directly with mock dictionaries, so the full
 parse / FSM / rotation / backoff logic runs without any HTTP traffic.
 
-Beyond parsing / token-FSM / quota / cache / glance-projection, the suite now also
+Beyond parsing / token-FSM / quota / cache / glance-projection, the suite also
 covers the BMW error-code classifiers used across the app:
 `testRateLimit_detectsCu429` (rate limit = HTTP 403 + CU-429),
 `testCapError_detectsCu124` (container cap), and
@@ -44,8 +44,8 @@ java -jar "$SDK/bin/monkeybrains.jar" \
 Expected tail:
 
 ```
-Ran 38 tests
-PASSED (passed=38, failed=0, errors=0)
+Ran 41 tests
+PASSED (passed=41, failed=0, errors=0)
 ```
 
 ## What is and isn't covered
@@ -64,10 +64,12 @@ PASSED (passed=38, failed=0, errors=0)
 
 ---
 
-## CarDataClient — telematic parser (8)
+## CarDataClient — telematic parser (12)
 
 Source: [source/api/CarDataClient.mc](../source/api/CarDataClient.mc).
-All run against `_fixture()` — a full 21-descriptor BMW 218i payload.
+Most run against `_fixture()` — the 26-descriptor BMW 218i payload in
+[source/mock/MockData.mc](../source/mock/MockData.mc) (`(:debug :background)`, so it never
+reaches a release build); the rest build minimal inline payloads.
 
 | Test | Asserts |
 |---|---|
@@ -79,6 +81,10 @@ All run against `_fixture()` — a full 21-descriptor BMW 218i payload.
 | `testParse_lastUpdatedIsMax` | `lastUpdated` = **max** epoch across all fields — the newer `2026-05-27T17:53:20Z`, not the older `05-24` entries. *(This is the test that caught the `String.compareTo` crash — see below.)* |
 | `testParse_emptyContainer` | Empty `{}` → non-null dict with no fields (no crash, no partial state). |
 | `testParse_lockEnums` | Lock enum mapping: `UNLOCKED`→false, `LOCKED`→true, `INVALID`→omitted entirely. |
+| `testParse_rearDoorsAndWindowsClosed` | Row2 doors and all four windows parse to `false` from `CLOSED` (FR-19 rear-door support). |
+| `testParse_windowStatusVariants` | Only `OPEN` counts as open: `INTERMEDIATE` (frameless reseat, B11), `CLOSED` and `INVALID` → false; an absent descriptor is omitted, not false (OQ-4). |
+| `testParse_rangeSelection` | F16 powertrain-aware range: ICE → `lastRemainingRange`; `totalRemainingRange` wins when present; BEV → `kombiRemainingElectricRange` + `socPercent`. |
+| `testParse_aboutCarTelematics` | About-car detail casts: battery volts Float, coolant/`totalRangeKm`/`cbsCount` Number, teleservice + preconditioning String, lat/lon Float. |
 
 ## CarDataClient — ISO-8601 (2)
 
@@ -114,15 +120,56 @@ Source: [source/guard/QuotaGuard.mc](../source/guard/QuotaGuard.mc).
 | `testQuota_activeGateBlocks` | Gate in the future → `canFetch()` false (background skips the cycle). |
 | `testQuota_expiredGateAllows` | Gate in the past → `canFetch()` true. |
 | `testQuota_updateAdvancesGate` | `updateAfterFetch()` advances the gate ≈ now + 2400s (40-min poll interval). |
-| `testQuota_exceededBlocks24h` | `onQuotaExceeded()` (CU-429) blocks ≈ now + 86400s (24h). |
+| `testQuota_exceededBlocksUntil4Am` | `onQuotaExceeded()` (CU-429) blocks until the **next 4 AM local** — the offset from local midnight is 4 h or 28 h, and the block always lifts within 24 h. (The older "≈ now + 86400s" assertion only held if the test ran at exactly 4 AM.) |
 
-## VehicleCache — persistence (1)
+## VehicleCache & containers — persistence (3)
 
-Source: [source/cache/VehicleCache.mc](../source/cache/VehicleCache.mc).
+Source: [source/cache/VehicleCache.mc](../source/cache/VehicleCache.mc),
+[source/api/CarDataClient.mc](../source/api/CarDataClient.mc).
 
 | Test | Asserts |
 |---|---|
 | `testCache_roundTrip` | Empty cache → `null`; after `write()` the dict round-trips with `Number` and `Boolean` values intact. |
+| `testCache_mergePreservesDoorsLocked` | Merge-on-write (FR-15/16, B3): a later write that omits `doorsLocked` doesn't erase it, so the Lock page stays visible. |
+| `testContainer_staleNameInvalidatesCachedId` | A cached container id whose stored **name** no longer matches the current `_CONTAINER_NAME` is dropped and re-resolved (the version-bump path, §11). |
+
+## Glance projection (3)
+
+Source: [source/cache/VehicleCache.mc](../source/cache/VehicleCache.mc) `_writeGlanceSummary`.
+
+| Test | Asserts |
+|---|---|
+| `testGlance_summaryProjection` | `KEY_GLANCE_STATE` holds exactly `doorsLocked`/`rangeKm`/`fuelPercent`/`lastUpdated` — heavy fields (`lat`, tyres) stay out, which is what keeps the glance inside its ~28 KB partition. |
+| `testGlance_clearDropsProjection` | `clear()` (sign-out) removes the projection as well as the full state. |
+| `testGlance_backfillFromFullState` | `ensureGlanceSummary()` seeds the projection from an existing full state — the upgrade path for installs predating `KEY_GLANCE_STATE`. |
+
+## FuelMath (2)
+
+Source: [source/FuelMath.mc](../source/FuelMath.mc).
+
+| Test | Asserts |
+|---|---|
+| `testFuelMath_derivesLitresFromPercent` | Litres in tank / to fill derive from `fuelPercent` × tank size (B12), sum to the tank, clamp at 0/full, follow a changed tank property, and pass `null` through. |
+| `testFuelConsumptionPer100Km` | The FR-22 instantaneous `~L/100 km` estimate from remaining litres + remaining range. |
+
+## Map page (2)
+
+Source: [source/PageNav.mc](../source/PageNav.mc), [source/ui/PageMap.mc](../source/ui/PageMap.mc).
+
+| Test | Asserts |
+|---|---|
+| `testMapPage_pageCountIncludesMapSlot` | The carousel has the build-variant fifth slot on a map-capable build (`_pageCount()` = 5). |
+| `testMapPage_visibilityRequiresBothCoordinates` | The page hides unless **both** `lat` and `lon` are cached — one alone is not a fix. |
+
+## BMW error-code classifiers (3)
+
+Source: [source/api/CarDataClient.mc](../source/api/CarDataClient.mc).
+
+| Test | Asserts |
+|---|---|
+| `testRateLimit_detectsCu429` | Daily limit = HTTP **403** with `exveErrorId == CU-429` (and plain 429) → `isRateLimit` true. |
+| `testCapError_detectsCu124` | Container cap = 403 + `CU-124` → `isCapError` true. |
+| `testDelete_alreadyDeletingIsOk` | `CU-122` ("already set for deletion") counts as a successful delete. |
 
 ## PageChrome — UI formatters (2)
 
@@ -143,10 +190,14 @@ test case); only `_BoolCapture` carries `(:test)` since a class is never run as 
 test. The `(:test)`-only code is still excluded from release builds via the test
 build flag.
 
-- **`_fixture()`** — full 21-descriptor BMW 218i telematic payload (mixed
-  fresh/stale timestamps, one null-valued descriptor).
-- **`_lockFixture(val)`** — minimal payload with a single lock-status descriptor,
-  for enum-mapping tests.
+- **`_fixture()`** — returns `MockData.telematicFixture()`, the 26-descriptor BMW 218i
+  telematic payload in [source/mock/MockData.mc](../source/mock/MockData.mc) (mixed
+  fresh/stale timestamps, one null-valued descriptor). `MockData` is `(:debug :background)`
+  and referenced **only** from the test file — the app itself has no mock layer and always
+  talks to the live API.
+- **`_lockFixture(val)` / `_windowFixture(val)`** — minimal payloads carrying a single
+  lock- or window-status descriptor, for enum-mapping tests.
+- **`_aboutFixture()`** — the About-car telematics subset (battery, coolant, location…).
 - **`_BoolCapture`** — object whose `onResult(b)` records the boolean a
   `TokenManager` callback was invoked with (`called` / `value`).
 - **`_resetStorage()`** — `Application.Storage.clearValues()`; gives each

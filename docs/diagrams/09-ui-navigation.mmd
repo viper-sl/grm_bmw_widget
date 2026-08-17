@@ -6,6 +6,7 @@ flowchart TD
 
     CAR -->|"up/down"| CAR
     CAR -->|"START on Range/Lock"| REFRESH["manual full ForegroundSync"]
+    CAR -->|"START on Map"| ZOOM["Map browse mode<br/>MapPageDelegate: up/down zoom, BACK collapses"]
     CAR -->|"MENU"| SET["SettingsMenu"]
     SET --> MANAGE["Manage: re-auth · delete containers · sign out"]
     SET --> ABOUT["About car (basicData + detail telematics)"]

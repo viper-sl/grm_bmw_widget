@@ -11,7 +11,7 @@ face glance and a small page carousel.
 
 | Process | Heap | What runs there |
 |---|---|---|
-| **Foreground app** | ~1 MB | UI, pairing, the full data sync, cache writes |
+| **Foreground app** | ~1 MB on fēnix 6 Pro · **64 KB on base fēnix 6** | UI, pairing, the full data sync, cache writes |
 | **Glance** | ~28 KB (own partition) | the glance view only — reads a lean projection |
 | **Background service** | **~28 KB** | the periodic poll: token → fetch → parse → exit |
 
@@ -35,7 +35,7 @@ graph TB
     subgraph FG["FOREGROUND process (~1 MB)"]
         direction TB
         VIEW["BmwWidgetView + Delegate<br/>setup / loading / carousel host"]
-        PAGES["Pages: RangeFuel · Lock · Odometer · Tyres<br/>PageNav · PageDelegate · PageChrome"]
+        PAGES["Pages: RangeFuel · Lock · Odometer · Tyres · Map<br/>PageNav · PageDelegate · MapPageDelegate · PageChrome"]
         MENUS["SettingsMenu · AboutMenu · AuthView"]
         FSYNC["ForegroundSync<br/>full cold-start + refresh chain"]
         BOOT["CarDataBootstrap<br/>VIN · containers · basicData · tyre · delete"]
@@ -339,6 +339,7 @@ flowchart TD
 
     CAR -->|"up/down"| CAR
     CAR -->|"START on Range/Lock"| REFRESH["manual full ForegroundSync"]
+    CAR -->|"START on Map"| ZOOM["Map browse mode<br/>MapPageDelegate: up/down zoom, BACK collapses"]
     CAR -->|"MENU"| SET["SettingsMenu"]
     SET --> MANAGE["Manage: re-auth · delete containers · sign out"]
     SET --> ABOUT["About car (basicData + detail telematics)"]
@@ -350,8 +351,16 @@ flowchart TD
 
 Pages: **RangeFuel** (range + fuel/SOC bar + consumption est.), **Lock** (lock state + all
 doors/windows/trunk/hood), **Odometer** (odometer + service distance), **Tyres** (per-tyre
-pressure/target + wear km). A page is visible only when its key fields are present
-(`isVisible()`), so the carousel grows as data arrives.
+pressure/target + wear km, START cycles the three views), and **Map** (FR-27..FR-40 — the
+car's last known position on the device's onboard cartography; the only page extending
+`WatchUi.MapView`, and the only one with its own delegate, `MapPageDelegate`, so BACK
+collapses browse mode instead of exiting and up/down zoom instead of paging). A page is
+visible only when its key fields are present (`isVisible()`), so the carousel grows as
+data arrives — the map needs both `lat` and `lon`.
+
+The map occupies a **build-variant fifth slot**: `PageNav._pageCount()` is a `(:mapPage)` /
+`(:noMapPage)` function pair, so the carousel is 5 pages on map-capable devices and 4
+elsewhere (see §12).
 
 ---
 
@@ -403,7 +412,35 @@ flowchart TD
 
 ---
 
-## 12. Key invariants (do not break)
+## 12. Build tiers (the annotation split)
+
+One source tree, several device capabilities. Each jungle
+([`monkey.jungle`](../monkey.jungle), [`iq.jungle`](../iq.jungle),
+and the gitignored personal `livetest.jungle`) resolves them with `excludeAnnotations` on three
+**orthogonal** axes, each a pair where exactly one side survives a given device build:
+
+| Axis | Annotations | Split |
+|---|---|---|
+| **Scheduling** | `(:bgPoll)` / `(:manualOnly)` | API 6.0+ devices get hourly + adaptive update modes; API < 6.0 gets manual + the daily 10:00 fetch only, and the Update Mode setting is hidden (a different `resources-modes-*` settings XML). |
+| **Design** | `(:designNew)` / `(:designClassic)` | The AMOLED refresh (anti-aliasing, pill bars) on the API 6.0+ tier; the original look byte-identical on legacy. |
+| **Map page** | `(:mapPage)` / `(:noMapPage)` | `WatchUi.MapView` needs onboard cartography — 32 of the 36 declared products have it; base fēnix 6, fēnix 6S, FR255 and FR745 do not. |
+
+Seven products are on the full tier: fēnix 8 (43/47 mm), fēnix 8 Pro, fēnix 8 Solar
+(47/51 mm), fēnix E, FR970. Everything else falls through to `base`.
+
+Two traps worth knowing:
+
+- **Jungle values REPLACE, they don't merge.** A device line must restate its *whole*
+  exclusion list, which is why each per-device line repeats the base annotations.
+- **A jungle qualifier for a device whose SDK profile isn't installed locally breaks
+  every build**, not just that device's — which is why `fenix6s` and `fr745` still have no
+  map-tier line (see the TODO in the jungles). `PageNav` therefore also guards
+  instantiation with `WatchUi has :MapView` at runtime: compiling map code for a
+  map-incapable device *succeeds*, so the annotation is not a safety net on its own.
+
+---
+
+## 13. Key invariants (do not break)
 
 - **No `makeWebRequest` in the foreground `AppBase`** — network I/O is in the background
   service and the foreground sync/auth classes.
@@ -414,9 +451,12 @@ flowchart TD
   big; trim `_bgContainerDescriptors`).
 - **Token rotation writes the refresh token before the access token** (atomic-rotation rule).
 - **Always use `StorageKeys.KEY_*`** — never inline a storage key string.
+- **Every tier annotation needs both halves** (`:mapPage`/`:noMapPage`, `:bgPoll`/`:manualOnly`,
+  `:designNew`/`:designClassic`) — a symbol excluded on one tier with no counterpart on the
+  other fails that tier's build, not the one you were editing.
 
 ---
 
 *See also: [findings/connectiq-gotchas.md](findings/connectiq-gotchas.md) (platform limits),
 [findings/bmw-cardata-api.md](findings/bmw-cardata-api.md) (API behaviour),
-[DEBUGGING.md](DEBUGGING.md) (build/run/watch loop).*
+[TESTING.md](TESTING.md) (build/run the suite on both tiers).*

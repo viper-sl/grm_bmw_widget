@@ -721,3 +721,38 @@ function testMapPage_visibilityRequiresBothCoordinates(logger as Test.Logger) as
     _resetStorage();
     return true;
 }
+
+// ============================================================
+//  DeviceAuthManager — auth error text
+//  The watch has room for a short, actionable line; BMW answers a
+//  refused scope with the RFC 6749 boilerplate. Guards the mapping
+//  and the length cap AuthView's un-clipped word-wrap depends on.
+// ============================================================
+
+(:test)
+function testAuth_errorTextIsActionableAndFits(logger as Test.Logger) as Lang.Boolean {
+    // A portal permission switched off arrives as invalid_request + boilerplate
+    // (observed 2026-08-17 with "CarData API access" disabled).
+    var rfcBoilerplate = "The request is missing a required parameter, includes an "
+        + "unsupported parameter value (other than grant type), repeats a parameter, "
+        + "includes multiple credentials, utilizes more than one mechanism for "
+        + "authenticating the client, or is otherwise malformed.";
+    var msg = DeviceAuthManager._serverError(400, {
+        "error" => "invalid_request", "error_description" => rfcBoilerplate });
+    Test.assertMessage(msg.find("CarData API") != null, "points at the portal switches");
+    Test.assertMessage(msg.length() <= DeviceAuthManager._MSG_MAX, "fits the screen");
+
+    // Unmapped code -> BMW's own words, capped so they can't run off the bezel.
+    var unknown = DeviceAuthManager._serverError(400, {
+        "error" => "some_new_code", "error_description" => rfcBoilerplate });
+    Test.assertMessage(unknown.length() <= DeviceAuthManager._MSG_MAX, "long text capped");
+
+    // Error code with no description at all still says something.
+    var bare = DeviceAuthManager._serverError(400, { "error" => "some_new_code" });
+    Test.assertEqualMessage(bare, "some_new_code", "falls back to the raw code");
+
+    // No body = transport failure -> the friendly HTTP mapping, not an OAuth hint.
+    Test.assertEqualMessage(DeviceAuthManager._serverError(429, null),
+        "Daily limit reached", "429 without a body");
+    return true;
+}

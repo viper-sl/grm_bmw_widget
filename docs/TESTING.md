@@ -5,7 +5,7 @@ Unit tests for the BMW status widget. All tests live in
 framework (`(:test)` annotation — test functions compile only into test builds,
 never into release).
 
-**41 tests, 0 failures** (verified 2026-08-17). They cover every major module *except the
+**42 tests, 0 failures** (verified 2026-08-17). They cover every major module *except the
 live network data calls* (`makeWebRequest`). Network handlers are exercised by
 invoking their response callbacks directly with mock dictionaries, so the full
 parse / FSM / rotation / backoff logic runs without any HTTP traffic.
@@ -44,8 +44,8 @@ java -jar "$SDK/bin/monkeybrains.jar" \
 Expected tail:
 
 ```
-Ran 41 tests
-PASSED (passed=41, failed=0, errors=0)
+Ran 42 tests
+PASSED (passed=42, failed=0, errors=0)
 ```
 
 ## What is and isn't covered
@@ -160,6 +160,14 @@ Source: [source/PageNav.mc](../source/PageNav.mc), [source/ui/PageMap.mc](../sou
 |---|---|
 | `testMapPage_pageCountIncludesMapSlot` | The carousel has the build-variant fifth slot on a map-capable build (`_pageCount()` = 5). |
 | `testMapPage_visibilityRequiresBothCoordinates` | The page hides unless **both** `lat` and `lon` are cached — one alone is not a fix. |
+
+## DeviceAuthManager — auth error text (1)
+
+Source: [source/api/DeviceAuthManager.mc](../source/api/DeviceAuthManager.mc).
+
+| Test | Asserts |
+|---|---|
+| `testAuth_errorTextIsActionableAndFits` | `invalid_request` (what a disabled portal permission actually returns, alongside RFC 6749 boilerplate) maps to the "check CarData API + streaming" hint; an unmapped code keeps BMW's own words but capped at `_MSG_MAX`; a code with no description falls back to the code; a bodyless 429 gives the friendly transport text. The length cap matters because `AuthView` word-wraps without clipping — an uncapped sentence runs off the bezel. |
 
 ## BMW error-code classifiers (3)
 

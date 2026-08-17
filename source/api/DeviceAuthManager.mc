@@ -84,16 +84,47 @@ class DeviceAuthManager {
         return "Server error " + responseCode;
     }
 
-    // Prefer BMW's own OAuth error text over a bare HTTP code. On a 400 the body
-    // is {"error":"...","error_description":"..."} — the description says exactly
-    // why the request was rejected (e.g. an under-encoded scope/grant_type from
-    // the phone bridge, which the sim never hits). Falls back to the friendly
-    // mapping when there's no body (transport failure).
+    // Longest error text that still fits the round screen. AuthView word-wraps but
+    // does not clip, so anything longer runs off the bottom bezel unread.
+    static const _MSG_MAX = 90;
+
+    // Turn an RFC 6749 `error` code into something the wearer can act on.
+    // BMW's own `error_description` for these is the spec's boilerplate ("The request
+    // is missing a required parameter, includes an unsupported parameter value…") —
+    // technically accurate, useless on a watch, and it overflows the screen.
+    //
+    // The scope this app requests is a single string covering BOTH portal switches
+    // (`cardata:api:read` + `cardata:streaming:read`). Turning either one off in the
+    // BMW portal makes the whole scope ungrantable, and BMW reports that as a generic
+    // invalid_request/invalid_scope rather than naming the missing permission — so
+    // that check is the first thing worth telling the user. Verified 2026-08-17: a
+    // disabled "CarData API access" toggle surfaces exactly as invalid_request.
+    static function _oauthHint(err) {
+        if (err.equals("invalid_request") || err.equals("invalid_scope")
+            || err.equals("unauthorized_client") || err.equals("unsupported_grant_type")) {
+            return "Check CarData API + streaming are on in the BMW portal";
+        }
+        if (err.equals("invalid_client"))  { return "Client ID rejected — check settings"; }
+        if (err.equals("invalid_grant"))   { return "Pairing no longer valid — retry"; }
+        if (err.equals("access_denied"))   { return "Approval was denied — retry"; }
+        if (err.equals("expired_token"))   { return "Code expired — retry"; }
+        return null;
+    }
+
+    // Error text for the auth screen, best first: our actionable hint for a known
+    // OAuth error code, else BMW's own description (capped), else the error code,
+    // else the friendly HTTP/transport mapping (no body = transport failure).
     static function _serverError(responseCode, data) {
         if (data != null) {
-            var d = data.hasKey("error_description") ? data["error_description"] : null;
-            if (d != null && !d.equals("")) { return d; }
             var e = data.hasKey("error") ? data["error"] : null;
+            if (e != null && !e.equals("")) {
+                var hint = _oauthHint(e);
+                if (hint != null) { return hint; }
+            }
+            var d = data.hasKey("error_description") ? data["error_description"] : null;
+            if (d != null && !d.equals("")) {
+                return (d.length() > _MSG_MAX) ? d.substring(0, _MSG_MAX - 1) + "…" : d;
+            }
             if (e != null && !e.equals("")) { return e; }
         }
         return _friendlyError(responseCode);

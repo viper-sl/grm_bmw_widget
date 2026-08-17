@@ -206,6 +206,7 @@ catalogue: [`docs/descriptors.md`](docs/descriptors.md).
 | `BMW Widget` / `Press START to connect` | No client ID in settings yet — step 3.1. |
 | Pairing fails right after creating the client | The 5–10 min portal activation hasn't completed; retry. |
 | `Re-auth needed` / `Press START to re-pair` | Refresh token expired (unopened > ~2 weeks) → **Manage → Re-pair**. |
+| `Auth failed` → `Check CarData API + streaming are on in the BMW portal` | One of the two portal toggles for your client is off (step 1.4). The widget asks for a single scope covering **both**, so BMW refuses the whole pairing request. Re-enable it, wait **5–10 min** for the portal to apply it, then press START again. |
 | Container error / `CU-124` | BMW caps an account at **10 containers**. Onboarding offers to delete all and retry; otherwise **Manage → Delete containers** (the widget re-creates its own). |
 | A page is missing, or values are blank | Your car (or your CarData selection) doesn't report that field — pages hide themselves when their key data is absent. |
 

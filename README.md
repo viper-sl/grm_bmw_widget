@@ -266,8 +266,11 @@ manifest*.xml      app id, supported devices, permissions (Communications + Back
 ## Privacy
 
 The widget reads your vehicle's data only to display it on your watch; nothing is sent
-anywhere except BMW's own API. Captured telematics and any personal config
-(VIN, tokens, client ID, simulator settings) are **gitignored** and never committed.
+anywhere except BMW's own API — there is no server behind this app, no analytics and no
+third-party SDK. Full policy: [`PRIVACY.md`](PRIVACY.md).
+
+For contributors: captured telematics and any personal config (VIN, tokens, client ID,
+simulator settings) are **gitignored** and never committed.
 
 ## License
 

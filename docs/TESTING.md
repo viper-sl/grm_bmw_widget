@@ -5,7 +5,7 @@ Unit tests for the BMW status widget. All tests live in
 framework (`(:test)` annotation — test functions compile only into test builds,
 never into release).
 
-**38 tests, 0 failures.** They cover every major module *except the live
+**39 tests, 0 failures.** They cover every major module *except the live
 network data calls* (`makeWebRequest`). Network handlers are exercised by
 invoking their response callbacks directly with mock dictionaries, so the full
 parse / FSM / rotation / backoff logic runs without any HTTP traffic.
@@ -19,7 +19,7 @@ covers the BMW error-code classifiers used across the app:
 ## Running
 
 ```sh
-SDK="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-9.1.0-2026-03-09-6a872a80b"
+SDK="$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-9.2.0-2026-06-09-92a1605b2"
 
 # build a test binary (-t compiles the (:test) code)
 java -jar "$SDK/bin/monkeybrains.jar" \
@@ -27,6 +27,18 @@ java -jar "$SDK/bin/monkeybrains.jar" \
 
 # run it in the simulator (simulator must be open first)
 "$SDK/bin/monkeydo" bin/test.prg fenix6pro -t
+```
+
+**Run the suite on BOTH capability tiers.** The jungle's tier split
+(`base.excludeAnnotations = bgPoll`) means a fenix6pro (legacy) build never
+compiles the `(:bgPoll)` code — hourly/adaptive scheduling and
+`_adaptiveShouldFetch` — so a legacy-only run cannot catch full-tier
+regressions (even syntax errors there). Repeat on a full-tier device:
+
+```sh
+java -jar "$SDK/bin/monkeybrains.jar" \
+  -o bin/test8.prg -f monkey.jungle -y developer_key -d fenix8pro47mm_sim -w -t
+"$SDK/bin/monkeydo" bin/test8.prg fenix8pro47mm -t
 ```
 
 Expected tail:
@@ -46,6 +58,7 @@ PASSED (passed=38, failed=0, errors=0)
 | Quota / rate-limit gate | ✅ | seed Storage, assert `canFetch` / advances |
 | Vehicle State persistence | ✅ | `VehicleCache` write→read round-trip |
 | UI formatters | ✅ | `PageChrome.oneDecimal`, `_ageString` |
+| Fuel litres math (glance ≡ page) | ✅ | `FuelMath` derived from `fuelPercent` × tank (B12) |
 | **Live HTTP fetches** | ⛔ by design | network excluded; only the response handlers are tested |
 | View `onUpdate` rendering | ⛔ | requires a graphics context; not unit-testable |
 

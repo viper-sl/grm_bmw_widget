@@ -45,6 +45,10 @@ MC
    <?xml version="1.0"?>
    <properties>
      <property id="clientId" type="String">YOUR_CLIENT_ID</property>
+     <!-- Settings-proof copy: not referenced by settings.xml, so the sim/GCM
+          settings store can never override it with an empty value.
+          Config.clientId() falls back to it when "clientId" resolves empty. -->
+     <property id="clientIdBaked" type="String">YOUR_CLIENT_ID</property>
      <property id="vin" type="String"></property>
      <property id="containerId" type="String"></property>
      <property id="refreshToken" type="String"></property>

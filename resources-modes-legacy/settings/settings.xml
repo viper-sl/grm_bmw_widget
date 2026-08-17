@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<!-- LEGACY TIER (API < 6.0 devices — see monkey.jungle) settings.
+     No updateMode setting: these devices are always manual + one daily 10:00
+     background refresh (the (:manualOnly) code path ignores any persisted mode).
+     SYNC BURDEN: this file and resources-modes-full/settings/settings.xml are
+     full copies that must stay in sync; they differ ONLY in the updateMode
+     setting (absent here, present on full) and the group comment that
+     mentions it. -->
+<settings>
+
+  <!-- ── Required ────────────────────────────────────────────────────── -->
+  <group id="required" title="@Strings.GroupRequired">
+    <setting propertyKey="@Properties.clientId" title="@Strings.ClientIdLabel">
+      <settingConfig type="alphaNumeric"/>
+    </setting>
+  </group>
+
+  <!-- ── Optional ─────────────────────────────────────────────────────
+       VIN, containerId and refreshToken are auto-discovered on first run.
+       Tank size controls widget behaviour.                             -->
+  <group id="optional" title="@Strings.GroupOptional">
+    <setting propertyKey="@Properties.vin" title="@Strings.VinLabel">
+      <settingConfig type="alphaNumeric"/>
+    </setting>
+    <setting propertyKey="@Properties.containerId" title="@Strings.ContainerIdLabel">
+      <settingConfig type="alphaNumeric"/>
+    </setting>
+    <setting propertyKey="@Properties.refreshToken" title="@Strings.RefreshTokenLabel">
+      <settingConfig type="alphaNumeric"/>
+    </setting>
+    <setting propertyKey="@Properties.tankLitres" title="@Strings.TankLitresLabel">
+      <settingConfig type="numeric" min="20" max="120"/>
+    </setting>
+    <setting propertyKey="@Properties.nextServiceOdoK" title="@Strings.NextServiceOdoLabel">
+      <settingConfig type="numeric" min="0" max="999"/>
+    </setting>
+    <setting propertyKey="@Properties.showConsumption" title="@Strings.ShowConsumptionLabel">
+      <settingConfig type="boolean"/>
+    </setting>
+  </group>
+
+</settings>

@@ -16,7 +16,11 @@ the Connect IQ platform.
 - **Lock overview** — SECURED / UNLOCKED, per-door open dots (front + rear), hood and
   trunk, plus a red **W** badge for any open window. Prominent data-age indicator.
 - **Odometer** — mileage and distance to next service (with an optional user override).
-- **Tyres** — per-wheel pressure vs. target, and tyre-wear estimate.
+- **Tyres** — per-wheel pressure vs. target, and tyre-wear estimate (START cycles the
+  three views).
+- **Car location** — the parked car pinned on the watch's own onboard map; START toggles
+  a browsable zoom view. Only on devices that ship cartography — 32 of the 36 supported
+  products (not base fēnix 6/6s, FR255, FR745).
 - **About car** — a grouped, read-only dump of static vehicle info plus live telematics
   (12 V battery, coolant, location, teleservice, …).
 - **On-watch settings** — update mode, tank size, service override, consumption toggle,
@@ -25,7 +29,8 @@ the Connect IQ platform.
 ## Supported devices
 
 fēnix 6 / 7 / 8 / E families, MARQ, and Forerunner 255 / 745 / 945 / 955 / 965 / 970
-(see [`manifest.xml`](manifest.xml)). Developed and tested against **fēnix 6 Pro**.
+(see [`manifest.xml`](manifest.xml)). Developed and tested against **fēnix 6 Pro**
+(legacy tier) and **fēnix 8 Pro** (API 6.0+ tier).
 
 ## How it works
 
@@ -45,9 +50,11 @@ Background service ─ live ─────────────────�
 - The **background service** (~28 KB) refreshes the at-a-glance **live** fields (lock,
   doors, windows, range, fuel) from a **lean container** whose response fits that tiny
   heap, and writes a compact Vehicle State to the cache.
-- The **foreground app** (~1 MB) does the **full** fetch — all pages plus the "About car"
-  detail — on a manual refresh (START) or once a day on open, from the **full container**.
+- The **foreground app** does the **full** fetch — all pages plus the "About car" detail
+  — on a manual refresh (START) or once a day on open, from the **full container**.
   `VehicleCache.write` merges, so background live updates and the last full fetch coexist.
+  Its heap is ~1 MB on fēnix 6 Pro but only **64 KB** on the base fēnix 6, and that
+  smaller ceiling is what the foreground code size is really budgeted against.
 - The **glance and pages** are read-only over the cache — they never do network I/O.
 - All vehicle-specific values (client ID, VIN, container IDs, tokens) live only in
   Connect IQ **Settings/Storage** — the source contains **no** hardcoded credentials.
@@ -65,8 +72,8 @@ in [`docs/findings/`](docs/findings/).
 
 ## Setup
 
-You need a **BMW CarData client ID** (free, from the BMW CarData portal). Everything
-else is automatic:
+You need a **BMW CarData client ID** (free, from the BMW CarData portal) and a My BMW
+account in a country where CarData is offered (EU / UK). Everything else is automatic:
 
 | Value | Source |
 |---|---|
@@ -75,20 +82,152 @@ else is automatic:
 | VIN | auto-discovered via `/customers/vehicles/mappings` |
 | container IDs | two auto-created via `POST /customers/containers`: a **full** one (foreground) + a **lean** one (background poll) |
 
-First run: open the widget → **START to connect** → approve the shown code at
-`customer.bmwgroup.com` → the widget discovers your VIN, creates its data containers, and
-fetches your car. No VIN/container typing. (BMW caps an account at **10 containers**; if
-that's hit, onboarding offers to delete all and retry — see **Manage → Delete containers**.)
+### 1. Create a BMW CarData client
+
+One-time, ~10 minutes. Portal labels differ per language; the Spanish ones are given as
+an example.
+
+1. Sign in to the **My BMW web portal** for your country and open your vehicle overview
+   — e.g. `https://www.bmw.es/es-es/mybmw/vehicle-overview`.
+2. Open **BMW CARDATA**.
+3. In the technical-access section — *Technical access to BMW CarData* / ES *ACCESO
+   TÉCNICO A BMW CARDATA* — **create a client** and copy the **Client ID**.
+4. Switch on **both** toggles: *CarData API access* (ES *Solicitar acceso a la API de
+   CarData*) and *CarData streaming* (ES *Transmisión de CarData*). The widget's OAuth
+   scope is `authenticate_user openid cardata:streaming:read cardata:api:read`, so both
+   must be enabled even though only the REST API is used.
+5. In the streaming section open the **data selection** (ES *Cambiar selección de
+   datos*) and tick the [descriptors below](#2-select-the-data-fields). Selecting
+   everything works too — the widget never requests anything outside that set.
+6. Save and **wait 5–10 minutes**: a freshly created client is not usable immediately.
+
+### 2. Select the data fields
+
+Exactly the 41 descriptors of the widget's **full container** — verbatim from
+[`CarDataBootstrap._containerDescriptors`](source/api/CarDataBootstrap.mc#L353-L401).
+The lean background container is a 14-field **subset** of the same list (no extra
+selection needed), and the two extra endpoints the widget calls — `basicData` and
+`smartMaintenanceTyreDiagnosis` — take no descriptors at all.
+
+```text
+# Doors, windows, lock  → glance lock state + Lock page
+vehicle.cabin.door.lock.status
+vehicle.cabin.door.row1.driver.isOpen
+vehicle.cabin.door.row1.passenger.isOpen
+vehicle.cabin.door.row2.driver.isOpen
+vehicle.cabin.door.row2.passenger.isOpen
+vehicle.cabin.window.row1.driver.status
+vehicle.cabin.window.row1.passenger.status
+vehicle.cabin.window.row2.driver.status
+vehicle.cabin.window.row2.passenger.status
+vehicle.body.trunk.isOpen
+vehicle.body.trunk.isLocked
+vehicle.body.hood.isOpen
+
+# Range and fuel  → glance + Range & Fuel page
+vehicle.drivetrain.totalRemainingRange
+vehicle.drivetrain.lastRemainingRange
+vehicle.drivetrain.fuelSystem.level
+vehicle.drivetrain.fuelSystem.remainingFuel
+
+# Odometer and service  → Odometer page + About car
+vehicle.vehicle.travelledDistance
+vehicle.status.serviceDistance.next
+vehicle.status.serviceDistance.yellow
+vehicle.status.conditionBasedServicesCount
+vehicle.cabin.infotainment.displayUnit.distance
+
+# Tyres  → Tyres page (wear km comes from the tyre-diagnosis endpoint)
+vehicle.chassis.axle.row1.wheel.left.tire.pressure
+vehicle.chassis.axle.row1.wheel.right.tire.pressure
+vehicle.chassis.axle.row2.wheel.left.tire.pressure
+vehicle.chassis.axle.row2.wheel.right.tire.pressure
+vehicle.chassis.axle.row1.wheel.left.tire.pressureTarget
+vehicle.chassis.axle.row1.wheel.right.tire.pressureTarget
+vehicle.chassis.axle.row2.wheel.left.tire.pressureTarget
+vehicle.chassis.axle.row2.wheel.right.tire.pressureTarget
+
+# Car location  → map page + About car → Location
+vehicle.cabin.infotainment.navigation.currentLocation.latitude
+vehicle.cabin.infotainment.navigation.currentLocation.longitude
+vehicle.cabin.infotainment.navigation.currentLocation.altitude
+vehicle.cabin.infotainment.navigation.currentLocation.heading
+
+# About car → Battery & engine / Status
+vehicle.electricalSystem.battery.voltage
+vehicle.drivetrain.internalCombustionEngine.engine.ect
+vehicle.vehicle.deepSleepModeActive
+vehicle.vehicle.preConditioning.activity
+vehicle.channel.teleservice.status
+
+# EV / PHEV only (null on ICE — the parser picks the live field)
+vehicle.drivetrain.electricEngine.kombiRemainingElectricRange
+vehicle.powertrain.electric.battery.stateOfCharge.displayed
+
+# Subscribed for an upcoming feature, not parsed yet
+vehicle.cabin.hvac.statusAirPurification
+```
+
+Litres are derived from `fuelSystem.level`, not from `remainingFuel` — the latter goes
+stale on a running car (see `docs/findings/`). Per-descriptor rationale and the excluded
+catalogue: [`docs/descriptors.md`](docs/descriptors.md).
+
+### 3. Pair the watch
+
+1. **Garmin Connect** → your device → *Connect IQ Apps* → **BMW Status** → *Settings* →
+   paste the **Client ID**. Leave VIN and Container ID empty.
+2. Open the widget → **START to connect**. A pairing code and a link appear.
+3. Approve it at the link the watch shows — BMW returns it alongside the code, falling
+   back to `customer.bmwgroup.com/oneid/#/link` — on a phone or computer, signing in
+   with your BMW account.
+4. The watch discovers your VIN, creates both containers and fetches your car. No
+   VIN/container typing. The refresh token is ~2-week sliding, renewed on every use — a
+   widget you open regularly stays paired.
+
+### Refresh behaviour
+
+- **START** on the *Range & Fuel* or *Lock* page → immediate full refresh (60 s
+  cooldown). On *Tyres* START cycles actual/target/wear, on the map page it toggles
+  zoom, on *Odometer* it does nothing.
+- **Once a day at ~10:00** — a full fetch even in manual mode, which also keeps the
+  OAuth token pair alive (FR-25).
+- **Update Mode** (*Auto hourly* / *Auto adaptive*) exists only on the **API 6.0+ tier**
+  — fēnix 8, fēnix 8 Pro, fēnix 8 Solar, fēnix E, FR970. Every other device is manual +
+  daily, and the setting is hidden ([`iq.jungle`](iq.jungle)).
+- BMW allows **~50 data calls / 24 h**. A full fetch spends 3 (basicData + tyre
+  diagnosis + telematicData), a background poll spends 1; token refresh is exempt.
+- Freshness is bounded by the **car**, not the widget: a parked BMW may report every few
+  hours. The pages show a data-age indicator for that reason.
+
+### Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| `BMW Widget` / `Press START to connect` | No client ID in settings yet — step 3.1. |
+| Pairing fails right after creating the client | The 5–10 min portal activation hasn't completed; retry. |
+| `Re-auth needed` / `Press START to re-pair` | Refresh token expired (unopened > ~2 weeks) → **Manage → Re-pair**. |
+| Container error / `CU-124` | BMW caps an account at **10 containers**. Onboarding offers to delete all and retry; otherwise **Manage → Delete containers** (the widget re-creates its own). |
+| A page is missing, or values are blank | Your car (or your CarData selection) doesn't report that field — pages hide themselves when their key data is absent. |
 
 ## Build
 
 Prereqs: the [Connect IQ SDK](https://developer.garmin.com/connect-iq/sdk/) and a
 developer key (`developer_key`).
 
-**Store / generic build** (credentials entered in the Garmin Connect Mobile app):
+**Generic build** — no baked credentials, one device at a time
+([`monkey.jungle`](monkey.jungle) → [`manifest.xml`](manifest.xml)):
 
 ```sh
 monkeyc -f monkey.jungle -d fenix6pro -o bin/BmwStatus.prg -y developer_key
+```
+
+**Store package** — signed `.iq` for all supported devices, from
+[`iq.jungle`](iq.jungle) → `manifest-iq.xml`, which carries a **different app ID** so
+the published widget and a personal sideload coexist on one watch. See
+[`docs/IQ-STORE-PUBLISH.md`](docs/IQ-STORE-PUBLISH.md):
+
+```sh
+./build-personal.sh --iq       # → bin/BMWWIDGET.iq
 ```
 
 **Personal build** (your client ID baked in, for your own watch) — see
@@ -115,10 +254,14 @@ monkeydo bin/test.prg fenix6pro -t
 ```
 source/            Monkey C app (api/ cache/ guard/ ui/ mock/)
 resources/         strings, settings, drawables, properties
+resources-modes-*  per-tier settings XML (full = all update modes, legacy = manual only)
 resources-src/     icon source art
 docs/              build/test docs + BMW CarData descriptor reference
 docs/findings/     verified API behaviour, descriptor semantics, CIQ gotchas
-manifest.xml       app id, supported devices, permissions (Communications + Background)
+monkey.jungle      generic build  → manifest.xml
+iq.jungle          store package  → manifest-iq.xml (different app ID)
+livetest.jungle    personal build → manifest.xml + resources-livetest (gitignored)
+manifest*.xml      app id, supported devices, permissions (Communications + Background)
 ```
 
 ## Privacy

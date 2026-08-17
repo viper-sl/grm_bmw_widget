@@ -18,16 +18,13 @@ class SettingsMenu {
     static function build() {
         var menu = new WatchUi.Menu2({ :title => "Settings" });
 
-        menu.addItem(new WatchUi.MenuItem(
-            "Update Mode", modeLabel(), :updateMode, null));
-
-        var tankProp = Application.Properties.getValue("tankLitres");
-        var tank = (tankProp != null) ? tankProp : 52;
-        menu.addItem(new WatchUi.MenuItem(
-            "Tank Size", tank.toString() + " L", :tankSize, null));
+        _addUpdateModeItem(menu);
 
         menu.addItem(new WatchUi.MenuItem(
-            "Next Service", nextMaintenanceLabel(), :nextMaintenance, null));
+            "Tank Size", FuelMath.tankLitres().toString() + " L", :tankSize, null));
+
+        menu.addItem(new WatchUi.MenuItem(
+            "Next Service", nextServiceLabel(), :nextService, null));
 
         // F13: enable/disable the Range & Fuel L/100km estimate.
         menu.addItem(new WatchUi.MenuItem(
@@ -37,6 +34,22 @@ class SettingsMenu {
         menu.addItem(new WatchUi.MenuItem("Manage", "Auth · container", :manage, null));
         menu.addItem(new WatchUi.MenuItem("About car", null, :about, null));
         return menu;
+    }
+
+    // TIER SPLIT: exactly one variant survives each device build (see monkey.jungle).
+    // Full tier offers the on-watch Update Mode selector; legacy tier hides it —
+    // those devices are always manual + one daily 10:00 refresh, so showing a
+    // selector whose choices do nothing would mislead. (modeLabel()/the :updateMode
+    // handler stay un-annotated: dead-but-tiny on legacy, foreground heap is ~1 MB.)
+    (:bgPoll)
+    static function _addUpdateModeItem(menu) {
+        menu.addItem(new WatchUi.MenuItem(
+            "Update Mode", modeLabel(), :updateMode, null));
+    }
+
+    (:manualOnly)
+    static function _addUpdateModeItem(menu) {
+        // Legacy tier: no user-selectable update mode.
     }
 
     // F13: consumption-estimate row toggle (default on).
@@ -62,16 +75,19 @@ class SettingsMenu {
         return "Manual · button";
     }
 
-    // FR-23: 0 = use BMW's serviceDistanceKm; >0 = user override (km).
-    static function nextMaintenanceKm() {
-        var v = Application.Properties.getValue("nextMaintenanceKm");
+    // FR-23 (reworked): 0 = use BMW's serviceDistanceKm; >0 = the odometer
+    // value (in THOUSANDS of km) at which the next service is due —
+    // e.g. 50 means "service at 50,000 km". The page shows the remaining
+    // distance (target − current odometer).
+    static function nextServiceOdoK() {
+        var v = Application.Properties.getValue("nextServiceOdoK");
         return (v == null) ? 0 : v;
     }
 
-    static function nextMaintenanceLabel() {
-        var km = nextMaintenanceKm();
-        if (km == 0) { return "Auto (BMW)"; }
-        return km.toString() + " km";
+    static function nextServiceLabel() {
+        var k = nextServiceOdoK();
+        if (k == 0) { return "Auto (BMW)"; }
+        return "at " + k.toString() + "k km";
     }
 
 }
@@ -103,13 +119,11 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
             item.setSubLabel(t.toString() + " L");
             WatchUi.requestUpdate();
 
-        } else if (id == :nextMaintenance) {
-            // FR-23: cycle in 1000 km steps, 0 ("Auto (BMW)") .. 50000, then wrap to 0.
-            var n = SettingsMenu.nextMaintenanceKm() + 1000;
-            if (n > 50000) { n = 0; }
-            Application.Properties.setValue("nextMaintenanceKm", n);
-            item.setSubLabel(SettingsMenu.nextMaintenanceLabel());
-            WatchUi.requestUpdate();
+        } else if (id == :nextService) {
+            // FR-23 (reworked): exact 3-digit input (thousands of km) via the
+            // custom entry view — e.g. 027 = 27k km, 128 = 128k km, 000 = Auto.
+            var v = new ServiceOdoInputView();
+            WatchUi.pushView(v, new ServiceOdoInputDelegate(v, item), WatchUi.SLIDE_LEFT);
 
         } else if (id == :consumption) {
             // F13: toggle the L/100km estimate on the Range & Fuel page.
@@ -127,8 +141,7 @@ class SettingsMenuDelegate extends WatchUi.Menu2InputDelegate {
     }
 
     function _tank() {
-        var t = Application.Properties.getValue("tankLitres");
-        return (t == null) ? 52 : t;
+        return FuelMath.tankLitres();
     }
 
 }

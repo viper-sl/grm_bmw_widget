@@ -1,4 +1,9 @@
 <?xml version="1.0"?>
+<!-- FULL TIER (API 6.0+ devices — see monkey.jungle) settings.
+     SYNC BURDEN: this file and resources-modes-legacy/settings/settings.xml are
+     full copies that must stay in sync; they differ ONLY in the updateMode
+     setting (present here, absent on legacy) and the group comment that
+     mentions it. -->
 <settings>
 
   <!-- ── Required ────────────────────────────────────────────────────── -->
@@ -31,8 +36,8 @@
         <listEntry value="2">@Strings.UpdateModeAdaptive</listEntry>
       </settingConfig>
     </setting>
-    <setting propertyKey="@Properties.nextMaintenanceKm" title="@Strings.NextMaintenanceLabel">
-      <settingConfig type="numeric" min="0" max="50000"/>
+    <setting propertyKey="@Properties.nextServiceOdoK" title="@Strings.NextServiceOdoLabel">
+      <settingConfig type="numeric" min="0" max="999"/>
     </setting>
     <setting propertyKey="@Properties.showConsumption" title="@Strings.ShowConsumptionLabel">
       <settingConfig type="boolean"/>

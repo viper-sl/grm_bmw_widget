@@ -6,11 +6,14 @@
 # on first run). Pairing is done on-watch via the device flow.
 #
 # Usage:
-#   ./build-personal.sh            # build + load into the running simulator (fenix 6 Pro)
-#   ./build-personal.sh --device   # build a sideload-ready .prg for a real fenix 6 Pro
+#   ./build-personal.sh            # build + load into the running simulator (fenix 8 Pro 47mm)
+#   ./build-personal.sh --device   # build a sideload-ready .prg for a real fenix 8 Pro
 #   ./build-personal.sh --fr255-sim  # build + load into simulator as Forerunner 255
 #   ./build-personal.sh --fr255    # build a sideload-ready .prg for a real Forerunner 255
 #   ./build-personal.sh --iq       # build a signed .iq package (all installed devices)
+#
+# Override the default target via CIQ_DEVICE (e.g. CIQ_DEVICE=fenix6pro ./build-personal.sh).
+# Explicit device flags (--fr255, --fr255-sim) always win over CIQ_DEVICE.
 #
 # Output:
 #   bin/personal.prg               (simulator)
@@ -18,10 +21,10 @@
 #   bin/BMWWIDGET.iq               (signed IQ package — sideload via Connect IQ phone app)
 set -euo pipefail
 
-SDK="${CIQ_SDK:-$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-9.1.0-2026-03-09-6a872a80b}"
+SDK="${CIQ_SDK:-$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-9.2.0-2026-06-09-92a1605b2}"
 KEY="${DEVELOPER_KEY:-developer_key}"
 JUNGLE="livetest.jungle"
-DEVICE="fenix6pro"
+DEVICE="${CIQ_DEVICE:-fenix8pro47mm}"
 
 if [ ! -f "resources-livetest/properties/properties.xml" ]; then
   echo "Missing resources-livetest/properties/properties.xml (your clientId)." >&2
@@ -112,10 +115,16 @@ fi
 # ── --device: real watch sideload .prg ──────────────────────────────────────
 if [ "$ARG" == "--device" ]; then
   OUT="bin/BMWWIDGET.PRG"
+  rm -f "$OUT"
   echo "Building DEVICE release build → $OUT  (target: $DEVICE)"
   java -jar "$SDK/bin/monkeybrains.jar" \
     -o "$OUT" -f "$JUNGLE" -y "$KEY" -d "$DEVICE" -r 2>&1 \
-    | grep -v "^WARNING:"
+    | grep -v "^WARNING:" || true
+  if [ ! -f "$OUT" ]; then
+    echo "✗ Build failed — the $DEVICE SDK profile may not be installed." >&2
+    echo "  Install it: SDK Manager → Devices → $DEVICE, then re-run." >&2
+    exit 1
+  fi
   echo "✓ Built $OUT"
 
   DEST=""
@@ -132,7 +141,7 @@ if [ "$ARG" == "--device" ]; then
     echo "  Safely eject the watch, then open 'BMW Status' in the widget loop."
   else
     echo "⚠ No Garmin device mounted (looked for /Volumes/*/GARMIN/APPS)."
-    echo "  1. Connect the fenix 6 Pro by USB; on the watch confirm 'Mass Storage'."
+    echo "  1. Connect the watch ($DEVICE) by USB; on the watch confirm 'Mass Storage'."
     echo "  2. Re-run, or copy manually:"
     echo "       cp $OUT /Volumes/<GARMIN>/GARMIN/APPS/GRM_BMW_WIDGET.PRG"
   fi
@@ -155,10 +164,16 @@ fi
 
 # ── default: simulator build + load ─────────────────────────────────────────
 OUT="bin/personal.prg"
+rm -f "$OUT"
 echo "Building SIM release build → $OUT  (target: ${DEVICE}_sim)"
 java -jar "$SDK/bin/monkeybrains.jar" \
   -o "$OUT" -f "$JUNGLE" -y "$KEY" -d "${DEVICE}_sim" -r 2>&1 \
-  | grep -v "^WARNING:"
+  | grep -v "^WARNING:" || true
+if [ ! -f "$OUT" ]; then
+  echo "✗ Build failed — the $DEVICE SDK profile may not be installed (or CIQ_DEVICE typo)." >&2
+  echo "  Install it: SDK Manager → Devices → $DEVICE, then re-run." >&2
+  exit 1
+fi
 
 # Launch simulator if not already running, then wait for it to accept connections.
 SIM_APP="$SDK/bin/ConnectIQ.app"

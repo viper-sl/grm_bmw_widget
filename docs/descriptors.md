@@ -1,9 +1,11 @@
 # BMW CarData descriptors — final widget set
 
-Working curation of the BMW CarData telematics catalogue for the GRM BMW widget.
-This is the **source of truth for which descriptors the widget subscribes to**;
-[reference/cardata-descriptors.json](reference/cardata-descriptors.json) mirrors it
-(`include` flag) and the build script reads that JSON to create the container.
+Working curation of the BMW CarData telematics catalogue for the GRM BMW widget —
+the readable view of what the widget subscribes to, with the observed value of each
+descriptor on the test vehicle. It and the `include` flags in
+[reference/cardata-descriptors.json](reference/cardata-descriptors.json) (which the
+build script reads to create the container) track
+[`CarDataBootstrap._containerDescriptors`](../source/api/CarDataBootstrap.mc#L353-L401).
 
 ## How to read each row
 
@@ -151,7 +153,7 @@ vehicle.drivetrain.lastRemainingRange                                  | Last se
 -vehicle.drivetrain.electricEngine.charging.connectionType              | Charging process (inductive/conductive) | NULL
 -vehicle.drivetrain.electricEngine.charging.phaseNumber                 | Charging phases | NULL
 -vehicle.drivetrain.electricEngine.charging.status                      | Charging status | NULL
-vehicle.powertrain.electric.battery.stateOfCharge.displayed             | Charging status displayed (SoC) | NULL
+vehicle.powertrain.electric.battery.stateOfCharge.displayed            | Charging status displayed (SoC) | NULL
 -vehicle.drivetrain.batteryManagement.header                            | HV battery charging status | NULL
 -vehicle.drivetrain.avgElectricRangeConsumption                         | Average electric consumption | NULL
 -vehicle.vehicle.avgSpeed                                               | Average speed | NULL
@@ -161,7 +163,7 @@ vehicle.powertrain.electric.battery.stateOfCharge.displayed             | Chargi
 vehicle.drivetrain.totalRemainingRange                                 | Estimate of total range (elec+CE) | 499 km
 -vehicle.drivetrain.electricEngine.charging.hvStatus                    | HV charging system status | NULL
 -vehicle.powertrain.electric.range.target                               | Remaining electric range (target SoC) | NULL
-vehicle.drivetrain.electricEngine.kombiRemainingElectricRange           | Remaining electric range | NULL
+vehicle.drivetrain.electricEngine.kombiRemainingElectricRange          | Remaining electric range | NULL
 -vehicle.powertrain.electric.battery.stateOfCharge.target               | Target SoC | NULL
 -vehicle.body.chargingPort.status                                       | Status of charging plug | NULL
 -vehicle.body.chargingPort.combinedStatus                               | Charging port connection status | NULL

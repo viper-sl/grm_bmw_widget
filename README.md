@@ -111,7 +111,7 @@ selection needed), and the two extra endpoints the widget calls — `basicData` 
 
 ```text
 # Doors, windows, lock  → glance lock state + Lock page
-vehicle.cabin.door.lock.status
+vehicle.cabin.door.status
 vehicle.cabin.door.row1.driver.isOpen
 vehicle.cabin.door.row1.passenger.isOpen
 vehicle.cabin.door.row2.driver.isOpen

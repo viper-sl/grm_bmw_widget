@@ -238,6 +238,14 @@ class DeviceAuthManager {
                 ? data["expires_in"].toNumber() : 3600;
             Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY, Time.now().value() + expiresIn);
             Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+            // A NEW grant starts with a clean slate. A strike count left over from the
+            // grant that just died would give this one zero tolerance: the first lost
+            // rotation would push it straight back over the threshold and re-latch
+            // NEEDS_REBOOTSTRAP (TokenManager.GRANT_STRIKES_*). Same for a stale
+            // in-flight stamp and an error backoff earned by the old credentials.
+            Application.Storage.deleteValue(StorageKeys.KEY_GRANT_STRIKES);
+            Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_INFLIGHT);
+            QuotaGuard.clearBackoff();
 
             _state = SUCCESS;
             _notify();

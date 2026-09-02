@@ -464,11 +464,12 @@ function testToken_manualStrikeThresholdIsLower(logger as Test.Logger) as Lang.B
     return true;
 }
 
-// A successful refresh retires both failure ledgers — otherwise an old strike would
-// latch on the next isolated 400, and the backoff would keep the background poll
-// gated for up to 4h after the link came back.
+// A successful refresh retires the strike ledger — otherwise an old strike would latch
+// on the next isolated 400. It must NOT clear the error backoff: that gates the DATA
+// API, and a refresh against customer.bmwgroup.com is no evidence that host is healthy.
+// Clearing it here let one widget open reset a backoff earned by a data-API outage.
 (:test)
-function testToken_successClearsStrikesAndBackoff(logger as Test.Logger) as Lang.Boolean {
+function testToken_successClearsStrikesNotBackoff(logger as Test.Logger) as Lang.Boolean {
     _resetStorage();
     var tm = new TokenManager();
     var cap = new _BoolCapture();
@@ -480,7 +481,8 @@ function testToken_successClearsStrikesAndBackoff(logger as Test.Logger) as Lang
     Test.assertMessage(
         Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES) == null, "strikes cleared");
     Test.assertMessage(
-        Application.Storage.getValue(StorageKeys.KEY_BACKOFF_UNTIL) == null, "backoff cleared");
+        _nearNow(Application.Storage.getValue(StorageKeys.KEY_BACKOFF_UNTIL), 14400),
+        "data-API backoff survives a token refresh");
     _resetStorage();
     return true;
 }
@@ -512,8 +514,15 @@ function testToken_missingRefreshTokenKeepsStored(logger as Test.Logger) as Lang
 (:test)
 function testToken_concurrentRefreshIsBlocked(logger as Test.Logger) as Lang.Boolean {
     _resetStorage();
-    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REFRESH");
+    // Start from NORMAL, the state a healthy widget is actually in when a sibling
+    // refresh collides with it. Asserting from "NEEDS_REFRESH" proved nothing: that is
+    // the value the refresh path writes anyway, so the assertion held whether or not
+    // the gate worked.
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
     Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "REF");
+    // Inside the skew window, so ensureValidToken routes to _refreshToken.
+    Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY,
+        Time.now().value() + TokenManager.EXPIRY_SKEW_SECONDS - 30);
     Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT, Time.now().value());
 
     var cap = new _BoolCapture();
@@ -521,9 +530,69 @@ function testToken_concurrentRefreshIsBlocked(logger as Test.Logger) as Lang.Boo
     Test.assertMessage(cap.called, "callback fired");
     Test.assertMessage(cap.value == false, "in-flight refresh -> transient false");
     Test.assertEqualMessage(
-        Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE), "NEEDS_REFRESH",
-        "token state untouched (not an auth failure)");
+        Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE), "NORMAL",
+        "token state genuinely untouched (not demoted, not an auth failure)");
     _resetStorage();
+    return true;
+}
+
+// A stamp dated in the future (the clock moved backwards) must still count as live —
+// failing open there reopens the double-refresh race the stamp exists to close.
+(:test)
+function testToken_futureInflightStillBlocks(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "REF");
+    Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY, Time.now().value() - 1);
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT, Time.now().value() + 30);
+
+    var cap = new _BoolCapture();
+    new TokenManager().ensureValidToken(cap.method(:onResult));
+    Test.assertMessage(cap.value == false, "future stamp -> still blocked");
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE), "NORMAL",
+        "state untouched");
+
+    // ...but an impossible stamp is discarded rather than blocking forever.
+    _resetStorage();
+    var prev = _blankCreds();
+    try {
+        var tm = new TokenManager();
+        var cap2 = new _BoolCapture();
+        tm._callback = cap2.method(:onResult);
+        Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT,
+            Time.now().value() + TokenManager.INFLIGHT_TTL_SECONDS + 600);
+        tm._refreshToken();
+        Test.assertEqualMessage(tm.getTokenState(), "UNCONFIGURED",
+            "impossible stamp discarded, gate passed");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
+    return true;
+}
+
+// A refresh that never went out must not advance the token state. Before the fix,
+// ensureValidToken wrote NEEDS_REFRESH up front, so a gated or credential-less attempt
+// demoted a healthy NORMAL watch to a state only a successful refresh clears.
+(:test)
+function testToken_abortedAttemptLeavesStateAlone(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var prev = _blankCreds();
+    try {
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REBOOTSTRAP");
+        Application.Storage.setValue(StorageKeys.KEY_GRANT_STRIKES, 2);
+        var tm = new TokenManager();
+        var cap = new _BoolCapture();
+        // Forced retry with no creds: aborts at the creds check, before dispatch.
+        tm.retryAfterRebootstrap(cap.method(:onResult));
+        Test.assertEqualMessage(
+            Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES), 2,
+            "strike ledger survives an attempt that never sent anything");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
     return true;
 }
 
@@ -532,32 +601,51 @@ function testToken_concurrentRefreshIsBlocked(logger as Test.Logger) as Lang.Boo
 function testToken_staleInflightExpires(logger as Test.Logger) as Lang.Boolean {
     _resetStorage();
     var prev = _blankCreds();
-    var tm = new TokenManager();
-    var cap = new _BoolCapture();
-    tm._callback = cap.method(:onResult);
-    Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT,
-        Time.now().value() - TokenManager.INFLIGHT_TTL_SECONDS - 1);
-    // With the creds blanked, reaching UNCONFIGURED is the proof the call got PAST
-    // the in-flight gate instead of returning at it.
-    tm._refreshToken();
-    Test.assertEqualMessage(tm.getTokenState(), "UNCONFIGURED", "stale stamp ignored");
-    _restoreCreds(prev);
-    _resetStorage();
+    try {
+        var tm = new TokenManager();
+        var cap = new _BoolCapture();
+        tm._callback = cap.method(:onResult);
+        Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT,
+            Time.now().value() - TokenManager.INFLIGHT_TTL_SECONDS - 1);
+        // With the creds blanked, reaching UNCONFIGURED is the proof the call got PAST
+        // the in-flight gate instead of returning at it.
+        tm._refreshToken();
+        Test.assertEqualMessage(tm.getTokenState(), "UNCONFIGURED", "stale stamp ignored");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
     return true;
 }
 
-// The response handler always releases the in-flight lock, whatever the outcome.
+// The response handler releases the in-flight lock on every outcome — but only the lock
+// it took. A response that outlived the TTL must leave the stamp a later refresh now
+// owns, or a third caller could dispatch into that live rotation.
 (:test)
-function testToken_responseReleasesInflight(logger as Test.Logger) as Lang.Boolean {
+function testToken_responseReleasesOnlyItsOwnInflight(logger as Test.Logger) as Lang.Boolean {
     _resetStorage();
+    var stamp = Time.now().value();
     var tm = new TokenManager();
     var cap = new _BoolCapture();
     tm._callback = cap.method(:onResult);
-    Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT, Time.now().value());
+    tm._inFlightStamp = stamp;                     // as if _refreshToken had dispatched
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT, stamp);
     tm.onTokenRefreshResponse(500, null);
     Test.assertMessage(
         Application.Storage.getValue(StorageKeys.KEY_REFRESH_INFLIGHT) == null,
-        "in-flight lock released on failure too");
+        "own lock released on failure too");
+
+    // Overtaken: our response lands after a later refresh re-stamped. Leave it alone.
+    _resetStorage();
+    var later = Time.now().value() + 120;
+    var slow = new TokenManager();
+    slow._callback = cap.method(:onResult);
+    slow._inFlightStamp = stamp;
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT, later);
+    slow.onTokenRefreshResponse(500, null);
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_REFRESH_INFLIGHT), later,
+        "a stale response must not release someone else's lock");
     _resetStorage();
     return true;
 }
@@ -568,27 +656,30 @@ function testToken_responseReleasesInflight(logger as Test.Logger) as Lang.Boole
 function testToken_refreshesBeforeExpiry(logger as Test.Logger) as Lang.Boolean {
     _resetStorage();
     var prev = _blankCreds();
-    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
-    // Not expired, but inside the skew window — with the creds blanked, _refreshToken
-    // bails to UNCONFIGURED, the observable proof that a refresh was attempted.
-    Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY,
-        Time.now().value() + TokenManager.EXPIRY_SKEW_SECONDS - 30);
-    var cap = new _BoolCapture();
-    var tm = new TokenManager();
-    tm.ensureValidToken(cap.method(:onResult));
-    Test.assertMessage(cap.value == false, "near-expiry token is not served as valid");
-    Test.assertEqualMessage(tm.getTokenState(), "UNCONFIGURED", "a refresh was attempted");
+    try {
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+        // Not expired, but inside the skew window — with the creds blanked, _refreshToken
+        // bails to UNCONFIGURED, the observable proof that a refresh was attempted.
+        Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY,
+            Time.now().value() + TokenManager.EXPIRY_SKEW_SECONDS - 30);
+        var cap = new _BoolCapture();
+        var tm = new TokenManager();
+        tm.ensureValidToken(cap.method(:onResult));
+        Test.assertMessage(cap.value == false, "near-expiry token is not served as valid");
+        Test.assertEqualMessage(tm.getTokenState(), "UNCONFIGURED", "a refresh was attempted");
 
-    // Comfortably outside the skew window -> served as-is, no refresh.
-    _resetStorage();
-    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
-    Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY,
-        Time.now().value() + TokenManager.EXPIRY_SKEW_SECONDS + 600);
-    cap = new _BoolCapture();
-    new TokenManager().ensureValidToken(cap.method(:onResult));
-    Test.assertMessage(cap.value == true, "token outside the skew window is still valid");
-    _restoreCreds(prev);
-    _resetStorage();
+        // Comfortably outside the skew window -> served as-is, no refresh.
+        _resetStorage();
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+        Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY,
+            Time.now().value() + TokenManager.EXPIRY_SKEW_SECONDS + 600);
+        cap = new _BoolCapture();
+        new TokenManager().ensureValidToken(cap.method(:onResult));
+        Test.assertMessage(cap.value == true, "token outside the skew window is still valid");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
     return true;
 }
 
@@ -598,18 +689,23 @@ function testToken_refreshesBeforeExpiry(logger as Test.Logger) as Lang.Boolean 
 function testToken_retryAfterRebootstrapBypassesGuard(logger as Test.Logger) as Lang.Boolean {
     _resetStorage();
     var prev = _blankCreds();
-    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REBOOTSTRAP");
-    Application.Storage.setValue(StorageKeys.KEY_GRANT_STRIKES, 2);
-    var tm = new TokenManager();
-    var cap = new _BoolCapture();
-    // Blanked creds -> the forced refresh reaches _refreshToken and bails to UNCONFIGURED;
-    // ensureValidToken would have short-circuited on NEEDS_REBOOTSTRAP without touching it.
-    tm.retryAfterRebootstrap(cap.method(:onResult));
-    Test.assertEqualMessage(tm.getTokenState(), "UNCONFIGURED", "guard bypassed");
-    Test.assertMessage(
-        Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES) == null, "strikes reset");
-    _restoreCreds(prev);
-    _resetStorage();
+    try {
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REBOOTSTRAP");
+        Application.Storage.setValue(StorageKeys.KEY_GRANT_STRIKES, 2);
+        var tm = new TokenManager();
+        var cap = new _BoolCapture();
+        // Blanked creds -> the forced refresh reaches _refreshToken and bails to UNCONFIGURED;
+        // ensureValidToken would have short-circuited on NEEDS_REBOOTSTRAP without touching it.
+        tm.retryAfterRebootstrap(cap.method(:onResult));
+        Test.assertEqualMessage(tm.getTokenState(), "UNCONFIGURED", "guard bypassed");
+        // The strike reset is deferred to dispatch (see testToken_abortedAttemptLeavesStateAlone),
+        // so a credential-less attempt leaves the ledger where it was.
+        Test.assertEqualMessage(
+            Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES), 2, "ledger untouched");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
     return true;
 }
 
@@ -890,6 +986,10 @@ function _blankCreds() {
     return prev;
 }
 
+// MUST be called from a `finally`: an assertion that throws between _blankCreds() and
+// here leaves both Settings blanked for every later test AND every later sim session,
+// and the next _blankCreds() then captures "" as the value to "restore" — the damage
+// becomes permanent.
 function _restoreCreds(prev) {
     if (prev[0] != null) { Application.Properties.setValue("clientId", prev[0]); }
     if (prev[1] != null) { Application.Properties.setValue("refreshToken", prev[1]); }

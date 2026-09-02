@@ -207,6 +207,7 @@ class ForegroundSync {
     // the next successful sync.
     function onBgContainer(responseCode as Lang.Number, containerId) as Void {
         if (_stop429(responseCode)) { return; }
+        if (_stop401(responseCode)) { return; }
         // A bg-container create rejected by the cap blocks onboarding too (so cleanup can be
         // offered). A non-cap bg failure stays best-effort — the foreground still proceeds.
         if (containerId == null && _boot.createCapFailure()) {
@@ -221,17 +222,28 @@ class ForegroundSync {
             _finish(true);
             return;
         }
+        // On a 401 retry the About-car extras were already fetched (or already failed)
+        // on the first pass. Re-issuing them would double the quota cost of every 401
+        // — go straight to the telematic call the retry exists for.
+        if (_retried401) {
+            _client.fetchTelematicData(_vin, _containerId, _accessToken, method(:onTelematic));
+            return;
+        }
         // Step 3: basicData (best-effort), then tyre, then full telematic.
         _boot.fetchBasicData(_vin, _accessToken, method(:onBasic));
     }
 
     function onBasic(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
         if (_stop429(responseCode)) { return; }
+        // Best-effort for ordinary failures, but a 401 means every remaining call is
+        // doomed too — refresh now instead of burning them.
+        if (_stop401(responseCode)) { return; }
         _boot.fetchTyreDiagnosis(_vin, _accessToken, method(:onTyreDiag));
     }
 
     function onTyreDiag(responseCode as Lang.Number, tyreKm as Lang.Dictionary or Null) as Void {
         if (_stop429(responseCode)) { return; }
+        if (_stop401(responseCode)) { return; }
         _tyreKm = tyreKm;  // best-effort — proceed regardless of success
         _client.fetchTelematicData(_vin, _containerId, _accessToken, method(:onTelematic));
     }

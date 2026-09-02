@@ -56,8 +56,18 @@ class TokenManager {
     // True when a START press is driving this refresh — selects the strike threshold.
     var _manual;
 
+    // The in-flight stamp THIS instance wrote, so the response releases its own lock
+    // and not one a later refresh now owns.
+    var _inFlightStamp;
+
+    // Set by retryAfterRebootstrap: clear the strike ledger, but only if a request
+    // actually goes out.
+    var _resetStrikesOnDispatch;
+
     function initialize() {
         _manual = false;   // default: background poll / auto sync on app open
+        _inFlightStamp = null;
+        _resetStrikesOnDispatch = false;
     }
 
     // Callers that know a user is watching say so before ensureValidToken().
@@ -94,7 +104,8 @@ class TokenManager {
         // The skew makes it "expiring soon", not "expired" (see EXPIRY_SKEW_SECONDS).
         var expiry = Application.Storage.getValue(StorageKeys.KEY_ACCESS_EXPIRY);
         if (expiry == null || Time.now().value() + EXPIRY_SKEW_SECONDS >= expiry) {
-            Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REFRESH");
+            // NEEDS_REFRESH is written by _refreshToken(), and only once a request
+            // genuinely goes out — see the note there.
             _refreshToken();
         } else {
             _callback.invoke(true); // Access Token still valid
@@ -110,8 +121,10 @@ class TokenManager {
         _manual   = true;   // always a user action, from the re-link prompt
 
         // The user's explicit "try again" — start the strike count over so the
-        // corroboration rule applies to this attempt too.
-        Application.Storage.deleteValue(StorageKeys.KEY_GRANT_STRIKES);
+        // corroboration rule applies to this attempt too. Deferred to the moment a
+        // request is dispatched: clearing it here destroyed the ledger even when the
+        // in-flight gate aborted the attempt without sending anything.
+        _resetStrikesOnDispatch = true;
         _refreshToken();
     }
 
@@ -123,9 +136,17 @@ class TokenManager {
         // state is left untouched, so this reads as "try again", never as "re-pair".
         var now = Time.now().value();
         var inFlight = Application.Storage.getValue(StorageKeys.KEY_REFRESH_INFLIGHT);
-        if (inFlight != null && inFlight <= now && now - inFlight < INFLIGHT_TTL_SECONDS) {
-            _callback.invoke(false);
-            return;
+        if (inFlight != null) {
+            if (inFlight > now + INFLIGHT_TTL_SECONDS) {
+                // Impossible stamp — the clock jumped forward and back (GPS/phone
+                // resync). Discard it rather than blocking refreshes indefinitely.
+                Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_INFLIGHT);
+            } else if (inFlight > now || now - inFlight < INFLIGHT_TTL_SECONDS) {
+                // A stamp slightly in the future means the clock moved backwards; treat
+                // it as live rather than failing open into the double-refresh race.
+                _callback.invoke(false);
+                return;
+            }
         }
 
         var clientId = Config.clientId();
@@ -147,7 +168,21 @@ class TokenManager {
             return;
         }
 
+        // A request is genuinely going out now. Everything below is bookkeeping that
+        // must NOT happen when the gate or the creds check aborted the attempt.
+        _inFlightStamp = now;
         Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT, now);
+        if (_resetStrikesOnDispatch) {
+            Application.Storage.deleteValue(StorageKeys.KEY_GRANT_STRIKES);
+            _resetStrikesOnDispatch = false;
+        }
+        // Record that a refresh is underway — but never clobber the latched
+        // NEEDS_REBOOTSTRAP that retryAfterRebootstrap() is trying to recover from;
+        // only a SUCCESSFUL refresh clears that one.
+        var ts = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
+        if (ts == null || !ts.equals("NEEDS_REBOOTSTRAP")) {
+            Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REFRESH");
+        }
 
         // BMW's OAuth token endpoint requires application/x-www-form-urlencoded.
         // Without an explicit Content-Type header, makeWebRequest sends the params
@@ -172,10 +207,6 @@ class TokenManager {
 
     // CIQ runtime invokes this when the token refresh HTTP response arrives.
     function onTokenRefreshResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
-        // The round-trip is over however it ended — release the in-flight lock first
-        // so an early return can't strand it for the full TTL.
-        Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_INFLIGHT);
-
         if (responseCode == 200 && data != null && data.hasKey("access_token")) {
             // Atomic rotation: Refresh Token MUST be persisted before Access Token is used.
             // If interrupted after step 1 but before step 2, the user can still re-auth.
@@ -190,12 +221,13 @@ class TokenManager {
             Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY,
                 Time.now().value() + expiresIn);
             Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
-            // Success retires both failure ledgers. Without the backoff clear a bad
-            // patch of connectivity keeps the background poll gated for up to 4h
-            // after the link is back (QuotaGuard's documented contract).
-            QuotaGuard.clearBackoff();
+            // A working grant retires the strike ledger. The error BACKOFF is
+            // deliberately NOT cleared here: it gates the data API, and this refresh
+            // proves nothing about that host (customer.bmwgroup.com is a different
+            // service). Only a successful data fetch clears it.
             Application.Storage.deleteValue(StorageKeys.KEY_GRANT_STRIKES);
             data = null;
+            _releaseInFlight();
             _callback.invoke(true);
 
         } else if (responseCode == 400
@@ -216,14 +248,30 @@ class TokenManager {
                 _incrementBackoff();
             }
             data = null;
+            _releaseInFlight();
             _callback.invoke(false);
 
         } else {
             // Transient failure (5xx, network error, timeout) — back off and retry later
             _incrementBackoff();
             data = null;
+            _releaseInFlight();
             _callback.invoke(false);
         }
+    }
+
+    // Release the in-flight lock, but ONLY if Storage still holds the stamp this
+    // instance wrote. A response that outlived INFLIGHT_TTL_SECONDS must not delete a
+    // lock a later refresh now owns — that would let a third caller dispatch into an
+    // active rotation, which is the collision the stamp exists to prevent. Called
+    // after the token writes so the lock covers them.
+    function _releaseInFlight() {
+        if (_inFlightStamp == null) { return; }
+        var held = Application.Storage.getValue(StorageKeys.KEY_REFRESH_INFLIGHT);
+        if (held != null && held == _inFlightStamp) {
+            Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_INFLIGHT);
+        }
+        _inFlightStamp = null;
     }
 
     // Doubles the current backoff delay; cap at 4 hours (A-4).

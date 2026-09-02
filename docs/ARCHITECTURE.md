@@ -287,7 +287,7 @@ into a permanent "Re-auth needed". Three guards keep that from happening:
 | Guard | Key | Effect |
 |---|---|---|
 | **Corroboration** (`GRANT_STRIKES_MANUAL = 3`, `GRANT_STRIKES_UNATTENDED = 5`) | `KEY_GRANT_STRIKES` | strikes below the threshold behave like any transient failure (backoff, state untouched). Any successful refresh clears the count. The threshold depends on who asked — see below. |
-| **Serialization** (`INFLIGHT_TTL_SECONDS = 90`) | `KEY_REFRESH_INFLIGHT` | one refresh at a time across views *and* processes (they share Storage). A caller arriving mid-refresh fails transiently. The TTL self-heals a stamp left by a killed process. |
+| **Serialization** (`INFLIGHT_TTL_SECONDS = 90`) | `KEY_REFRESH_INFLIGHT` | best-effort advisory lock, not mutual exclusion — one refresh at a time across views *and* processes (they share Storage), with a caller arriving mid-refresh failing transiently. The TTL self-heals a stamp left by a killed process, which also means a round-trip slower than the TTL can be overtaken; the responder releases only the stamp it wrote, so the overtaking refresh keeps its own lock. A stamp dated in the future counts as live (the clock moved backwards); one further ahead than the TTL is discarded as impossible. |
 | **Silent retry** | — | opening the re-link prompt spends one quota-exempt refresh via `TokenManager.retryAfterRebootstrap()` before showing the device flow; success clears the latch outright. Settings → *Re-pair* opts out (`AuthView.setAllowRecover(false)`) because the user asked for pairing by name. |
 
 **Who asked sets the bar.** `ForegroundSync.run()` passes its `isManual` through to
@@ -301,8 +301,13 @@ background can be finished by a START press.
 
 Below the threshold the cost is only a delayed prompt, never lost data: the pages keep
 showing cached values under a "No connection" note, and Settings → *Re-pair* is always
-available. Spread over the doubling backoff (40 m, 80 m, 160 m, 4 h, 4 h) an unattended
-watch latches in ~12 h; three START presses do it at once.
+available. Three START presses latch it at once (the 60 s cooldown does not apply — it is
+stamped on success and rate-limit, not on failure). An unattended watch takes longer, but
+**not** as long as a doubling ladder would suggest: `_incrementBackoff` doubles only while
+a backoff is still *active*, and the poll is gated until it expires, so each background
+strike simply re-arms the 40 min base. Five strikes therefore cost roughly `5 ×
+max(poll interval, 40 min)` — about **3–5 h** depending on update mode, not the ~12 h an
+un-gated doubling ladder would give.
 
 `EXPIRY_SKEW_SECONDS = 300` refreshes early: a token still valid when the request leaves
 the watch can expire in flight, and the data path reads the resulting `401` as a transient
@@ -375,9 +380,12 @@ flowchart TD
   the 24 h block and show a clear message (no false "auth needed").
 - `KEY_NEXT_ALLOWED` (quota gate) and `KEY_BACKOFF_UNTIL` (error backoff) are **separate**:
   the gate advances on every call; backoff is set on errors and cleared on success. "Cleared
-  on success" is `QuotaGuard.clearBackoff()`, called from the token refresh, the background
-  poll and the foreground sync — without it the backoff only ever doubles, and one bad patch
-  of connectivity keeps the poll blocked for up to 4 h after the link is back.
+  on success" is `QuotaGuard.clearBackoff()`, called from the background poll and the
+  foreground sync on a successful **data fetch** — plus sign-out and re-pair, which retire
+  the old grant's ledgers. Deliberately **not** called on a successful token refresh: that
+  hits `customer.bmwgroup.com`, a different service, and says nothing about whether the data
+  API is healthy. Clearing it there let a single widget open reset a backoff earned by a
+  data-API outage.
 
 ---
 
@@ -431,9 +439,9 @@ elsewhere (see §12).
 | `KEY_GLANCE_STATE` | `_writeGlanceSummary` (every write) | glance (direct) |
 | `KEY_VEHICLE_NAME` / `KEY_BASIC_DATA` / `KEY_DRIVE_TYPE` | basicData | About menu, header |
 | `KEY_NEXT_ALLOWED` | QuotaGuard | QuotaGuard.canFetch |
-| `KEY_BACKOFF_UNTIL` | TokenManager / ServiceDelegate (set on error, cleared on every success) | poll backoff gate |
+| `KEY_BACKOFF_UNTIL` | TokenManager / ServiceDelegate (set on error; cleared by a successful DATA fetch, sign-out and re-pair — never by a token refresh, which proves nothing about the data host) | poll backoff gate |
 | `KEY_REFRESH_INFLIGHT` | TokenManager (stamp on dispatch, cleared on response) | refresh serialization, 90 s TTL |
-| `KEY_GRANT_STRIKES` | TokenManager (on `invalid_grant`; cleared on success / sign-out) | `NEEDS_REBOOTSTRAP` corroboration |
+| `KEY_GRANT_STRIKES` | TokenManager (on `invalid_grant`; cleared by a successful refresh, sign-out, and a device-flow re-pair — a new grant must start with a clean ledger) | `NEEDS_REBOOTSTRAP` corroboration |
 | `lastForegroundSync` (`KEY_LAST_FG`) | full success, rate-limit | 60 s cooldown |
 | `lastFullFetch` (`KEY_LAST_FULL`) | full success | daily full-fetch gate |
 

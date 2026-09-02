@@ -415,8 +415,17 @@ function testToken_invalidGrantNeedsCorroboration(logger as Test.Logger) as Lang
     var until = Application.Storage.getValue(StorageKeys.KEY_BACKOFF_UNTIL);
     Test.assertMessage(_nearNow(until, 2400), "first strike backs off like a transient error");
 
+    // Every strike up to the threshold behaves the same way. Driven off the constant
+    // so raising it can't leave this test asserting the old rule.
+    for (var i = 2; i < TokenManager.GRANT_STRIKES_TO_LATCH; i++) {
+        tm.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
+        Test.assertMessage(tm.getTokenState() == null, "strike below threshold does NOT latch");
+        Test.assertEqualMessage(
+            Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES), i, "strike counted");
+    }
+
     tm.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
-    Test.assertEqualMessage(tm.getTokenState(), "NEEDS_REBOOTSTRAP", "second strike latches");
+    Test.assertEqualMessage(tm.getTokenState(), "NEEDS_REBOOTSTRAP", "threshold strike latches");
     _resetStorage();
     return true;
 }

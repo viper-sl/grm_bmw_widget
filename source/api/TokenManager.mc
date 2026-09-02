@@ -34,9 +34,15 @@ class TokenManager {
     // declared dead. One is not proof: a refresh whose RESPONSE was lost in transit
     // (BMW rotated, the watch never received the new token) produces exactly one
     // invalid_grant on the next attempt, and so does a mid-air collision between
-    // the foreground and the background poll. Latching on the first one turns a bad
-    // BLE moment into a permanent "Re-auth needed".
-    static const GRANT_STRIKES_TO_LATCH = 2;
+    // the foreground and the background poll. Latching early turns a bad BLE moment
+    // into a permanent "Re-auth needed", so demand a clear run of them.
+    //
+    // The cost of a high threshold is only a delayed prompt, never lost data: until
+    // it latches the widget keeps showing cached values under a "No connection" note,
+    // and Settings -> Re-pair is always available. The background poll spreads its
+    // strikes over the doubling backoff (40 m, 80 m, 160 m, 4 h, 4 h), so an
+    // unattended watch latches in ~12 h; a user tapping START burns them immediately.
+    static const GRANT_STRIKES_TO_LATCH = 5;
 
     // Holds the completion callback across the async HTTP round-trip.
     var _callback;

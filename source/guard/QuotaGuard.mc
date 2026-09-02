@@ -3,7 +3,8 @@
 // RULE: KEY_NEXT_ALLOWED is always advanced forward — never reset to 0.
 // RULE: KEY_NEXT_ALLOWED and KEY_BACKOFF_UNTIL are independent keys with different semantics:
 //   KEY_NEXT_ALLOWED  — advances on every call; cleared only by time expiry
-//   KEY_BACKOFF_UNTIL — cleared to 0 on success; set on error (managed by Background Service)
+//   KEY_BACKOFF_UNTIL — set on error, cleared on success via clearBackoff() (both
+//                       processes: token refresh, background poll, foreground sync)
 using Toybox.Application;
 using Toybox.Time;
 
@@ -28,6 +29,14 @@ class QuotaGuard {
             StorageKeys.KEY_NEXT_ALLOWED,
             Time.now().value() + 2400
         );
+    }
+
+    // Clears the error backoff. Every successful token refresh or data fetch must
+    // call this — the gate is only ever doubled otherwise, so one bad patch of
+    // connectivity would keep the background poll blocked for up to 4h after the
+    // link is back (the "cannot recover" half of the stale-token bug).
+    static function clearBackoff() {
+        Application.Storage.deleteValue(StorageKeys.KEY_BACKOFF_UNTIL);
     }
 
     // Call when CarDataClient receives a CU-429 quota-exceeded response.

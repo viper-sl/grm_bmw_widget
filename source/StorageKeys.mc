@@ -8,6 +8,12 @@ class StorageKeys {
     static const KEY_REFRESH_TOKEN    = "refreshToken";
     static const KEY_NEXT_ALLOWED     = "nextAllowedCall";
     static const KEY_BACKOFF_UNTIL    = "backoffUntil";
+    // Epoch of the refresh POST currently in flight — serializes token refreshes
+    // across the foreground views and the background process (they share Storage).
+    static const KEY_REFRESH_INFLIGHT = "refreshInFlight";
+    // Consecutive invalid_grant responses with no successful refresh in between.
+    // Corroboration before NEEDS_REBOOTSTRAP is latched (TokenManager).
+    static const KEY_GRANT_STRIKES    = "grantStrikes";
     static const KEY_VEHICLE_NAME     = "vehicleName";
     static const KEY_DRIVE_TYPE       = "driveType";
     static const KEY_BASIC_DATA       = "basicData";

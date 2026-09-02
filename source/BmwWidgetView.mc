@@ -11,6 +11,7 @@ class BmwWidgetView extends WatchUi.View {
     var _autoSyncStarted;
     var _autoSyncFailed;
     var _rateLimited;     // auto-sync failed because BMW's daily API limit was reached
+    var _offline;         // auto-sync failed on the link, not on the credentials
     var _sync;
 
     function initialize() {
@@ -18,12 +19,14 @@ class BmwWidgetView extends WatchUi.View {
         _autoSyncStarted = false;
         _autoSyncFailed  = false;
         _rateLimited     = false;
+        _offline         = false;
     }
 
     function retryAutoSync() {
         _autoSyncStarted = true;
         _autoSyncFailed  = false;
         _rateLimited     = false;
+        _offline         = false;
         _sync = new ForegroundSync();
         _sync.run(method(:onAutoSyncDone), false);  // auto: full fetch only once/day
         WatchUi.requestUpdate();
@@ -32,6 +35,11 @@ class BmwWidgetView extends WatchUi.View {
     function onAutoSyncDone(success) {
         _autoSyncFailed = !success;
         _rateLimited    = (!success && _sync != null && _sync.isRateLimited());
+        // A link-level failure must not fall through to the setup prompt: telling a
+        // paired user to "press START to connect" because the phone was out of range
+        // is how a dropout turns into an unnecessary re-pair.
+        _offline        = (!success && _sync != null
+                            && !_sync.isRateLimited() && !_sync.authFailed());
         WatchUi.requestUpdate();
     }
 
@@ -72,6 +80,8 @@ class BmwWidgetView extends WatchUi.View {
             _drawLoading(dc);
         } else if (_rateLimited) {
             _drawRateLimited(dc);
+        } else if (_offline) {
+            _drawOffline(dc);
         } else {
             _drawSetupPrompt(dc);
         }
@@ -79,12 +89,24 @@ class BmwWidgetView extends WatchUi.View {
 
     function needsAuth() {
         var ts = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
-        if (ts != null && ts.equals("NORMAL"))            { return false; }
         if (ts != null && ts.equals("NEEDS_REBOOTSTRAP")) { return true;  }
+        // A known link-level failure is not an auth problem — START retries instead
+        // (see onSelect). Checked before NORMAL so it also covers a paired watch left
+        // in NEEDS_REFRESH by a refresh that never got an answer.
+        if (_offline)                                     { return false; }
+        if (ts != null && ts.equals("NORMAL"))            { return false; }
         return !PageNav.hasVisible();
     }
 
-    function onSelect()       { return false; }
+    // START on the offline notice retries the sync (there is no page to hand it to,
+    // and needsAuth() is false here, so the press would otherwise do nothing).
+    function onSelect() {
+        if (_offline) {
+            retryAutoSync();
+            return true;
+        }
+        return false;
+    }
     function onNextPage()     { return false; }
     function onPreviousPage() { return false; }
 
@@ -124,6 +146,19 @@ class BmwWidgetView extends WatchUi.View {
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, cy + PageChrome.s(dc, 8), Graphics.FONT_TINY, "Try again tomorrow",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    // Paired, but the fetch could not reach BMW (no phone link, timeout, 5xx).
+    // Deliberately NOT the setup prompt — nothing about the pairing is wrong.
+    function _drawOffline(dc) {
+        var cx = dc.getWidth() / 2;
+        var cy = dc.getHeight() / 2;
+        dc.setColor(Theme.COLOR_TEXT, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy - PageChrome.s(dc, 18), Graphics.FONT_SMALL, "No connection",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy + PageChrome.s(dc, 8), Graphics.FONT_TINY, "Press START to retry",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 

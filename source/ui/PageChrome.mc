@@ -180,6 +180,17 @@ class PageChrome {
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
+    // Banner for a refresh that failed on the link, not on the credentials (no phone,
+    // timeout, 5xx). Drawn over the page's cached data, like the rate-limit note:
+    // a dropped connection must never read as "you need to sign in again".
+    static function drawOfflineNote(dc) {
+        var cx = dc.getWidth() / 2;
+        var y  = (dc.getHeight() * 3) / 4 + s(dc, 20);
+        dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
+        dc.drawText(cx, y, Graphics.FONT_XTINY, "No connection — retry",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
     static function drawSelectHint(dc) {
         var hy  = dc.getHeight() / 4;
         var tip = dc.getWidth() - s(dc, 22);

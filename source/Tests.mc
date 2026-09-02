@@ -396,15 +396,218 @@ function testToken_refreshDefaultExpiryWhenMissing(logger as Test.Logger) as Lan
     return true;
 }
 
+// A single invalid_grant is NOT proof the grant is dead: a refresh whose response was
+// lost in transit (BMW rotated, the watch never saw the new token) produces exactly one,
+// and NEEDS_REBOOTSTRAP is a one-way door. Strike one must behave like any transient
+// failure; only the second latches.
 (:test)
-function testToken_invalidGrantRebootstrap(logger as Test.Logger) as Lang.Boolean {
+function testToken_invalidGrantNeedsCorroboration(logger as Test.Logger) as Lang.Boolean {
     _resetStorage();
     var tm = new TokenManager();
     var cap = new _BoolCapture();
     tm._callback = cap.method(:onResult);
+
     tm.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
     Test.assertMessage(cap.value == false, "invalid_grant -> false");
-    Test.assertEqualMessage(tm.getTokenState(), "NEEDS_REBOOTSTRAP", "permanent failure state");
+    Test.assertMessage(tm.getTokenState() == null, "first strike does NOT latch");
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES), 1, "strike recorded");
+    var until = Application.Storage.getValue(StorageKeys.KEY_BACKOFF_UNTIL);
+    Test.assertMessage(_nearNow(until, 2400), "first strike backs off like a transient error");
+
+    tm.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
+    Test.assertEqualMessage(tm.getTokenState(), "NEEDS_REBOOTSTRAP", "second strike latches");
+    _resetStorage();
+    return true;
+}
+
+// A successful refresh retires both failure ledgers — otherwise an old strike would
+// latch on the next isolated 400, and the backoff would keep the background poll
+// gated for up to 4h after the link came back.
+(:test)
+function testToken_successClearsStrikesAndBackoff(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    Application.Storage.setValue(StorageKeys.KEY_GRANT_STRIKES, 1);
+    Application.Storage.setValue(StorageKeys.KEY_BACKOFF_UNTIL, Time.now().value() + 14400);
+
+    tm.onTokenRefreshResponse(200, { "access_token" => "A", "refresh_token" => "R" });
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES) == null, "strikes cleared");
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_BACKOFF_UNTIL) == null, "backoff cleared");
+    _resetStorage();
+    return true;
+}
+
+// A 200 that omits refresh_token must leave the stored one alone. Writing null over it
+// strands the widget in UNCONFIGURED on the very next call (DeviceAuthManager already
+// guards this; TokenManager did not).
+(:test)
+function testToken_missingRefreshTokenKeepsStored(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "REF-OLD");
+
+    tm.onTokenRefreshResponse(200, { "access_token" => "ACC-NEW", "expires_in" => 3600 });
+    Test.assertMessage(cap.value == true, "still a success");
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN), "REF-OLD",
+        "existing refresh token preserved");
+    Test.assertEqualMessage(tm.getAccessToken(), "ACC-NEW", "access token still rotated");
+    _resetStorage();
+    return true;
+}
+
+// BMW rotates on every refresh, so two overlapping refreshes race and the loser gets a
+// 400 invalid_grant. A caller arriving mid-refresh must fail transiently instead —
+// no second POST, and above all no change to the token state.
+(:test)
+function testToken_concurrentRefreshIsBlocked(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REFRESH");
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "REF");
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT, Time.now().value());
+
+    var cap = new _BoolCapture();
+    new TokenManager().ensureValidToken(cap.method(:onResult));
+    Test.assertMessage(cap.called, "callback fired");
+    Test.assertMessage(cap.value == false, "in-flight refresh -> transient false");
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE), "NEEDS_REFRESH",
+        "token state untouched (not an auth failure)");
+    _resetStorage();
+    return true;
+}
+
+// A stale in-flight stamp (process killed mid-refresh) must not block refreshes forever.
+(:test)
+function testToken_staleInflightExpires(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var prev = _blankCreds();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT,
+        Time.now().value() - TokenManager.INFLIGHT_TTL_SECONDS - 1);
+    // With the creds blanked, reaching UNCONFIGURED is the proof the call got PAST
+    // the in-flight gate instead of returning at it.
+    tm._refreshToken();
+    Test.assertEqualMessage(tm.getTokenState(), "UNCONFIGURED", "stale stamp ignored");
+    _restoreCreds(prev);
+    _resetStorage();
+    return true;
+}
+
+// The response handler always releases the in-flight lock, whatever the outcome.
+(:test)
+function testToken_responseReleasesInflight(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT, Time.now().value());
+    tm.onTokenRefreshResponse(500, null);
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_REFRESH_INFLIGHT) == null,
+        "in-flight lock released on failure too");
+    _resetStorage();
+    return true;
+}
+
+// An access token that expires while the request is in the air comes back as a 401 the
+// data path treats as transient. Refresh a skew window early instead.
+(:test)
+function testToken_refreshesBeforeExpiry(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var prev = _blankCreds();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+    // Not expired, but inside the skew window — with the creds blanked, _refreshToken
+    // bails to UNCONFIGURED, the observable proof that a refresh was attempted.
+    Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY,
+        Time.now().value() + TokenManager.EXPIRY_SKEW_SECONDS - 30);
+    var cap = new _BoolCapture();
+    var tm = new TokenManager();
+    tm.ensureValidToken(cap.method(:onResult));
+    Test.assertMessage(cap.value == false, "near-expiry token is not served as valid");
+    Test.assertEqualMessage(tm.getTokenState(), "UNCONFIGURED", "a refresh was attempted");
+
+    // Comfortably outside the skew window -> served as-is, no refresh.
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+    Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY,
+        Time.now().value() + TokenManager.EXPIRY_SKEW_SECONDS + 600);
+    cap = new _BoolCapture();
+    new TokenManager().ensureValidToken(cap.method(:onResult));
+    Test.assertMessage(cap.value == true, "token outside the skew window is still valid");
+    _restoreCreds(prev);
+    _resetStorage();
+    return true;
+}
+
+// The re-link prompt's escape hatch: retryAfterRebootstrap ignores the one-way guard
+// and clears the strike count, so a spurious latch is recoverable without re-pairing.
+(:test)
+function testToken_retryAfterRebootstrapBypassesGuard(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var prev = _blankCreds();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REBOOTSTRAP");
+    Application.Storage.setValue(StorageKeys.KEY_GRANT_STRIKES, 2);
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    // Blanked creds -> the forced refresh reaches _refreshToken and bails to UNCONFIGURED;
+    // ensureValidToken would have short-circuited on NEEDS_REBOOTSTRAP without touching it.
+    tm.retryAfterRebootstrap(cap.method(:onResult));
+    Test.assertEqualMessage(tm.getTokenState(), "UNCONFIGURED", "guard bypassed");
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES) == null, "strikes reset");
+    _restoreCreds(prev);
+    _resetStorage();
+    return true;
+}
+
+// A 401 on a data call must invalidate the cached expiry — nothing else would force a
+// refresh, since ensureValidToken trusts KEY_ACCESS_EXPIRY.
+(:test)
+function testToken_invalidateAccessTokenDropsExpiry(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY, Time.now().value() + 3600);
+    TokenManager.invalidateAccessToken();
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_ACCESS_EXPIRY) == null, "expiry dropped");
+    _resetStorage();
+    return true;
+}
+
+// ForegroundSync must tell a credential failure from a link failure: only the former
+// may send the user to pairing. This is the classification the pages branch on.
+(:test)
+function testSync_classifiesFailure(logger as Test.Logger) as Lang.Boolean {
+    var authStates = ["UNCONFIGURED", "NEEDS_REBOOTSTRAP"];
+    for (var i = 0; i < authStates.size(); i++) {
+        _resetStorage();
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, authStates[i]);
+        var fs = new ForegroundSync();
+        fs._finish(false);
+        Test.assertMessage(fs.authFailed(), authStates[i] + " -> auth failure");
+    }
+    // NORMAL / NEEDS_REFRESH / null all mean the credentials are fine and the link isn't.
+    var linkStates = ["NORMAL", "NEEDS_REFRESH"];
+    for (var j = 0; j < linkStates.size(); j++) {
+        _resetStorage();
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, linkStates[j]);
+        var fs2 = new ForegroundSync();
+        fs2._finish(false);
+        Test.assertMessage(!fs2.authFailed(), linkStates[j] + " -> transient, not auth");
+    }
+    _resetStorage();
+    var fs3 = new ForegroundSync();
+    fs3._finish(false);
+    Test.assertMessage(!fs3.authFailed(), "null state (first-run refresh) -> transient");
     _resetStorage();
     return true;
 }
@@ -631,6 +834,22 @@ class _BoolCapture {
 // as a test case. (:test) is only for the actual test_* functions.
 function _resetStorage() {
     Application.Storage.clearValues();
+}
+
+// Blanks the credential Settings so a TokenManager refresh bails out at its creds
+// check instead of dispatching a real web request from a unit test (the sim's
+// settings store supplies non-empty defaults for both). Returns the previous values.
+function _blankCreds() {
+    var prev = [Application.Properties.getValue("clientId"),
+                Application.Properties.getValue("refreshToken")];
+    Application.Properties.setValue("clientId", "");
+    Application.Properties.setValue("refreshToken", "");
+    return prev;
+}
+
+function _restoreCreds(prev) {
+    if (prev[0] != null) { Application.Properties.setValue("clientId", prev[0]); }
+    if (prev[1] != null) { Application.Properties.setValue("refreshToken", prev[1]); }
 }
 
 // True if a stored epoch is ~= now + offset (tolerates a few seconds of clock drift).

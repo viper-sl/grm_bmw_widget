@@ -1,6 +1,7 @@
 // On-device auth screen. Drives DeviceAuthManager and renders its FSM state.
 // Opened from the widget when tokenState is NEEDS_REBOOTSTRAP/UNCONFIGURED, or from
 // the glance/setup prompt. Shows the user code to enter on the BMW site, then polls.
+using Toybox.Application;
 using Toybox.Graphics;
 using Toybox.WatchUi;
 
@@ -13,6 +14,11 @@ class AuthView extends WatchUi.View {
     var _deleter;       // keeps the async ContainerDeleter alive during cleanup
     var _cleaning;      // cleanup (delete-all) in progress
     var _cleanupFailed; // the delete-all could not complete
+    var _token;         // keeps the async TokenManager alive during recovery
+    var _recovering;    // silent refresh attempt in progress (pre-device-flow)
+    var _recoverOk;     // the silent refresh worked — no device flow needed
+    var _recoverTried;  // guard: attempt the silent refresh at most once
+    var _allowRecover;  // false when the user explicitly asked to re-pair
 
     function initialize(auth) {
         View.initialize();
@@ -21,16 +27,53 @@ class AuthView extends WatchUi.View {
         _rateLimited = false;
         _cleaning = false;
         _cleanupFailed = false;
+        _recovering = false;
+        _recoverOk = false;
+        _recoverTried = false;
+        _allowRecover = true;
     }
+
+    // Called by the Settings "Re-pair" item: the user asked for the device flow by
+    // name, so don't quietly resolve it with a token refresh instead.
+    function setAllowRecover(allow) { _allowRecover = allow; }
 
     function onLayout(dc) {}
 
     function onShow() {
         // Redraw whenever the device-flow state advances.
         _auth.setOnChange(method(:onAuthChange));
-        if (_auth.getState() == DeviceAuthManager.IDLE) {
+        if (_auth.getState() != DeviceAuthManager.IDLE) { return; }
+
+        // A latched NEEDS_REBOOTSTRAP is not always real: a refresh whose response was
+        // lost in transit leaves the watch holding a rotated-away token and produces
+        // the same 400 as a dead grant. Spend one quota-exempt refresh before making
+        // the user re-pair — if it succeeds the latch clears and the widget carries on.
+        var ts = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
+        if (_allowRecover && !_recoverTried
+                && ts != null && ts.equals("NEEDS_REBOOTSTRAP")) {
+            _recoverTried = true;
+            _recovering   = true;
+            _token = new TokenManager();
+            _token.retryAfterRebootstrap(method(:onRecoverDone));
+            WatchUi.requestUpdate();
+            return;
+        }
+        _auth.start();
+    }
+
+    // Silent-refresh outcome: on success the stored grant was fine all along, so fetch
+    // data and drop back to the widget; on failure fall through to the device flow.
+    function onRecoverDone(success) {
+        _recovering = false;
+        _recoverOk  = success;
+        if (success) {
+            _synced = true;
+            _sync = new ForegroundSync();
+            _sync.run(method(:onSyncDone), true);
+        } else {
             _auth.start();
         }
+        WatchUi.requestUpdate();
     }
 
     function onHide() {
@@ -105,7 +148,23 @@ class AuthView extends WatchUi.View {
         var cy = dc.getHeight() / 2;
         var st = _auth.getState();
 
+        if (_recovering) {
+            _center(dc, cx, cy - PageChrome.s(dc, 10), Graphics.FONT_SMALL, Theme.COLOR_TEXT, "Reconnecting…");
+            dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, cy + PageChrome.s(dc, 16), Graphics.FONT_XTINY, "checking saved login",
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            return;
+        }
+
         if (st == DeviceAuthManager.REQUESTING || st == DeviceAuthManager.IDLE) {
+            if (_recoverOk) {
+                // Recovered without re-pairing — the post-recovery fetch is running.
+                _center(dc, cx, cy - PageChrome.s(dc, 10), Graphics.FONT_SMALL, Theme.COLOR_OK, "Reconnected");
+                dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(cx, cy + PageChrome.s(dc, 16), Graphics.FONT_XTINY, "Fetching data…",
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                return;
+            }
             _center(dc, cx, cy, Graphics.FONT_SMALL, Theme.COLOR_TEXT, "Connecting…");
             return;
         }

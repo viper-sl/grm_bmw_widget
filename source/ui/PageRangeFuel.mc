@@ -12,11 +12,13 @@ class PageRangeFuel extends WatchUi.View {
     var _sync;
     var _refreshing;
     var _rateLimited;
+    var _failed;        // last refresh failed on the link, not on the credentials
 
     function initialize() {
         View.initialize();
         _refreshing  = false;
         _rateLimited = false;
+        _failed      = false;
     }
 
     function onSelect() {
@@ -26,7 +28,8 @@ class PageRangeFuel extends WatchUi.View {
             return true;
         }
         _refreshing  = true;
-        _rateLimited = false;   // clear any prior limit note on a fresh attempt
+        _rateLimited = false;   // clear any prior limit/offline note on a fresh attempt
+        _failed      = false;
         WatchUi.requestUpdate();
         _sync = new ForegroundSync();
         _sync.run(method(:onRefreshDone), true);  // START = manual full refresh
@@ -38,9 +41,15 @@ class PageRangeFuel extends WatchUi.View {
         if (!success && _sync != null && _sync.isRateLimited()) {
             // Daily API limit — show a note on the page; do NOT bounce to auth.
             _rateLimited = true;
-        } else if (!success) {
+        } else if (!success && _sync != null && _sync.authFailed()) {
+            // Credentials are genuinely unusable — pairing is the only way out.
             var auth = new DeviceAuthManager();
             WatchUi.pushView(new AuthView(auth), new AuthDelegate(auth), WatchUi.SLIDE_LEFT);
+        } else if (!success) {
+            // Link-level failure (no phone, timeout, 5xx): keep the cached data on
+            // screen with a note. Opening the device flow here was the "asks to
+            // re-auth after a while" bug — a BLE dropout is not an expired grant.
+            _failed = true;
         }
         WatchUi.requestUpdate();
     }
@@ -132,6 +141,7 @@ class PageRangeFuel extends WatchUi.View {
         PageChrome.drawNavDots(dc);
         PageChrome.drawRefreshHint(dc, _refreshing);
         if (_rateLimited) { PageChrome.drawRateLimitNote(dc); }
+        else if (_failed) { PageChrome.drawOfflineNote(dc); }
     }
 
     // FR-22: instantaneous L/100km from remaining fuel + remaining range.

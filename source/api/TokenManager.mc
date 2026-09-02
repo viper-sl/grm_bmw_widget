@@ -3,6 +3,9 @@
 // the _callback fires when the token is ready (or on failure).
 // RULE: Always use StorageKeys.KEY_* constants — never inline Storage key strings.
 // RULE: On token rotation, write KEY_REFRESH_TOKEN BEFORE KEY_ACCESS_TOKEN.
+// RULE: A 200 that omits refresh_token must NOT clear the stored one.
+// RULE: NEEDS_REBOOTSTRAP is a one-way door (ensureValidToken short-circuits on it
+//       before any network call) — only latch it on corroborated evidence.
 using Toybox.Application;
 using Toybox.Communications;
 using Toybox.Lang;
@@ -10,6 +13,30 @@ using Toybox.Time;
 
 (:background)
 class TokenManager {
+
+    // Refresh this many seconds BEFORE the access token actually expires. A token
+    // that is still valid when the request leaves the watch can be expired by the
+    // time it reaches BMW over a slow phone bridge; the data path reads that 401 as
+    // a transient error and never retries, so the widget would sit stale until the
+    // next poll.
+    static const EXPIRY_SKEW_SECONDS = 300;
+
+    // How long a dispatched refresh POST counts as "in flight". BMW rotates the
+    // refresh token on every refresh, so two overlapping refreshes race: the first
+    // rotates, the second presents a token BMW has already burned and gets 400
+    // invalid_grant. Foreground views and the background service are separate
+    // processes but share Storage, so this stamp serializes them across both. A
+    // process killed mid-refresh leaves the stamp behind — the TTL is what makes
+    // it self-heal.
+    static const INFLIGHT_TTL_SECONDS = 90;
+
+    // Consecutive invalid_grant responses required before the refresh token is
+    // declared dead. One is not proof: a refresh whose RESPONSE was lost in transit
+    // (BMW rotated, the watch never received the new token) produces exactly one
+    // invalid_grant on the next attempt, and so does a mid-air collision between
+    // the foreground and the background poll. Latching on the first one turns a bad
+    // BLE moment into a permanent "Re-auth needed".
+    static const GRANT_STRIKES_TO_LATCH = 2;
 
     // Holds the completion callback across the async HTTP round-trip.
     var _callback;
@@ -37,9 +64,10 @@ class TokenManager {
             return;
         }
 
-        // Proactive expiry check — avoids spending a quota call on a stale token
+        // Proactive expiry check — avoids spending a quota call on a stale token.
+        // The skew makes it "expiring soon", not "expired" (see EXPIRY_SKEW_SECONDS).
         var expiry = Application.Storage.getValue(StorageKeys.KEY_ACCESS_EXPIRY);
-        if (expiry == null || Time.now().value() >= expiry) {
+        if (expiry == null || Time.now().value() + EXPIRY_SKEW_SECONDS >= expiry) {
             Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REFRESH");
             _refreshToken();
         } else {
@@ -47,8 +75,31 @@ class TokenManager {
         }
     }
 
+    // Recovery entry point for the re-link prompt: ignores the permanent-failure
+    // guard and spends one (quota-exempt) refresh before the user is dragged through
+    // the device flow. A latched NEEDS_REBOOTSTRAP can be a false positive — see
+    // GRANT_STRIKES_TO_LATCH — and a successful refresh here clears it outright.
+    function retryAfterRebootstrap(callback) {
+        _callback = callback;
+        // The user's explicit "try again" — start the strike count over so the
+        // corroboration rule applies to this attempt too.
+        Application.Storage.deleteValue(StorageKeys.KEY_GRANT_STRIKES);
+        _refreshToken();
+    }
+
     // POST token refresh to auth host (customer.bmwgroup.com — quota-exempt).
     function _refreshToken() {
+        // Serialize refreshes across views and processes (see INFLIGHT_TTL_SECONDS).
+        // Checked first: a refresh being in flight already proves the credentials are
+        // there, and a caller arriving mid-refresh must fail TRANSIENTLY — the token
+        // state is left untouched, so this reads as "try again", never as "re-pair".
+        var now = Time.now().value();
+        var inFlight = Application.Storage.getValue(StorageKeys.KEY_REFRESH_INFLIGHT);
+        if (inFlight != null && inFlight <= now && now - inFlight < INFLIGHT_TTL_SECONDS) {
+            _callback.invoke(false);
+            return;
+        }
+
         var clientId = Config.clientId();
 
         // Storage-first fallback: first-run uses Settings value; subsequent runs use rotated token
@@ -57,11 +108,18 @@ class TokenManager {
             refreshToken = Application.Properties.getValue("refreshToken");
         }
 
+        // An unset String Setting reads back as "", not null — normalize, as the VIN
+        // and container resolvers do. Posting an empty refresh_token just earns a 400.
+        if (clientId != null && clientId.equals(""))         { clientId = null; }
+        if (refreshToken != null && refreshToken.equals("")) { refreshToken = null; }
+
         if (clientId == null || refreshToken == null) {
             Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "UNCONFIGURED");
             _callback.invoke(false);
             return;
         }
+
+        Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT, now);
 
         // BMW's OAuth token endpoint requires application/x-www-form-urlencoded.
         // Without an explicit Content-Type header, makeWebRequest sends the params
@@ -86,17 +144,30 @@ class TokenManager {
 
     // CIQ runtime invokes this when the token refresh HTTP response arrives.
     function onTokenRefreshResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
+        // The round-trip is over however it ended — release the in-flight lock first
+        // so an early return can't strand it for the full TTL.
+        Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_INFLIGHT);
+
         if (responseCode == 200 && data != null && data.hasKey("access_token")) {
             // Atomic rotation: Refresh Token MUST be persisted before Access Token is used.
             // If interrupted after step 1 but before step 2, the user can still re-auth.
-            Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, data["refresh_token"]);
+            // Guarded write: a 200 that omits refresh_token would otherwise store null
+            // over the live one and strand the widget in UNCONFIGURED on the next call.
+            if (data.hasKey("refresh_token") && data["refresh_token"] != null) {
+                Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, data["refresh_token"]);
+            }
             Application.Storage.setValue(StorageKeys.KEY_ACCESS_TOKEN,  data["access_token"]);
             var expiresIn = (data.hasKey("expires_in") && data["expires_in"] != null)
                 ? data["expires_in"].toNumber() : 3600;
             Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY,
                 Time.now().value() + expiresIn);
             Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
-            data = null; // parse-and-discard
+            // Success retires both failure ledgers. Without the backoff clear a bad
+            // patch of connectivity keeps the background poll gated for up to 4h
+            // after the link is back (QuotaGuard's documented contract).
+            QuotaGuard.clearBackoff();
+            Application.Storage.deleteValue(StorageKeys.KEY_GRANT_STRIKES);
+            data = null;
             _callback.invoke(true);
 
         } else if (responseCode == 400
@@ -104,8 +175,18 @@ class TokenManager {
                 && data.hasKey("error")
                 && data["error"] != null
                 && data["error"].equals("invalid_grant")) {
-            // Permanent auth failure — user must re-run Device Flow off-watch
-            Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REBOOTSTRAP");
+            // Probably-permanent auth failure — but corroborate before latching the
+            // one-way state (see GRANT_STRIKES_TO_LATCH). Until then it behaves like
+            // any transient failure: back off and let the next attempt decide.
+            var strikes = Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES);
+            strikes = (strikes == null) ? 1 : strikes + 1;
+            Application.Storage.setValue(StorageKeys.KEY_GRANT_STRIKES, strikes);
+            if (strikes >= GRANT_STRIKES_TO_LATCH) {
+                // Confirmed: user must re-run Device Flow.
+                Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REBOOTSTRAP");
+            } else {
+                _incrementBackoff();
+            }
             data = null;
             _callback.invoke(false);
 
@@ -141,6 +222,13 @@ class TokenManager {
     // Returns the current token FSM state string from Storage, or null.
     function getTokenState() {
         return Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
+    }
+
+    // A data call was rejected with 401: the access token is not accepted, whatever
+    // the stored expiry claims. Drop the expiry so the next ensureValidToken()
+    // refreshes instead of replaying a token the server has already refused.
+    static function invalidateAccessToken() {
+        Application.Storage.deleteValue(StorageKeys.KEY_ACCESS_EXPIRY);
     }
 
 }

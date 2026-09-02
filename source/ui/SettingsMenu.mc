@@ -172,13 +172,19 @@ class ManageMenuDelegate extends WatchUi.Menu2InputDelegate {
 
         if (id == :repair) {
             var auth = new DeviceAuthManager();
-            WatchUi.pushView(new AuthView(auth), new AuthDelegate(auth), WatchUi.SLIDE_LEFT);
+            var view = new AuthView(auth);
+            view.setAllowRecover(false);   // explicit re-pair: always run the device flow
+            WatchUi.pushView(view, new AuthDelegate(auth), WatchUi.SLIDE_LEFT);
 
         } else if (id == :signout) {
             Application.Storage.deleteValue(StorageKeys.KEY_ACCESS_TOKEN);
             Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_TOKEN);
             Application.Storage.deleteValue(StorageKeys.KEY_ACCESS_EXPIRY);
             Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "UNCONFIGURED");
+            // Failure ledgers belong to the old grant — a stale strike or in-flight
+            // stamp must not follow the next pairing.
+            Application.Storage.deleteValue(StorageKeys.KEY_GRANT_STRIKES);
+            Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_INFLIGHT);
             // The next pairing may be a different account/vehicle — drop all
             // vehicle-derived state, or write()'s merge would resurrect this
             // car's fields (doorsLocked, windows, ...) onto the next one.

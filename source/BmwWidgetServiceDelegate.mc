@@ -147,9 +147,18 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
             // age resets when the background poll succeeds, not just on field changes.
             state["lastUpdated"] = Time.now().value();
             QuotaGuard.updateAfterFetch();
+            QuotaGuard.clearBackoff();   // a working link retires any error backoff
             Background.exit(state);
         } else if (responseCode == 429) {
             QuotaGuard.onQuotaExceeded();
+            Background.exit(null);
+        } else if (responseCode == 401) {
+            // Token rejected despite a valid-looking stored expiry. Drop the expiry so
+            // the NEXT poll refreshes instead of replaying the same dead token; without
+            // this the poll fails identically until the token expires on its own.
+            TokenManager.invalidateAccessToken();
+            QuotaGuard.updateAfterFetch();
+            _incrementBackoff();
             Background.exit(null);
         } else {
             // Transient error: advance quota gate + apply error backoff

@@ -11,6 +11,8 @@
 // Foreground only. The owning view passes an onDone(success) callback.
 using Toybox.Application;
 using Toybox.Lang;
+using Toybox.System;
+using Toybox.Time;
 
 class ForegroundSync {
 
@@ -24,6 +26,8 @@ class ForegroundSync {
     var _accessToken;
     var _tyreKm;
     var _rateLimited;     // set if any step hit BMW's daily rate limit (CU-429)
+    var _authFailed;      // set if the failure was credential-level, not link-level
+    var _retried401;      // guard: re-run the chain at most once after a 401
     var _createFailed;    // set if a container create failed with a cap-like error
     var _fullFetch;       // true → fetch the FULL container (About-car etc.); false → just ensure containers
 
@@ -32,6 +36,8 @@ class ForegroundSync {
         _boot   = new CarDataBootstrap();   // foreground-only cold-start/maintenance calls
         _token  = new TokenManager();
         _rateLimited = false;
+        _authFailed  = false;
+        _retried401  = false;
         _createFailed = false;
         _fullFetch   = false;
     }
@@ -40,6 +46,14 @@ class ForegroundSync {
     // The owning view reads this to show a distinct "limit reached" message instead
     // of the generic setup/auth prompt.
     function isRateLimited() { return _rateLimited; }
+
+    // True when the sync stopped because the stored credentials are unusable
+    // (UNCONFIGURED / NEEDS_REBOOTSTRAP) rather than because the phone link or the
+    // API was momentarily unavailable. ONLY this justifies sending the user through
+    // pairing: a BLE dropout, a timeout or a 5xx also fail the chain, and treating
+    // those as an auth failure is what made the widget demand a re-auth after a
+    // spell of poor connectivity.
+    function authFailed() { return _authFailed; }
 
     // True when a container could not be created because the account is at the container
     // cap (not a bad descriptor). Onboarding offers "delete all containers and retry".
@@ -61,6 +75,23 @@ class ForegroundSync {
         return false;
     }
 
+    // A 401 means BMW rejected the access token even though the stored expiry said it
+    // was good (clock skew, or a token invalidated server-side). Nothing else would
+    // recover: ensureValidToken trusts KEY_ACCESS_EXPIRY, and the generic error path
+    // just backs off. Invalidate the token and re-run the chain once with a fresh one.
+    // Returns true when it handled (restarted or stopped) the step.
+    function _stop401(responseCode) {
+        if (responseCode != 401) { return false; }
+        TokenManager.invalidateAccessToken();
+        if (_retried401) {
+            _finish(false);
+            return true;
+        }
+        _retried401 = true;
+        _token.ensureValidToken(method(:onToken));
+        return true;
+    }
+
     static const COOLDOWN_SECONDS = 60;         // minimum gap between full foreground refreshes
     static const FULL_INTERVAL_SECONDS = 86400; // auto full (About-car) fetch at most once/day
     static const KEY_LAST_FG   = "lastForegroundSync";
@@ -71,6 +102,13 @@ class ForegroundSync {
     // containers exist and lets the background poll keep the live fields fresh.
     function run(onDone, isManual) {
         _onDone = onDone;
+        // Pre-flight the phone link. Without it every request returns -104
+        // BLE_CONNECTION_UNAVAILABLE and the chain fails in a way that is
+        // indistinguishable, to the caller, from an auth failure.
+        if (!System.getDeviceSettings().phoneConnected) {
+            _finish(false);
+            return;
+        }
         var now = Time.now().value();
         var lastFull = Application.Storage.getValue(KEY_LAST_FULL);
         var dailyDue = (lastFull == null) || (now - lastFull >= FULL_INTERVAL_SECONDS);
@@ -103,6 +141,7 @@ class ForegroundSync {
 
     function onVin(responseCode as Lang.Number, vin) as Void {
         if (_stop429(responseCode)) { return; }
+        if (_stop401(responseCode)) { return; }
         if (vin == null) { _finish(false); return; }
         _vin = vin;
 
@@ -118,6 +157,7 @@ class ForegroundSync {
 
     function onFullContainerList(responseCode as Lang.Number, containerId) as Void {
         if (_stop429(responseCode)) { return; }
+        if (_stop401(responseCode)) { return; }
         if (containerId != null) {
             onFullContainer(200, containerId);
         } else {
@@ -128,6 +168,7 @@ class ForegroundSync {
 
     function onFullContainer(responseCode as Lang.Number, containerId) as Void {
         if (_stop429(responseCode)) { return; }
+        if (_stop401(responseCode)) { return; }
         if (containerId == null) {
             // Couldn't resolve/create the full container — flag the cap case for onboarding.
             _createFailed = _boot.createCapFailure();
@@ -148,6 +189,7 @@ class ForegroundSync {
 
     function onBgContainerList(responseCode as Lang.Number, containerId) as Void {
         if (_stop429(responseCode)) { return; }
+        if (_stop401(responseCode)) { return; }
         if (containerId != null) {
             onBgContainer(200, containerId);
         } else {
@@ -192,6 +234,7 @@ class ForegroundSync {
 
     function onTelematic(responseCode as Lang.Number, state as Lang.Dictionary or Null) as Void {
         if (_stop429(responseCode)) { return; }
+        if (_stop401(responseCode)) { return; }
         if (responseCode == 200 && state != null) {
             // Merge tyre wear km (from separate endpoint) into the telematic state before writing.
             if (_tyreKm != null) {
@@ -205,6 +248,7 @@ class ForegroundSync {
             state["lastUpdated"] = Time.now().value();
             VehicleCache.write(state);
             QuotaGuard.updateAfterFetch();
+            QuotaGuard.clearBackoff();   // a working link retires any error backoff
             Application.Storage.setValue(KEY_LAST_FG, Time.now().value());
             Application.Storage.setValue(KEY_LAST_FULL, Time.now().value());
             // Re-assert the background poll schedule. Manual mode's daily 10:00
@@ -241,6 +285,14 @@ class ForegroundSync {
     }
 
     function _finish(success) {
+        if (!success) {
+            // Classify the failure for the caller (see authFailed()). Only a
+            // credential-level token state counts as an auth failure; a null state
+            // means a first-run refresh never got an answer, which is transient.
+            var ts = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
+            _authFailed = (ts != null
+                && (ts.equals("UNCONFIGURED") || ts.equals("NEEDS_REBOOTSTRAP")));
+        }
         if (_onDone != null) { _onDone.invoke(success); }
     }
 

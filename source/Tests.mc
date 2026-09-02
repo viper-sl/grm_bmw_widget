@@ -417,7 +417,7 @@ function testToken_invalidGrantNeedsCorroboration(logger as Test.Logger) as Lang
 
     // Every strike up to the threshold behaves the same way. Driven off the constant
     // so raising it can't leave this test asserting the old rule.
-    for (var i = 2; i < TokenManager.GRANT_STRIKES_TO_LATCH; i++) {
+    for (var i = 2; i < TokenManager.GRANT_STRIKES_UNATTENDED; i++) {
         tm.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
         Test.assertMessage(tm.getTokenState() == null, "strike below threshold does NOT latch");
         Test.assertEqualMessage(
@@ -426,6 +426,40 @@ function testToken_invalidGrantNeedsCorroboration(logger as Test.Logger) as Lang
 
     tm.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
     Test.assertEqualMessage(tm.getTokenState(), "NEEDS_REBOOTSTRAP", "threshold strike latches");
+    _resetStorage();
+    return true;
+}
+
+// A refresh driven by a START press latches sooner: the user is watching and can act
+// on the prompt. Same shared counter, lower bar.
+(:test)
+function testToken_manualStrikeThresholdIsLower(logger as Test.Logger) as Lang.Boolean {
+    Test.assertMessage(
+        TokenManager.GRANT_STRIKES_MANUAL < TokenManager.GRANT_STRIKES_UNATTENDED,
+        "manual threshold must be the lower of the two");
+
+    _resetStorage();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    tm.setManual(true);
+
+    for (var i = 1; i < TokenManager.GRANT_STRIKES_MANUAL; i++) {
+        tm.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
+        Test.assertMessage(tm.getTokenState() == null, "below the manual threshold: no latch");
+    }
+    tm.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
+    Test.assertEqualMessage(tm.getTokenState(), "NEEDS_REBOOTSTRAP", "manual threshold latches");
+
+    // The same strike count left by an unattended run must NOT have latched.
+    _resetStorage();
+    var bg = new TokenManager();
+    bg._callback = cap.method(:onResult);
+    for (var j = 0; j < TokenManager.GRANT_STRIKES_MANUAL; j++) {
+        bg.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
+    }
+    Test.assertMessage(bg.getTokenState() == null,
+        "unattended run survives the manual threshold");
     _resetStorage();
     return true;
 }

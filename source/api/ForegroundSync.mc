@@ -102,6 +102,10 @@ class ForegroundSync {
     // containers exist and lets the background poll keep the live fields fresh.
     function run(onDone, isManual) {
         _onDone = onDone;
+        // The invalid_grant strike threshold depends on who asked: after a START press
+        // the user is watching and can act on a re-auth prompt now; the auto sync on
+        // app open is unattended and gets the longer run (TokenManager._strikeLimit).
+        _token.setManual(isManual);
         // Pre-flight the phone link. Without it every request returns -104
         // BLE_CONNECTION_UNAVAILABLE and the chain fails in a way that is
         // indistinguishable, to the caller, from an auth failure.

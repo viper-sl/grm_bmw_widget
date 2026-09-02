@@ -257,8 +257,8 @@ stateDiagram-v2
     NORMAL --> NEEDS_REFRESH: expired or inside skew window
     NEEDS_REFRESH --> NORMAL: refresh 200 (rotate)
     NEEDS_REFRESH --> NEEDS_REFRESH: transient 5xx / -104 (backoff)
-    NEEDS_REFRESH --> NEEDS_REFRESH: 400 invalid_grant, strike < 5 (backoff)
-    NEEDS_REFRESH --> NEEDS_REBOOTSTRAP: 400 invalid_grant, strike 5
+    NEEDS_REFRESH --> NEEDS_REFRESH: 400 invalid_grant, below threshold (backoff)
+    NEEDS_REFRESH --> NEEDS_REBOOTSTRAP: 400 invalid_grant, 3rd (manual) / 5th (unattended)
 
     UNCONFIGURED --> [*]: callback(false)
     NEEDS_REBOOTSTRAP --> NORMAL: silent retry succeeds (AuthView)
@@ -286,9 +286,23 @@ into a permanent "Re-auth needed". Three guards keep that from happening:
 
 | Guard | Key | Effect |
 |---|---|---|
-| **Corroboration** (`GRANT_STRIKES_TO_LATCH = 5`) | `KEY_GRANT_STRIKES` | strikes 1–4 behave like any transient failure (backoff, state untouched); only the 5th latches. Any successful refresh clears the count. A high threshold only delays the prompt — cached data stays on screen under a "No connection" note, and Settings → *Re-pair* is always available. Spread over the doubling backoff (40 m, 80 m, 160 m, 4 h, 4 h) an unattended watch latches in ~12 h; tapping START burns the strikes immediately. |
+| **Corroboration** (`GRANT_STRIKES_MANUAL = 3`, `GRANT_STRIKES_UNATTENDED = 5`) | `KEY_GRANT_STRIKES` | strikes below the threshold behave like any transient failure (backoff, state untouched). Any successful refresh clears the count. The threshold depends on who asked — see below. |
 | **Serialization** (`INFLIGHT_TTL_SECONDS = 90`) | `KEY_REFRESH_INFLIGHT` | one refresh at a time across views *and* processes (they share Storage). A caller arriving mid-refresh fails transiently. The TTL self-heals a stamp left by a killed process. |
 | **Silent retry** | — | opening the re-link prompt spends one quota-exempt refresh via `TokenManager.retryAfterRebootstrap()` before showing the device flow; success clears the latch outright. Settings → *Re-pair* opts out (`AuthView.setAllowRecover(false)`) because the user asked for pairing by name. |
+
+**Who asked sets the bar.** `ForegroundSync.run()` passes its `isManual` through to
+`TokenManager.setManual()`, so a **START press latches at 3 strikes** while the
+**background poll and the auto sync on app open latch at 5**. The reasoning is the cost of
+being wrong: after a START press the user is watching, has just seen the refresh fail
+repeatedly, and can act on the prompt immediately; an unattended refresh has nobody to
+judge it and a false latch is a one-way door found hours later. `retryAfterRebootstrap()`
+(the re-link prompt) counts as manual. The counter is shared, so a run started in the
+background can be finished by a START press.
+
+Below the threshold the cost is only a delayed prompt, never lost data: the pages keep
+showing cached values under a "No connection" note, and Settings → *Re-pair* is always
+available. Spread over the doubling backoff (40 m, 80 m, 160 m, 4 h, 4 h) an unattended
+watch latches in ~12 h; three START presses do it at once.
 
 `EXPIRY_SKEW_SECONDS = 300` refreshes early: a token still valid when the request leaves
 the watch can expire in flight, and the data path reads the resulting `401` as a transient

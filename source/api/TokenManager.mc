@@ -37,15 +37,35 @@ class TokenManager {
     // the foreground and the background poll. Latching early turns a bad BLE moment
     // into a permanent "Re-auth needed", so demand a clear run of them.
     //
-    // The cost of a high threshold is only a delayed prompt, never lost data: until
-    // it latches the widget keeps showing cached values under a "No connection" note,
-    // and Settings -> Re-pair is always available. The background poll spreads its
-    // strikes over the doubling backoff (40 m, 80 m, 160 m, 4 h, 4 h), so an
-    // unattended watch latches in ~12 h; a user tapping START burns them immediately.
-    static const GRANT_STRIKES_TO_LATCH = 5;
+    // The threshold depends on WHO asked, because the cost of a false latch differs.
+    // After a START press the user is watching: they have just seen the refresh fail
+    // repeatedly, and the re-auth prompt is something they can act on immediately, so
+    // a shorter run is enough. An unattended refresh gets the longer one — nobody is
+    // there to judge, and a wrong latch is a one-way door discovered hours later.
+    //
+    // Either way the cost is a delayed prompt, never lost data: below the threshold
+    // the widget keeps showing cached values under a "No connection" note, and
+    // Settings -> Re-pair is always available. The strikes are shared, so a run that
+    // starts in the background can be finished by a START press (and vice versa).
+    static const GRANT_STRIKES_MANUAL     = 3;
+    static const GRANT_STRIKES_UNATTENDED = 5;
 
     // Holds the completion callback across the async HTTP round-trip.
     var _callback;
+
+    // True when a START press is driving this refresh — selects the strike threshold.
+    var _manual;
+
+    function initialize() {
+        _manual = false;   // default: background poll / auto sync on app open
+    }
+
+    // Callers that know a user is watching say so before ensureValidToken().
+    function setManual(isManual) { _manual = isManual; }
+
+    function _strikeLimit() {
+        return (_manual == true) ? GRANT_STRIKES_MANUAL : GRANT_STRIKES_UNATTENDED;
+    }
 
     // Entry point called by Background Service before every Data Fetch.
     // Invokes callback(true)  — valid Access Token available (existing or freshly refreshed).
@@ -84,9 +104,11 @@ class TokenManager {
     // Recovery entry point for the re-link prompt: ignores the permanent-failure
     // guard and spends one (quota-exempt) refresh before the user is dragged through
     // the device flow. A latched NEEDS_REBOOTSTRAP can be a false positive — see
-    // GRANT_STRIKES_TO_LATCH — and a successful refresh here clears it outright.
+    // the strike constants — and a successful refresh here clears it outright.
     function retryAfterRebootstrap(callback) {
         _callback = callback;
+        _manual   = true;   // always a user action, from the re-link prompt
+
         // The user's explicit "try again" — start the strike count over so the
         // corroboration rule applies to this attempt too.
         Application.Storage.deleteValue(StorageKeys.KEY_GRANT_STRIKES);
@@ -182,12 +204,12 @@ class TokenManager {
                 && data["error"] != null
                 && data["error"].equals("invalid_grant")) {
             // Probably-permanent auth failure — but corroborate before latching the
-            // one-way state (see GRANT_STRIKES_TO_LATCH). Until then it behaves like
+            // one-way state (see _strikeLimit). Until then it behaves like
             // any transient failure: back off and let the next attempt decide.
             var strikes = Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES);
             strikes = (strikes == null) ? 1 : strikes + 1;
             Application.Storage.setValue(StorageKeys.KEY_GRANT_STRIKES, strikes);
-            if (strikes >= GRANT_STRIKES_TO_LATCH) {
+            if (strikes >= _strikeLimit()) {
                 // Confirmed: user must re-run Device Flow.
                 Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REBOOTSTRAP");
             } else {

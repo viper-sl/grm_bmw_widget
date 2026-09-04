@@ -83,6 +83,11 @@ class TokenManager {
     function ensureValidToken(callback) {
         _callback = callback;
 
+        // Checked here because this is the one funnel every token use passes through,
+        // in BOTH processes — onSettingsChanged only fires when the app is loaded, so
+        // a clientId edited while the widget was closed would otherwise go unnoticed.
+        syncClient();
+
         var tokenState = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
 
         // Guard: permanent auth failure — no network call.
@@ -221,6 +226,7 @@ class TokenManager {
             Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY,
                 Time.now().value() + expiresIn);
             Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+            stampClient();   // this refresh proves which client the tokens belong to
             // A working grant retires the strike ledger. The error BACKOFF is
             // deliberately NOT cleared here: it gates the data API, and this refresh
             // proves nothing about that host (customer.bmwgroup.com is a different
@@ -234,7 +240,7 @@ class TokenManager {
                 && data != null
                 && data.hasKey("error")
                 && data["error"] != null
-                && data["error"].equals("invalid_grant")) {
+                && _isTerminalGrantError(data["error"])) {
             // Probably-permanent auth failure — but corroborate before latching the
             // one-way state (see _strikeLimit). Until then it behaves like
             // any transient failure: back off and let the next attempt decide.
@@ -272,6 +278,73 @@ class TokenManager {
             Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_INFLIGHT);
         }
         _inFlightStamp = null;
+    }
+
+    // OAuth `error` codes on a REFRESH that mean the grant is finished, not that the
+    // link hiccuped: re-presenting the same refresh_token can never succeed. They still
+    // go through the strike ladder rather than latching instantly — a 400 can be a proxy
+    // artefact — but they MUST count, or the widget waits forever on "No connection"
+    // and is never prompted to re-pair (only invalid_grant used to count here).
+    //
+    // invalid_request is deliberately NOT in this list. On this endpoint its documented
+    // cause in this codebase is a malformed POST — a missing url-encoded Content-Type
+    // header, see _refreshToken — i.e. OUR bug. Latching on it would tell users to
+    // re-pair because of a code regression. DeviceAuthManager._oauthHint does treat it
+    // as actionable, but that is the device-code endpoint, where the cause is a
+    // disabled portal toggle.
+    static function _isTerminalGrantError(err) {
+        return err.equals("invalid_grant")
+            || err.equals("invalid_client")
+            || err.equals("unauthorized_client")
+            || err.equals("invalid_scope");
+    }
+
+    // --- Client-id binding -------------------------------------------------------
+    // Tokens belong to the client that issued them. Without this stamp the app cannot
+    // tell "the user swapped the clientId in settings" from "the link is flaky", so a
+    // deliberate credential change looked like a network fault: the pages showed
+    // "No connection" and the corroboration ladder took hours (days, in manual mode)
+    // to reach the re-auth prompt.
+
+    // Record the client the current tokens were issued to. Called wherever tokens are
+    // persisted — the device flow and a successful rotation.
+    static function stampClient() {
+        var cid = Config.clientId();
+        if (cid != null && !cid.equals("")) {
+            Application.Storage.setValue(StorageKeys.KEY_TOKEN_CLIENT_ID, cid);
+        }
+    }
+
+    // True when the stored grant belongs to a DIFFERENT client than the one configured
+    // now. An absent stamp means "unknown", NOT "mismatch": installs that predate the
+    // stamp must keep working, or every upgrade would force a re-pair. The next
+    // successful refresh stamps them.
+    static function clientChanged() {
+        var stamped = Application.Storage.getValue(StorageKeys.KEY_TOKEN_CLIENT_ID);
+        if (stamped == null) { return false; }
+        var cid = Config.clientId();
+        if (cid == null || cid.equals("")) { return false; }
+        return !stamped.equals(cid);
+    }
+
+    // Act on a client change: every stored token is dead by definition, so drop them
+    // and demand a re-pair NOW with an honest message, instead of letting the strike
+    // ladder discover it over hours. Returns true when it fired.
+    static function syncClient() {
+        if (!clientChanged()) { return false; }
+        Application.Storage.deleteValue(StorageKeys.KEY_ACCESS_TOKEN);
+        Application.Storage.deleteValue(StorageKeys.KEY_ACCESS_EXPIRY);
+        Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_TOKEN);
+        Application.Storage.deleteValue(StorageKeys.KEY_TOKEN_CLIENT_ID);
+        // Ledgers belong to the retired grant, exactly as on sign-out and re-pair.
+        Application.Storage.deleteValue(StorageKeys.KEY_GRANT_STRIKES);
+        Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_INFLIGHT);
+        QuotaGuard.clearBackoff();
+        // NEEDS_REBOOTSTRAP (not UNCONFIGURED): a clientId IS configured, what is
+        // missing is a grant for it — and this is the one state that makes the widget
+        // show the re-link prompt and route START to pairing even with cached data.
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REBOOTSTRAP");
+        return true;
     }
 
     // Doubles the current backoff delay; cap at 4 hours (A-4).

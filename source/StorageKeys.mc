@@ -6,6 +6,10 @@ class StorageKeys {
     static const KEY_ACCESS_TOKEN     = "accessToken";
     static const KEY_ACCESS_EXPIRY    = "accessTokenExpiry";
     static const KEY_REFRESH_TOKEN    = "refreshToken";
+    // The clientId the stored tokens were issued to. BMW rejects a refresh_token
+    // presented by a client that did not issue it, so a changed clientId kills the
+    // whole grant — this stamp is how that is detected (TokenManager.syncClient).
+    static const KEY_TOKEN_CLIENT_ID  = "tokenClientId";
     static const KEY_NEXT_ALLOWED     = "nextAllowedCall";
     static const KEY_BACKOFF_UNTIL    = "backoffUntil";
     // Epoch of the refresh POST currently in flight — serializes token refreshes

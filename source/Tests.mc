@@ -722,6 +722,110 @@ function testToken_invalidateAccessTokenDropsExpiry(logger as Test.Logger) as La
     return true;
 }
 
+// A clientId change retires the grant outright: BMW rejects a refresh_token presented
+// by a client that did not issue it, so waiting for the strike ladder to work that out
+// means hours (days in manual mode) of a misleading "No connection".
+(:test)
+function testToken_clientChangeRetiresTheGrant(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var prev = _blankCreds();
+    try {
+        Application.Properties.setValue("clientId", "NEW-CLIENT");
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_CLIENT_ID, "OLD-CLIENT");
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE,   "NORMAL");
+        Application.Storage.setValue(StorageKeys.KEY_ACCESS_TOKEN,  "A");
+        Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "R");
+        Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY, Time.now().value() + 3600);
+        Application.Storage.setValue(StorageKeys.KEY_GRANT_STRIKES, 2);
+        Application.Storage.setValue(StorageKeys.KEY_BACKOFF_UNTIL, Time.now().value() + 14400);
+
+        Test.assertMessage(TokenManager.clientChanged(), "mismatch detected");
+        Test.assertMessage(TokenManager.syncClient(), "syncClient acted");
+
+        Test.assertEqualMessage(
+            Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE), "NEEDS_REBOOTSTRAP",
+            "prompts for a re-pair immediately");
+        Test.assertMessage(
+            Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN) == null, "dead token dropped");
+        Test.assertMessage(
+            Application.Storage.getValue(StorageKeys.KEY_ACCESS_TOKEN) == null, "access token dropped");
+        Test.assertMessage(
+            Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES) == null, "strikes retired");
+        Test.assertMessage(
+            Application.Storage.getValue(StorageKeys.KEY_BACKOFF_UNTIL) == null, "backoff retired");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
+    return true;
+}
+
+// An install predating the stamp has no clientId recorded. That is "unknown", NOT a
+// mismatch — treating it as one would force every upgrading user to re-pair.
+(:test)
+function testToken_missingStampIsNotAMismatch(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var prev = _blankCreds();
+    try {
+        Application.Properties.setValue("clientId", "SOME-CLIENT");
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE,   "NORMAL");
+        Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "R");
+        // No KEY_TOKEN_CLIENT_ID at all.
+        Test.assertMessage(!TokenManager.clientChanged(), "absent stamp is not a mismatch");
+        Test.assertMessage(!TokenManager.syncClient(), "syncClient does nothing");
+        Test.assertEqualMessage(
+            Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE), "NORMAL",
+            "paired install keeps working across the upgrade");
+
+        // A matching stamp is likewise no mismatch.
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_CLIENT_ID, "SOME-CLIENT");
+        Test.assertMessage(!TokenManager.clientChanged(), "matching stamp is not a mismatch");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
+    return true;
+}
+
+// Every OAuth error that means "this grant is finished" must count toward the latch.
+// Only invalid_grant used to, so a mistyped clientId (invalid_client) or a half-enabled
+// portal client (unauthorized_client / invalid_scope) backed off forever and NEVER
+// prompted the user to re-pair.
+(:test)
+function testToken_allTerminalGrantErrorsCount(logger as Test.Logger) as Lang.Boolean {
+    var terminal = ["invalid_grant", "invalid_client", "unauthorized_client", "invalid_scope"];
+    for (var i = 0; i < terminal.size(); i++) {
+        _resetStorage();
+        var tm = new TokenManager();
+        var cap = new _BoolCapture();
+        tm._callback = cap.method(:onResult);
+        tm.setManual(true);   // threshold 3, keeps the loop short
+        for (var j = 0; j < TokenManager.GRANT_STRIKES_MANUAL; j++) {
+            tm.onTokenRefreshResponse(400, { "error" => terminal[i] });
+        }
+        Test.assertEqualMessage(tm.getTokenState(), "NEEDS_REBOOTSTRAP",
+            terminal[i] + " must reach the latch");
+    }
+
+    // invalid_request stays transient: on THIS endpoint its documented cause is a
+    // malformed POST of our own (missing url-encoded Content-Type), and latching on a
+    // code regression would tell users to re-pair for no reason.
+    _resetStorage();
+    var tm2 = new TokenManager();
+    var cap2 = new _BoolCapture();
+    tm2._callback = cap2.method(:onResult);
+    tm2.setManual(true);
+    for (var k = 0; k < TokenManager.GRANT_STRIKES_MANUAL + 2; k++) {
+        tm2.onTokenRefreshResponse(400, { "error" => "invalid_request" });
+    }
+    Test.assertMessage(tm2.getTokenState() == null, "invalid_request never latches");
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES) == null,
+        "invalid_request is not a strike");
+    _resetStorage();
+    return true;
+}
+
 // ForegroundSync must tell a credential failure from a link failure: only the former
 // may send the user to pairing. This is the classification the pages branch on.
 (:test)

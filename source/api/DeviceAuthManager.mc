@@ -246,6 +246,9 @@ class DeviceAuthManager {
             Application.Storage.deleteValue(StorageKeys.KEY_GRANT_STRIKES);
             Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_INFLIGHT);
             QuotaGuard.clearBackoff();
+            // Bind the new tokens to the client that issued them, so a later clientId
+            // edit is detected as a dead grant instead of looking like a flaky link.
+            TokenManager.stampClient();
 
             _state = SUCCESS;
             _notify();

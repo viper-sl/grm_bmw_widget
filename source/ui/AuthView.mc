@@ -61,8 +61,12 @@ class AuthView extends WatchUi.View {
         // Skipped with no phone: the request could only fail, and burning the attempt
         // would forfeit the recovery for the whole life of this view. The device flow
         // surfaces its own clear "phone not connected" error instead.
+        // A refresh token must exist for the recovery to mean anything — after a
+        // clientId change syncClient() deletes it, and the attempt would just flip the
+        // state to UNCONFIGURED without ever reaching the network.
         var ts = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
-        if (_allowRecover && !_recoverTried
+        var haveRefresh = Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN) != null;
+        if (_allowRecover && !_recoverTried && haveRefresh
                 && System.getDeviceSettings().phoneConnected
                 && ts != null && ts.equals("NEEDS_REBOOTSTRAP")) {
             _recoverTried = true;

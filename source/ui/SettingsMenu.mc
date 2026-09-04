@@ -187,6 +187,7 @@ class ManageMenuDelegate extends WatchUi.Menu2InputDelegate {
             // up to 4h on credentials that are perfectly good.)
             Application.Storage.deleteValue(StorageKeys.KEY_GRANT_STRIKES);
             Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_INFLIGHT);
+            Application.Storage.deleteValue(StorageKeys.KEY_TOKEN_CLIENT_ID);
             QuotaGuard.clearBackoff();
             // The next pairing may be a different account/vehicle — drop all
             // vehicle-derived state, or write()'s merge would resurrect this

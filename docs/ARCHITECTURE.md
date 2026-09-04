@@ -309,6 +309,34 @@ strike simply re-arms the 40 min base. Five strikes therefore cost roughly `5 ×
 max(poll interval, 40 min)` — about **3–5 h** depending on update mode, not the ~12 h an
 un-gated doubling ladder would give.
 
+### The grant is bound to a client id
+
+BMW rejects a `refresh_token` presented by a client that did not issue it, so **editing
+`clientId` in GCM settings retires the whole grant**. `KEY_TOKEN_CLIENT_ID` records which
+client the stored tokens belong to — stamped by the device flow and by every successful
+rotation — and `TokenManager.syncClient()` compares it to `Config.clientId()`.
+
+On a mismatch the tokens and both ledgers are dropped and the state goes straight to
+`NEEDS_REBOOTSTRAP`, so the user sees "Re-auth needed" the moment they save. The check
+runs in two places: `onSettingsChanged` (immediate, while the widget is open) and at the
+top of `ensureValidToken` (the one funnel every token use passes through, in **both**
+processes — it catches an edit made while the widget was closed).
+
+An **absent** stamp means "unknown", not "mismatch": installs predating the stamp must
+keep working, and the next successful refresh stamps them. Without this the old tokens
+kept working until the access token expired (up to an hour), then failed as
+`invalid_grant` — classified transient, so the pages showed "No connection" and the
+strike ladder took hours (days in manual mode) to reach a prompt the user could act on.
+
+`_isTerminalGrantError` widens the latching branch beyond `invalid_grant` to
+`invalid_client`, `unauthorized_client` and `invalid_scope` — a mistyped client id or a
+half-enabled portal client returns one of those, and while only `invalid_grant` counted
+they backed off forever and **never** prompted a re-pair. `invalid_request` is
+deliberately excluded on this endpoint: its documented cause here is a malformed POST of
+our own (a missing url-encoded `Content-Type`), and latching on a code regression would
+demand a re-pair for no reason. `DeviceAuthManager._oauthHint` does treat it as
+actionable — that is the device-code endpoint, where the cause is a portal toggle.
+
 `EXPIRY_SKEW_SECONDS = 300` refreshes early: a token still valid when the request leaves
 the watch can expire in flight, and the data path reads the resulting `401` as a transient
 error. A `401` on a data call therefore also calls `TokenManager.invalidateAccessToken()`
@@ -432,6 +460,7 @@ elsewhere (see §12).
 |---|---|---|
 | `KEY_TOKEN_STATE` | TokenManager, DeviceAuthManager, sign-out | TokenManager, views |
 | `KEY_ACCESS_TOKEN` / `KEY_ACCESS_EXPIRY` / `KEY_REFRESH_TOKEN` | TokenManager (refresh **before** access) | TokenManager |
+| `KEY_TOKEN_CLIENT_ID` | device flow + every successful rotation (`stampClient`); cleared by sign-out and by a detected client change | `syncClient()` mismatch check |
 | `KEY_VIN` | CarDataBootstrap (mappings) | both sync paths |
 | `KEY_CONTAINER_ID` / `_NAME` | `_storeContainer` | `cachedContainerId` (FULL) |
 | `KEY_BG_CONTAINER_ID` / `_NAME` | `_storeBgContainer` | `cachedBgContainerId` (LEAN) |

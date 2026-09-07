@@ -328,14 +328,22 @@ kept working until the access token expired (up to an hour), then failed as
 `invalid_grant` — classified transient, so the pages showed "No connection" and the
 strike ladder took hours (days in manual mode) to reach a prompt the user could act on.
 
-`_isTerminalGrantError` widens the latching branch beyond `invalid_grant` to
-`invalid_client`, `unauthorized_client` and `invalid_scope` — a mistyped client id or a
-half-enabled portal client returns one of those, and while only `invalid_grant` counted
-they backed off forever and **never** prompted a re-pair. `invalid_request` is
-deliberately excluded on this endpoint: its documented cause here is a malformed POST of
-our own (a missing url-encoded `Content-Type`), and latching on a code regression would
-demand a re-pair for no reason. `DeviceAuthManager._oauthHint` does treat it as
-actionable — that is the device-code endpoint, where the cause is a portal toggle.
+`_isDeadGrant` decides whether a `400` counts toward the latch, and it defaults to
+**yes**. A 400 is a rejection: replaying the identical `refresh_token` cannot start
+working. It deliberately does not require reading `error` out of the body, because
+**on real hardware there is often no body** — Connect IQ commonly delivers a non-2xx
+response as `(code, null)`. An earlier rule that matched on specific `error` codes was
+therefore unreachable on the watch while passing every simulator test (all of which
+hand-build the response dictionary): a dead grant looped on the transient path and no
+number of refreshes ever produced a re-auth prompt. Observed on hardware as
+"Server error 400" surviving 5+ manual refreshes.
+
+The one exception is `invalid_request` **when it can be read**: on this endpoint its
+documented cause here is a malformed POST of our own (a missing url-encoded
+`Content-Type`), and latching on a code regression would demand a re-pair for nothing.
+`DeviceAuthManager._oauthHint` does treat it as actionable — that is the device-code
+endpoint, where the cause is a portal toggle. Over-eagerness is bounded by the strike
+ladder, not by this predicate; `5xx` and negative transport codes are never strikes.
 
 `EXPIRY_SKEW_SECONDS = 300` refreshes early: a token still valid when the request leaves
 the watch can expire in flight, and the data path reads the resulting `401` as a transient

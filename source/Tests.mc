@@ -861,6 +861,54 @@ function testSync_failureReasonsAreDistinct(logger as Test.Logger) as Lang.Boole
     return true;
 }
 
+// THE REGRESSION THIS SUITE MISSED. Connect IQ often delivers a non-2xx response as
+// (code, null) on real hardware, dropping the JSON body. Every other 400 test here
+// hand-builds a dictionary, so the latch branch passed in the simulator while being
+// unreachable on the watch: a dead grant looped on the transient path and no number of
+// refreshes ever prompted a re-pair (observed: "Server error 400" after 5+ retries).
+(:test)
+function testToken_bodylessBadRequestStillCounts(logger as Test.Logger) as Lang.Boolean {
+    // 400 with NO body at all.
+    _resetStorage();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    tm.setManual(true);
+    for (var i = 0; i < TokenManager.GRANT_STRIKES_MANUAL; i++) {
+        tm.onTokenRefreshResponse(400, null);
+    }
+    Test.assertEqualMessage(tm.getTokenState(), "NEEDS_REBOOTSTRAP",
+        "a bodyless 400 must reach the latch");
+
+    // 400 with a body that carries no `error` key.
+    _resetStorage();
+    var tm2 = new TokenManager();
+    tm2._callback = cap.method(:onResult);
+    tm2.setManual(true);
+    for (var j = 0; j < TokenManager.GRANT_STRIKES_MANUAL; j++) {
+        tm2.onTokenRefreshResponse(400, { "message" => "Bad Request" });
+    }
+    Test.assertEqualMessage(tm2.getTokenState(), "NEEDS_REBOOTSTRAP",
+        "a 400 with an unrecognised body must reach the latch");
+
+    // 5xx and transport errors stay transient no matter how many arrive — only a 400
+    // is a rejection of the grant.
+    _resetStorage();
+    var tm3 = new TokenManager();
+    tm3._callback = cap.method(:onResult);
+    tm3.setManual(true);
+    for (var k = 0; k < TokenManager.GRANT_STRIKES_MANUAL + 3; k++) {
+        tm3.onTokenRefreshResponse(500, null);
+        tm3.onTokenRefreshResponse(Communications.BLE_CONNECTION_UNAVAILABLE, null);
+    }
+    Test.assertMessage(tm3.getTokenState() == null, "5xx / transport never latch");
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES) == null,
+        "5xx / transport are not strikes");
+    _resetStorage();
+    return true;
+}
+
 // ForegroundSync must tell a credential failure from a link failure: only the former
 // may send the user to pairing. This is the classification the pages branch on.
 (:test)

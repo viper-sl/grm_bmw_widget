@@ -243,11 +243,7 @@ class TokenManager {
             _releaseInFlight();
             _callback.invoke(true);
 
-        } else if (responseCode == 400
-                && data != null
-                && data.hasKey("error")
-                && data["error"] != null
-                && _isTerminalGrantError(data["error"])) {
+        } else if (responseCode == 400 && _isDeadGrant(data)) {
             // Probably-permanent auth failure — but corroborate before latching the
             // one-way state (see _strikeLimit). Until then it behaves like
             // any transient failure: back off and let the next attempt decide.
@@ -287,23 +283,31 @@ class TokenManager {
         _inFlightStamp = null;
     }
 
-    // OAuth `error` codes on a REFRESH that mean the grant is finished, not that the
-    // link hiccuped: re-presenting the same refresh_token can never succeed. They still
-    // go through the strike ladder rather than latching instantly — a 400 can be a proxy
-    // artefact — but they MUST count, or the widget waits forever on "No connection"
-    // and is never prompted to re-pair (only invalid_grant used to count here).
+    // Does a 400 from the token endpoint mean the GRANT is finished?
     //
-    // invalid_request is deliberately NOT in this list. On this endpoint its documented
-    // cause in this codebase is a malformed POST — a missing url-encoded Content-Type
-    // header, see _refreshToken — i.e. OUR bug. Latching on it would tell users to
-    // re-pair because of a code regression. DeviceAuthManager._oauthHint does treat it
-    // as actionable, but that is the device-code endpoint, where the cause is a
-    // disabled portal toggle.
-    static function _isTerminalGrantError(err) {
-        return err.equals("invalid_grant")
-            || err.equals("invalid_client")
-            || err.equals("unauthorized_client")
-            || err.equals("invalid_scope");
+    // Default: YES. A 400 is a rejection — replaying the identical refresh_token cannot
+    // start working, so it must count toward the latch. This defaults to "dead" rather
+    // than requiring proof from the body because ON A REAL DEVICE THERE IS OFTEN NO
+    // BODY: Connect IQ frequently delivers a non-2xx response as (code, null), dropping
+    // the JSON. The previous rule required reading `error` out of that body, so on the
+    // watch the branch was never taken at all — a genuinely dead grant looped on the
+    // transient path forever and no number of refreshes ever produced a re-auth prompt
+    // (observed on hardware: "Server error 400" after 5+ manual refreshes). Every unit
+    // test hand-built the dictionary, so all of them passed while the watch was broken.
+    //
+    // The single exception is invalid_request WHEN WE CAN READ IT: on this endpoint its
+    // documented cause here is OUR malformed POST — a missing url-encoded Content-Type,
+    // see _refreshToken — and latching on a code regression would demand a needless
+    // re-pair. (DeviceAuthManager._oauthHint does treat invalid_request as actionable;
+    // that is the device-code endpoint, where a disabled portal toggle is the cause.)
+    //
+    // Over-eagerness is bounded by the strike ladder, not by this predicate: a 400 still
+    // needs GRANT_STRIKES_MANUAL/UNATTENDED of them in a row before anything latches.
+    static function _isDeadGrant(data) {
+        if (data == null || !data.hasKey("error") || data["error"] == null) {
+            return true;   // no readable body — trust the 400
+        }
+        return !data["error"].equals("invalid_request");
     }
 
     // --- Client-id binding -------------------------------------------------------

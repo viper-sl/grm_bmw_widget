@@ -63,6 +63,7 @@ class ForegroundSync {
     static const FAIL_RATE_LIMIT = 4;
     static const FAIL_CONTAINER  = 5;
     static const FAIL_NETWORK    = 6;
+    static const FAIL_STALE_AUTH = 7;
 
     function failReason() { return _failReason; }
 
@@ -72,6 +73,9 @@ class ForegroundSync {
         if (_failReason == FAIL_COOLDOWN)   { return "Just updated — wait"; }
         if (_failReason == FAIL_CONTAINER)  { return "Container limit — MENU"; }
         if (_failReason == FAIL_RATE_LIMIT) { return "Daily limit — try tomorrow"; }
+        // A rejected refresh is a sign-in problem, not a server fault. "Server error
+        // 400" told the user nothing and hid the fact that re-pairing is the way out.
+        if (_failReason == FAIL_STALE_AUTH) { return "Sign-in expired — retry to re-pair"; }
         // A real transport/server failure: name it. B9 says never show a bare "-104",
         // and _friendlyError is the existing mapping that turns codes into words.
         if (_lastCode != 0) { return DeviceAuthManager._friendlyError(_lastCode); }
@@ -167,6 +171,10 @@ class ForegroundSync {
         if (!success) {
             // The refresh knows why it failed; the chain otherwise loses that entirely.
             _lastCode = _token.getLastResponseCode();
+            // A 400 here is BMW rejecting the grant, not a server fault — say so, and
+            // say what fixes it. Each attempt is also a strike, so repeating it reaches
+            // the re-pair prompt (TokenManager._strikeLimit).
+            if (_lastCode == 400) { _failReason = FAIL_STALE_AUTH; }
             _finish(false);
             return;
         }

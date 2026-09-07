@@ -13,6 +13,7 @@ class BmwWidgetView extends WatchUi.View {
     var _rateLimited;     // auto-sync failed because BMW's daily API limit was reached
     var _offline;         // auto-sync failed for a non-credential reason
     var _offlineText;     // why, in words (ForegroundSync.failText)
+    var _lastWasManual;   // the last run came from a START press, not app open
     var _sync;
 
     function initialize() {
@@ -22,6 +23,7 @@ class BmwWidgetView extends WatchUi.View {
         _rateLimited     = false;
         _offline         = false;
         _offlineText     = null;
+        _lastWasManual   = false;
     }
 
     function retryAutoSync() {
@@ -30,14 +32,29 @@ class BmwWidgetView extends WatchUi.View {
         _rateLimited     = false;
         _offline         = false;
         _offlineText     = null;
+        // Only ever reached from onSelect() — a START press IS a manual refresh. Passing
+        // false here judged the user's own retries at the unattended strike threshold
+        // and skipped the full fetch they were asking for.
+        _lastWasManual   = true;
         _sync = new ForegroundSync();
-        _sync.run(method(:onAutoSyncDone), false);  // auto: full fetch only once/day
+        _sync.run(method(:onAutoSyncDone), true);
         WatchUi.requestUpdate();
     }
 
     function onAutoSyncDone(success) {
         _autoSyncFailed = !success;
         _rateLimited    = (!success && _sync != null && _sync.isRateLimited());
+        // BMW rejected the refresh outright and the user asked for this. Offer pairing
+        // now: it is cheap and reversible (BACK comes straight back here), unlike
+        // latching NEEDS_REBOOTSTRAP, which the strike ladder still governs. Making
+        // them press START N times to earn the only screen that fixes it is not a
+        // safety property. Never on the unattended open-sync.
+        if (!success && _lastWasManual && _sync != null
+                && _sync.failReason() == ForegroundSync.FAIL_STALE_AUTH) {
+            var auth = new DeviceAuthManager();
+            WatchUi.pushView(new AuthView(auth), new AuthDelegate(auth), WatchUi.SLIDE_LEFT);
+            return;
+        }
         // A link-level failure must not fall through to the setup prompt: telling a
         // paired user to "press START to connect" because the phone was out of range
         // is how a dropout turns into an unnecessary re-pair.
@@ -77,6 +94,7 @@ class BmwWidgetView extends WatchUi.View {
         var paired = (tokenState != null && tokenState.equals("NORMAL"));
         if (paired && !_autoSyncStarted) {
             _autoSyncStarted = true;
+            _lastWasManual = false;
             _sync = new ForegroundSync();
             _sync.run(method(:onAutoSyncDone), false);  // auto: full fetch only once/day
         }

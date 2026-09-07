@@ -909,6 +909,37 @@ function testToken_bodylessBadRequestStillCounts(logger as Test.Logger) as Lang.
     return true;
 }
 
+// A rejected refresh (400) must be reported as FAIL_STALE_AUTH, which is what routes a
+// user-initiated retry straight to pairing. Earning that screen by pressing START N
+// times is not a safety property — only the one-way NEEDS_REBOOTSTRAP latch is, and
+// that is still governed by the strike ladder.
+(:test)
+function testSync_rejectedRefreshOffersPairing(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REFRESH");
+    var fs = new ForegroundSync();
+    // Stand in for TokenManager having just seen a 400 on the refresh.
+    fs._token._lastCode = 400;
+    fs.onToken(false);
+    Test.assertEqualMessage(fs.failReason(), ForegroundSync.FAIL_STALE_AUTH,
+        "a 400 refresh is a sign-in failure, not a server fault");
+    Test.assertMessage(!fs.authFailed(),
+        "but it must NOT claim the latched auth state it has not earned");
+    Test.assertMessage(!fs.failText().equals("Server error 400"),
+        "and must not read as an opaque server error");
+
+    // A transport failure on the refresh stays a plain network failure.
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REFRESH");
+    var fs2 = new ForegroundSync();
+    fs2._token._lastCode = Communications.BLE_CONNECTION_UNAVAILABLE;
+    fs2.onToken(false);
+    Test.assertEqualMessage(fs2.failReason(), ForegroundSync.FAIL_NETWORK,
+        "a dropped link is not a sign-in problem");
+    _resetStorage();
+    return true;
+}
+
 // ForegroundSync must tell a credential failure from a link failure: only the former
 // may send the user to pairing. This is the classification the pages branch on.
 (:test)

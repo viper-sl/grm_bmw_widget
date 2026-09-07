@@ -44,8 +44,12 @@ class PageRangeFuel extends WatchUi.View {
         if (!success && _sync != null && _sync.isRateLimited()) {
             // Daily API limit — show a note on the page; do NOT bounce to auth.
             _rateLimited = true;
-        } else if (!success && _sync != null && _sync.authFailed()) {
-            // Credentials are genuinely unusable — pairing is the only way out.
+        } else if (!success && _sync != null
+                && (_sync.authFailed()
+                    || _sync.failReason() == ForegroundSync.FAIL_STALE_AUTH)) {
+            // Credentials are unusable, or BMW rejected the refresh with a 400 on a
+            // retry the user asked for. Offering pairing is cheap and reversible; the
+            // strike ladder still governs the one-way NEEDS_REBOOTSTRAP latch.
             var auth = new DeviceAuthManager();
             WatchUi.pushView(new AuthView(auth), new AuthDelegate(auth), WatchUi.SLIDE_LEFT);
         } else if (!success) {

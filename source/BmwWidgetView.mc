@@ -11,7 +11,8 @@ class BmwWidgetView extends WatchUi.View {
     var _autoSyncStarted;
     var _autoSyncFailed;
     var _rateLimited;     // auto-sync failed because BMW's daily API limit was reached
-    var _offline;         // auto-sync failed on the link, not on the credentials
+    var _offline;         // auto-sync failed for a non-credential reason
+    var _offlineText;     // why, in words (ForegroundSync.failText)
     var _sync;
 
     function initialize() {
@@ -20,6 +21,7 @@ class BmwWidgetView extends WatchUi.View {
         _autoSyncFailed  = false;
         _rateLimited     = false;
         _offline         = false;
+        _offlineText     = null;
     }
 
     function retryAutoSync() {
@@ -27,6 +29,7 @@ class BmwWidgetView extends WatchUi.View {
         _autoSyncFailed  = false;
         _rateLimited     = false;
         _offline         = false;
+        _offlineText     = null;
         _sync = new ForegroundSync();
         _sync.run(method(:onAutoSyncDone), false);  // auto: full fetch only once/day
         WatchUi.requestUpdate();
@@ -40,6 +43,7 @@ class BmwWidgetView extends WatchUi.View {
         // is how a dropout turns into an unnecessary re-pair.
         _offline        = (!success && _sync != null
                             && !_sync.isRateLimited() && !_sync.authFailed());
+        _offlineText    = _offline ? _sync.failText() : null;
         WatchUi.requestUpdate();
     }
 
@@ -155,10 +159,14 @@ class BmwWidgetView extends WatchUi.View {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
         dc.setColor(Theme.COLOR_TEXT, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy - PageChrome.s(dc, 18), Graphics.FONT_SMALL, "No connection",
+        dc.drawText(cx, cy - PageChrome.s(dc, 24), Graphics.FONT_SMALL, "Update failed",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.setColor(Theme.COLOR_WARN, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy, Graphics.FONT_XTINY,
+            (_offlineText != null) ? _offlineText : "Retry",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy + PageChrome.s(dc, 8), Graphics.FONT_TINY, "Press START to retry",
+        dc.drawText(cx, cy + PageChrome.s(dc, 22), Graphics.FONT_TINY, "Press START to retry",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 

@@ -12,13 +12,15 @@ class PageRangeFuel extends WatchUi.View {
     var _sync;
     var _refreshing;
     var _rateLimited;
-    var _failed;        // last refresh failed on the link, not on the credentials
+    var _failed;        // last refresh failed for a non-credential reason
+    var _failText;      // why, in words (ForegroundSync.failText)
 
     function initialize() {
         View.initialize();
         _refreshing  = false;
         _rateLimited = false;
         _failed      = false;
+        _failText    = null;
     }
 
     function onSelect() {
@@ -30,6 +32,7 @@ class PageRangeFuel extends WatchUi.View {
         _refreshing  = true;
         _rateLimited = false;   // clear any prior limit/offline note on a fresh attempt
         _failed      = false;
+        _failText    = null;
         WatchUi.requestUpdate();
         _sync = new ForegroundSync();
         _sync.run(method(:onRefreshDone), true);  // START = manual full refresh
@@ -46,10 +49,12 @@ class PageRangeFuel extends WatchUi.View {
             var auth = new DeviceAuthManager();
             WatchUi.pushView(new AuthView(auth), new AuthDelegate(auth), WatchUi.SLIDE_LEFT);
         } else if (!success) {
-            // Link-level failure (no phone, timeout, 5xx): keep the cached data on
-            // screen with a note. Opening the device flow here was the "asks to
-            // re-auth after a while" bug — a BLE dropout is not an expired grant.
-            _failed = true;
+            // Non-credential failure (no phone, cooldown, container cap, timeout, 5xx):
+            // keep the cached data on screen and say WHICH. Opening the device flow here
+            // was the "asks to re-auth after a while" bug — a BLE dropout is not an
+            // expired grant — and one generic string for all of them was undiagnosable.
+            _failed   = true;
+            _failText = _sync.failText();
         }
         WatchUi.requestUpdate();
     }
@@ -141,7 +146,7 @@ class PageRangeFuel extends WatchUi.View {
         PageChrome.drawNavDots(dc);
         PageChrome.drawRefreshHint(dc, _refreshing);
         if (_rateLimited) { PageChrome.drawRateLimitNote(dc); }
-        else if (_failed) { PageChrome.drawOfflineNote(dc); }
+        else if (_failed) { PageChrome.drawOfflineNote(dc, _failText); }
     }
 
     // FR-22: instantaneous L/100km from remaining fuel + remaining range.

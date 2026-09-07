@@ -64,10 +64,15 @@ class TokenManager {
     // actually goes out.
     var _resetStrikesOnDispatch;
 
+    // Response code of the last refresh attempt, so callers can say WHY it failed
+    // instead of collapsing every cause into one message.
+    var _lastCode;
+
     function initialize() {
         _manual = false;   // default: background poll / auto sync on app open
         _inFlightStamp = null;
         _resetStrikesOnDispatch = false;
+        _lastCode = 0;
     }
 
     // Callers that know a user is watching say so before ensureValidToken().
@@ -212,6 +217,8 @@ class TokenManager {
 
     // CIQ runtime invokes this when the token refresh HTTP response arrives.
     function onTokenRefreshResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
+        _lastCode = responseCode;
+
         if (responseCode == 200 && data != null && data.hasKey("access_token")) {
             // Atomic rotation: Refresh Token MUST be persisted before Access Token is used.
             // If interrupted after step 1 but before step 2, the user can still re-auth.
@@ -362,6 +369,10 @@ class TokenManager {
         }
         Application.Storage.setValue(StorageKeys.KEY_BACKOFF_UNTIL, now + delay);
     }
+
+    // Response code of the last refresh attempt (0 if none was sent — e.g. the
+    // in-flight gate or the creds check aborted it).
+    function getLastResponseCode() { return _lastCode; }
 
     // Returns the current Access Token from Storage, or null.
     function getAccessToken() {

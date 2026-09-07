@@ -4,6 +4,7 @@
 using Toybox.Test;
 using Toybox.Lang;
 using Toybox.Application;
+using Toybox.Communications;
 using Toybox.Time;
 
 // ============================================================
@@ -822,6 +823,40 @@ function testToken_allTerminalGrantErrorsCount(logger as Test.Logger) as Lang.Bo
     Test.assertMessage(
         Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES) == null,
         "invalid_request is not a strike");
+    _resetStorage();
+    return true;
+}
+
+// Every non-credential failure used to render as "No connection — retry", so a phone
+// link that was actually fine, a press inside the cooldown and a container-cap
+// rejection were indistinguishable on the wrist — and undiagnosable in the field.
+(:test)
+function testSync_failureReasonsAreDistinct(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+
+    var reasons = [ForegroundSync.FAIL_NO_PHONE, ForegroundSync.FAIL_COOLDOWN,
+                   ForegroundSync.FAIL_CONTAINER, ForegroundSync.FAIL_RATE_LIMIT];
+    var seen = {};
+    for (var i = 0; i < reasons.size(); i++) {
+        var fs = new ForegroundSync();
+        fs._failReason = reasons[i];
+        fs._finish(false);
+        // _finish must NOT overwrite a reason recorded on the way in.
+        Test.assertEqualMessage(fs.failReason(), reasons[i], "specific reason survives _finish");
+        var t = fs.failText();
+        Test.assertMessage(t != null && !t.equals(""), "reason has text");
+        Test.assertMessage(!seen.hasKey(t), "each reason reads differently: " + t);
+        seen[t] = true;
+    }
+
+    // With nothing specific recorded, a transport code still names itself rather than
+    // collapsing to a generic string.
+    var fs2 = new ForegroundSync();
+    fs2._lastCode = Communications.BLE_CONNECTION_UNAVAILABLE;
+    fs2._finish(false);
+    Test.assertEqualMessage(fs2.failReason(), ForegroundSync.FAIL_NETWORK, "falls back to NETWORK");
+    Test.assertMessage(!seen.hasKey(fs2.failText()), "transport text is distinct too");
     _resetStorage();
     return true;
 }

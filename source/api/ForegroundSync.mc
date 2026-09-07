@@ -27,6 +27,8 @@ class ForegroundSync {
     var _tyreKm;
     var _rateLimited;     // set if any step hit BMW's daily rate limit (CU-429)
     var _authFailed;      // set if the failure was credential-level, not link-level
+    var _failReason;      // WHY the run failed (FAIL_* below)
+    var _lastCode;        // last non-200 response code seen, for the failure text
     var _retried401;      // guard: re-run the chain at most once after a 401
     var _createFailed;    // set if a container create failed with a cap-like error
     var _fullFetch;       // true → fetch the FULL container (About-car etc.); false → just ensure containers
@@ -37,6 +39,8 @@ class ForegroundSync {
         _token  = new TokenManager();
         _rateLimited = false;
         _authFailed  = false;
+        _failReason  = FAIL_NONE;
+        _lastCode    = 0;
         _retried401  = false;
         _createFailed = false;
         _fullFetch   = false;
@@ -46,6 +50,33 @@ class ForegroundSync {
     // The owning view reads this to show a distinct "limit reached" message instead
     // of the generic setup/auth prompt.
     function isRateLimited() { return _rateLimited; }
+
+    // Why the last run failed. One opaque "it failed" made a dropped phone link, a
+    // press inside the cooldown, a container-cap rejection and a real server error all
+    // render identically as "No connection — retry" — indistinguishable on the wrist
+    // and undiagnosable in the field, which is exactly how a working watch and a
+    // capped account looked the same.
+    static const FAIL_NONE       = 0;
+    static const FAIL_NO_PHONE   = 1;
+    static const FAIL_COOLDOWN   = 2;
+    static const FAIL_AUTH       = 3;
+    static const FAIL_RATE_LIMIT = 4;
+    static const FAIL_CONTAINER  = 5;
+    static const FAIL_NETWORK    = 6;
+
+    function failReason() { return _failReason; }
+
+    // Short, wrist-readable reason for the failure banner.
+    function failText() {
+        if (_failReason == FAIL_NO_PHONE)   { return "No phone link"; }
+        if (_failReason == FAIL_COOLDOWN)   { return "Just updated — wait"; }
+        if (_failReason == FAIL_CONTAINER)  { return "Container limit — MENU"; }
+        if (_failReason == FAIL_RATE_LIMIT) { return "Daily limit — try tomorrow"; }
+        // A real transport/server failure: name it. B9 says never show a bare "-104",
+        // and _friendlyError is the existing mapping that turns codes into words.
+        if (_lastCode != 0) { return DeviceAuthManager._friendlyError(_lastCode); }
+        return "Update failed — retry";
+    }
 
     // True when the sync stopped because the stored credentials are unusable
     // (UNCONFIGURED / NEEDS_REBOOTSTRAP) rather than because the phone link or the
@@ -65,6 +96,7 @@ class ForegroundSync {
     function _stop429(responseCode) {
         if (responseCode == 429) {
             _rateLimited = true;
+            _failReason  = FAIL_RATE_LIMIT;
             QuotaGuard.onQuotaExceeded();
             // Start the foreground cooldown so a rate-limited refresh can't be re-tapped
             // immediately and re-run the token/container chain on every press.
@@ -110,6 +142,7 @@ class ForegroundSync {
         // BLE_CONNECTION_UNAVAILABLE and the chain fails in a way that is
         // indistinguishable, to the caller, from an auth failure.
         if (!System.getDeviceSettings().phoneConnected) {
+            _failReason = FAIL_NO_PHONE;
             _finish(false);
             return;
         }
@@ -121,6 +154,7 @@ class ForegroundSync {
         if (_fullFetch) {
             var lastSync = Application.Storage.getValue(KEY_LAST_FG);
             if (lastSync != null && (now - lastSync) < COOLDOWN_SECONDS) {
+                _failReason = FAIL_COOLDOWN;
                 _finish(false);
                 return;
             }
@@ -130,7 +164,12 @@ class ForegroundSync {
     }
 
     function onToken(success as Lang.Boolean) as Void {
-        if (!success) { _finish(false); return; }
+        if (!success) {
+            // The refresh knows why it failed; the chain otherwise loses that entirely.
+            _lastCode = _token.getLastResponseCode();
+            _finish(false);
+            return;
+        }
         _accessToken = Application.Storage.getValue(StorageKeys.KEY_ACCESS_TOKEN);
         if (_accessToken == null) { _finish(false); return; }
 
@@ -144,6 +183,7 @@ class ForegroundSync {
     }
 
     function onVin(responseCode as Lang.Number, vin) as Void {
+        if (responseCode != 200) { _lastCode = responseCode; }
         if (_stop429(responseCode)) { return; }
         if (_stop401(responseCode)) { return; }
         if (vin == null) { _finish(false); return; }
@@ -160,6 +200,7 @@ class ForegroundSync {
     }
 
     function onFullContainerList(responseCode as Lang.Number, containerId) as Void {
+        if (responseCode != 200) { _lastCode = responseCode; }
         if (_stop429(responseCode)) { return; }
         if (_stop401(responseCode)) { return; }
         if (containerId != null) {
@@ -171,11 +212,13 @@ class ForegroundSync {
     }
 
     function onFullContainer(responseCode as Lang.Number, containerId) as Void {
+        if (responseCode != 200) { _lastCode = responseCode; }
         if (_stop429(responseCode)) { return; }
         if (_stop401(responseCode)) { return; }
         if (containerId == null) {
             // Couldn't resolve/create the full container — flag the cap case for onboarding.
             _createFailed = _boot.createCapFailure();
+            if (_createFailed) { _failReason = FAIL_CONTAINER; }
             _finish(false);
             return;
         }
@@ -192,6 +235,7 @@ class ForegroundSync {
     }
 
     function onBgContainerList(responseCode as Lang.Number, containerId) as Void {
+        if (responseCode != 200) { _lastCode = responseCode; }
         if (_stop429(responseCode)) { return; }
         if (_stop401(responseCode)) { return; }
         if (containerId != null) {
@@ -206,12 +250,14 @@ class ForegroundSync {
     // shows data now). If it failed, the background poll simply has no container until
     // the next successful sync.
     function onBgContainer(responseCode as Lang.Number, containerId) as Void {
+        if (responseCode != 200) { _lastCode = responseCode; }
         if (_stop429(responseCode)) { return; }
         if (_stop401(responseCode)) { return; }
         // A bg-container create rejected by the cap blocks onboarding too (so cleanup can be
         // offered). A non-cap bg failure stays best-effort — the foreground still proceeds.
         if (containerId == null && _boot.createCapFailure()) {
             _createFailed = true;
+            _failReason   = FAIL_CONTAINER;
             _finish(false);
             return;
         }
@@ -234,6 +280,7 @@ class ForegroundSync {
     }
 
     function onBasic(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
+        if (responseCode != 200) { _lastCode = responseCode; }
         if (_stop429(responseCode)) { return; }
         // Best-effort for ordinary failures, but a 401 means every remaining call is
         // doomed too — refresh now instead of burning them.
@@ -242,6 +289,7 @@ class ForegroundSync {
     }
 
     function onTyreDiag(responseCode as Lang.Number, tyreKm as Lang.Dictionary or Null) as Void {
+        if (responseCode != 200) { _lastCode = responseCode; }
         if (_stop429(responseCode)) { return; }
         if (_stop401(responseCode)) { return; }
         _tyreKm = tyreKm;  // best-effort — proceed regardless of success
@@ -249,6 +297,7 @@ class ForegroundSync {
     }
 
     function onTelematic(responseCode as Lang.Number, state as Lang.Dictionary or Null) as Void {
+        if (responseCode != 200) { _lastCode = responseCode; }
         if (_stop429(responseCode)) { return; }
         if (_stop401(responseCode)) { return; }
         if (responseCode == 200 && state != null) {
@@ -308,6 +357,10 @@ class ForegroundSync {
             var ts = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
             _authFailed = (ts != null
                 && (ts.equals("UNCONFIGURED") || ts.equals("NEEDS_REBOOTSTRAP")));
+            // Only fill in a reason if no specific one was recorded on the way here.
+            if (_failReason == FAIL_NONE) {
+                _failReason = _authFailed ? FAIL_AUTH : FAIL_NETWORK;
+            }
         }
         if (_onDone != null) { _onDone.invoke(success); }
     }

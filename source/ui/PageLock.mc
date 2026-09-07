@@ -17,13 +17,15 @@ class PageLock extends WatchUi.View {
     var _sync;
     var _refreshing;
     var _rateLimited;
-    var _failed;        // last refresh failed on the link, not on the credentials
+    var _failed;        // last refresh failed for a non-credential reason
+    var _failText;      // why, in words (ForegroundSync.failText)
 
     function initialize() {
         View.initialize();
         _refreshing  = false;
         _rateLimited = false;
         _failed      = false;
+        _failText    = null;
         try { _iconClosed = WatchUi.loadResource(Rez.Drawables.ClosedIcon); } catch (e) { _iconClosed = null; }
         try { _iconOpen   = WatchUi.loadResource(Rez.Drawables.OpenIcon);   } catch (e) { _iconOpen   = null; }
     }
@@ -37,6 +39,7 @@ class PageLock extends WatchUi.View {
         _refreshing  = true;
         _rateLimited = false;
         _failed      = false;
+        _failText    = null;
         WatchUi.requestUpdate();
         _sync = new ForegroundSync();
         _sync.run(method(:onRefreshDone), true);  // START = manual full refresh
@@ -52,7 +55,9 @@ class PageLock extends WatchUi.View {
             var auth = new DeviceAuthManager();
             WatchUi.pushView(new AuthView(auth), new AuthDelegate(auth), WatchUi.SLIDE_LEFT);
         } else if (!success) {
-            _failed = true;        // link-level — note only, never the device flow
+            // Non-credential — note only, never the device flow. Say which failure.
+            _failed   = true;
+            _failText = _sync.failText();
         }
         WatchUi.requestUpdate();
     }
@@ -126,7 +131,7 @@ class PageLock extends WatchUi.View {
         PageChrome.drawNavDots(dc);
         PageChrome.drawRefreshHint(dc, _refreshing);
         if (_rateLimited) { PageChrome.drawRateLimitNote(dc); }
-        else if (_failed) { PageChrome.drawOfflineNote(dc); }
+        else if (_failed) { PageChrome.drawOfflineNote(dc, _failText); }
     }
 
     function _drawWindowBadge(dc, x, y, radius) {

@@ -28,7 +28,7 @@ class PageTyres extends WatchUi.View {
         dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
         dc.clear();
         var state = VehicleCache.read();
-        if (state == null) { return; }
+        if (state == null) { PageChrome.drawEmptyState(dc); return; }
         _renderDirect(dc, state);
     }
 

@@ -10,8 +10,10 @@ class PageDelegate extends WatchUi.BehaviorDelegate {
     function onPreviousPage() { return PageNav.advance(-1); }
 
     function onSelect() {
+        // UNCONFIGURED as well as NEEDS_REBOOTSTRAP: sign-out sets the former and wipes
+        // the cache, leaving the user on an empty page whose START did nothing at all.
         var ts = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
-        if (ts != null && ts.equals("NEEDS_REBOOTSTRAP")) {
+        if (ts != null && (ts.equals("NEEDS_REBOOTSTRAP") || ts.equals("UNCONFIGURED"))) {
             var auth = new DeviceAuthManager();
             WatchUi.pushView(new AuthView(auth), new AuthDelegate(auth), WatchUi.SLIDE_LEFT);
             return true;

@@ -1032,6 +1032,33 @@ function testQuota_bodyless403IsTheDailyLimit(logger as Test.Logger) as Lang.Boo
     return true;
 }
 
+// Sign-out wipes the cache while a data page is still on the view stack under the menu.
+// Every page used to clear the screen and return, painting pure black with no way
+// forward, and START did nothing because the delegate only routed NEEDS_REBOOTSTRAP.
+// Both halves of the trap are asserted here: pages must not claim to be renderable with
+// no data, and the state sign-out leaves behind must route to pairing.
+(:test)
+function testSignOut_leavesNoDeadEnd(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    VehicleCache.replace({ "rangeKm" => 300, "fuelPercent" => 50, "doorsLocked" => true,
+                           "odometerKm" => 1000, "tyrePressureFL" => 2.4 });
+    var pages = [new PageRangeFuel(), new PageLock(), new PageOdometer(), new PageTyres()];
+    for (var i = 0; i < pages.size(); i++) {
+        Test.assertMessage(pages[i].isVisible(), "page is visible with data");
+    }
+
+    // What sign-out does to the cache.
+    VehicleCache.clear();
+    Test.assertMessage(VehicleCache.read() == null, "cache wiped");
+    for (var j = 0; j < pages.size(); j++) {
+        Test.assertMessage(!pages[j].isVisible(),
+            "no page may claim visibility with an empty cache");
+    }
+    Test.assertMessage(!PageNav.hasVisible(), "and the carousel has nothing to show");
+    _resetStorage();
+    return true;
+}
+
 // ForegroundSync must tell a credential failure from a link failure: only the former
 // may send the user to pairing. This is the classification the pages branch on.
 (:test)

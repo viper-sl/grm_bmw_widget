@@ -193,6 +193,22 @@ class PageChrome {
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
+    // The cache is empty but a page view is still on the stack — after a sign-out, which
+    // calls VehicleCache.clear() while the menu sits on top of a data page. Every page
+    // used to `dc.clear()` and return here, i.e. paint pure black with no way forward,
+    // and START did nothing because the delegate only routed NEEDS_REBOOTSTRAP. Draw an
+    // honest empty state instead; START now opens pairing (see PageDelegate.onSelect).
+    static function drawEmptyState(dc) {
+        var cx = dc.getWidth() / 2;
+        var cy = dc.getHeight() / 2;
+        dc.setColor(Theme.COLOR_TEXT, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy - s(dc, 14), Graphics.FONT_SMALL, "No vehicle data",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy + s(dc, 12), Graphics.FONT_TINY, "Press START to set up",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
     static function drawSelectHint(dc) {
         var hy  = dc.getHeight() / 4;
         var tip = dc.getWidth() - s(dc, 22);

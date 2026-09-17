@@ -108,11 +108,21 @@ class CarDataClient {
     // (NOT HTTP 429). Normalize both to 429 so callers have one "rate limited" signal.
     static function isRateLimit(rc, data) {
         if (rc == 429) { return true; }
-        if (rc == 403 && data instanceof Lang.Dictionary && data.hasKey("exveErrorId")) {
+        if (rc != 403) { return false; }
+        if (data instanceof Lang.Dictionary && data.hasKey("exveErrorId")) {
             var id = data["exveErrorId"];
+            // A readable body names the cause. CU-124 (container cap) is a 403 too and
+            // is NOT a rate limit — isContainerCapError handles it.
             return (id != null && id.equals("CU-429"));
         }
-        return false;
+        // No readable body. On real hardware Connect IQ frequently delivers a non-2xx
+        // response as (code, null), dropping the JSON — so requiring the body meant the
+        // daily limit was NEVER detected on the watch: the quota gate stayed unarmed and
+        // the app kept hammering an API that was already refusing, which is how a day's
+        // budget disappears. CU-429 is far and away the most common 403 on this API, and
+        // the cost of assuming it wrongly is only that we wait instead of retrying —
+        // whereas the cost of the old assumption was burning the entire daily quota.
+        return true;
     }
 
     // Container-create rejected because the BMW account is at its container cap:

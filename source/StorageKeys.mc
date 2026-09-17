@@ -10,6 +10,11 @@ class StorageKeys {
     // presented by a client that did not issue it, so a changed clientId kills the
     // whole grant — this stamp is how that is detected (TokenManager.syncClient).
     static const KEY_TOKEN_CLIENT_ID  = "tokenClientId";
+    // Two-phase rotation. BMW hands out a new refresh token on every refresh, but a
+    // new token is only PROVEN once it has actually fetched data — so the outgoing one
+    // is kept here until then, and restored if the new one is rejected first.
+    static const KEY_REFRESH_TOKEN_PREV = "refreshTokenPrev";
+    static const KEY_GRANT_UNCONFIRMED  = "grantUnconfirmed";
     static const KEY_NEXT_ALLOWED     = "nextAllowedCall";
     static const KEY_BACKOFF_UNTIL    = "backoffUntil";
     // Epoch of the refresh POST currently in flight — serializes token refreshes

@@ -225,6 +225,16 @@ class TokenManager {
             // Guarded write: a 200 that omits refresh_token would otherwise store null
             // over the live one and strand the widget in UNCONFIGURED on the next call.
             if (data.hasKey("refresh_token") && data["refresh_token"] != null) {
+                // Two-phase rotation. A 200 proves BMW accepted the OLD token; it does
+                // NOT prove the new one fetches data. Keep the outgoing token until a
+                // real fetch confirms the new grant (confirmGrant), so a rotation that
+                // lands us on a token BMW later refuses is recoverable instead of
+                // destroying the only working credential we had.
+                var outgoing = Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN);
+                if (outgoing != null && !outgoing.equals(data["refresh_token"])) {
+                    Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN_PREV, outgoing);
+                    Application.Storage.setValue(StorageKeys.KEY_GRANT_UNCONFIRMED, true);
+                }
                 Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, data["refresh_token"]);
             }
             Application.Storage.setValue(StorageKeys.KEY_ACCESS_TOKEN,  data["access_token"]);
@@ -242,6 +252,17 @@ class TokenManager {
             data = null;
             _releaseInFlight();
             _callback.invoke(true);
+
+        } else if (responseCode == 400 && _isDeadGrant(data) && _rollBackGrant()) {
+            // The rotated-to token was refused before it ever fetched anything, and the
+            // token it replaced is still on hand — put that one back rather than
+            // counting this against the grant. Reported as transient so it does not
+            // shove the user at the pairing screen: the next attempt uses the restored
+            // token, and only if THAT is refused does the ladder start counting.
+            _incrementBackoff();
+            data = null;
+            _releaseInFlight();
+            _callback.invoke(false);
 
         } else if (responseCode == 400 && _isDeadGrant(data)) {
             // Probably-permanent auth failure — but corroborate before latching the
@@ -310,6 +331,39 @@ class TokenManager {
         return !data["error"].equals("invalid_request");
     }
 
+    // --- Two-phase rotation --------------------------------------------------------
+
+    // Restore the pre-rotation refresh token, if one is being held and the grant that
+    // replaced it was never confirmed by a real fetch. Returns true when it rolled back.
+    // One shot: the restore clears the held copy, so a second rejection falls through
+    // to the strike ladder and cannot ping-pong between two dead tokens.
+    static function _rollBackGrant() {
+        var unconfirmed = Application.Storage.getValue(StorageKeys.KEY_GRANT_UNCONFIRMED);
+        if (unconfirmed == null || unconfirmed != true) { return false; }
+        var prev = Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN_PREV);
+        if (prev == null) {
+            Application.Storage.deleteValue(StorageKeys.KEY_GRANT_UNCONFIRMED);
+            return false;
+        }
+        Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, prev);
+        Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_TOKEN_PREV);
+        Application.Storage.deleteValue(StorageKeys.KEY_GRANT_UNCONFIRMED);
+        // The access token came from the refused grant — drop it so the restored
+        // refresh token is actually used next time.
+        Application.Storage.deleteValue(StorageKeys.KEY_ACCESS_TOKEN);
+        Application.Storage.deleteValue(StorageKeys.KEY_ACCESS_EXPIRY);
+        return true;
+    }
+
+    // A real data fetch succeeded: the current grant is proven. Retire the held copy of
+    // the token it replaced. THIS is the confirmation — a 200 from the token endpoint is
+    // not, because it says nothing about whether the new token can read vehicle data.
+    static function confirmGrant() {
+        if (Application.Storage.getValue(StorageKeys.KEY_GRANT_UNCONFIRMED) == null) { return; }
+        Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_TOKEN_PREV);
+        Application.Storage.deleteValue(StorageKeys.KEY_GRANT_UNCONFIRMED);
+    }
+
     // --- Client-id binding -------------------------------------------------------
     // Tokens belong to the client that issued them. Without this stamp the app cannot
     // tell "the user swapped the clientId in settings" from "the link is flaky", so a
@@ -345,7 +399,15 @@ class TokenManager {
         if (!clientChanged()) { return false; }
         Application.Storage.deleteValue(StorageKeys.KEY_ACCESS_TOKEN);
         Application.Storage.deleteValue(StorageKeys.KEY_ACCESS_EXPIRY);
+        // Keep the refresh token rather than destroying it: it is dead for the NEW
+        // client, but perfectly alive for the old one, so reverting the setting
+        // restores service instead of forcing a re-pair. Only sign-out truly erases.
+        var rt = Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN);
+        if (rt != null) {
+            Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN_PREV, rt);
+        }
         Application.Storage.deleteValue(StorageKeys.KEY_REFRESH_TOKEN);
+        Application.Storage.deleteValue(StorageKeys.KEY_GRANT_UNCONFIRMED);
         Application.Storage.deleteValue(StorageKeys.KEY_TOKEN_CLIENT_ID);
         // Ledgers belong to the retired grant, exactly as on sign-out and re-pair.
         Application.Storage.deleteValue(StorageKeys.KEY_GRANT_STRIKES);

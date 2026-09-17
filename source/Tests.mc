@@ -34,7 +34,10 @@ function testRateLimit_detectsCu429(logger as Test.Logger) as Lang.Boolean {
         "403 + CU-429 body -> rate limited");
     Test.assertMessage(!CarDataClient.isRateLimit(403, {"exveErrorId" => "CU-105"}),
         "403 + other CU code -> not rate limited");
-    Test.assertMessage(!CarDataClient.isRateLimit(403, null), "403 no body -> not rate limited");
+    // Inverted deliberately: on hardware the body naming CU-429 is usually not
+    // delivered, so requiring it meant the daily limit was never detected on the watch.
+    // An unreadable 403 now defaults to "rate limited" — see isRateLimit.
+    Test.assertMessage(CarDataClient.isRateLimit(403, null), "403 no body -> rate limited");
     Test.assertMessage(!CarDataClient.isRateLimit(200, null), "200 -> not rate limited");
     return true;
 }
@@ -936,6 +939,95 @@ function testSync_rejectedRefreshOffersPairing(logger as Test.Logger) as Lang.Bo
     fs2.onToken(false);
     Test.assertEqualMessage(fs2.failReason(), ForegroundSync.FAIL_NETWORK,
         "a dropped link is not a sign-in problem");
+    _resetStorage();
+    return true;
+}
+
+// A rotation must not destroy the credential it replaces. A 200 from the token endpoint
+// proves BMW accepted the OLD token; only a real data fetch proves the NEW one works.
+(:test)
+function testToken_rotationKeepsPreviousUntilDataConfirms(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "R-OLD");
+
+    tm.onTokenRefreshResponse(200, { "access_token" => "A1", "refresh_token" => "R-NEW" });
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN), "R-NEW", "rotated");
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN_PREV), "R-OLD",
+        "the replaced token is kept, not destroyed");
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_UNCONFIRMED) == true,
+        "and the new grant is marked unproven");
+
+    // Data arrives -> the new grant is proven and the fallback retires.
+    TokenManager.confirmGrant();
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN_PREV) == null,
+        "confirmed by data: fallback retired");
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_UNCONFIRMED) == null, "flag cleared");
+    _resetStorage();
+    return true;
+}
+
+// If the rotated-to token is refused before it ever fetched data, put the old one back
+// rather than counting it against the grant — that is the whole point of holding it.
+(:test)
+function testToken_unprovenGrantRollsBackInsteadOfStriking(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    tm.setManual(true);
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "R-OLD");
+    tm.onTokenRefreshResponse(200, { "access_token" => "A1", "refresh_token" => "R-NEW" });
+
+    // R-NEW refused before any fetch confirmed it.
+    tm.onTokenRefreshResponse(400, null);
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN), "R-OLD",
+        "the working token is restored");
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES) == null,
+        "a rollback is not a strike against the grant");
+    Test.assertEqualMessage(tm.getTokenState(), "NORMAL",
+        "and must leave the token state exactly as it was");
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_ACCESS_TOKEN) == null,
+        "the refused grant's access token is dropped so the restored one gets used");
+
+    // One shot: a second refusal has no fallback left and falls through to the ladder.
+    tm.onTokenRefreshResponse(400, null);
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES), 1,
+        "second refusal counts normally — no ping-pong between dead tokens");
+    _resetStorage();
+    return true;
+}
+
+// BMW signals its daily limit as 403, and on hardware the body that names CU-429 is
+// usually not delivered. Requiring it meant the limit was never detected on the watch:
+// the gate stayed unarmed and the app kept hammering an API already refusing it.
+(:test)
+function testQuota_bodyless403IsTheDailyLimit(logger as Test.Logger) as Lang.Boolean {
+    Test.assertMessage(CarDataClient.isRateLimit(403, null),
+        "a 403 with no body must be treated as the daily limit");
+    Test.assertMessage(CarDataClient.isRateLimit(403, { "exveErrorId" => "CU-429" }),
+        "and so must an explicit CU-429");
+    Test.assertMessage(!CarDataClient.isRateLimit(403, { "exveErrorId" => "CU-124" }),
+        "but a readable container-cap 403 is NOT a rate limit");
+    Test.assertMessage(!CarDataClient.isRateLimit(500, null), "5xx is not a rate limit");
+
+    // The daily block is distinguishable from the routine 40-minute advance.
+    _resetStorage();
+    QuotaGuard.updateAfterFetch();
+    Test.assertMessage(!QuotaGuard.isDailyBlocked(), "40-min gate is not a daily block");
+    QuotaGuard.onQuotaExceeded();
+    Test.assertMessage(QuotaGuard.isDailyBlocked(), "the 4 AM block is");
     _resetStorage();
     return true;
 }

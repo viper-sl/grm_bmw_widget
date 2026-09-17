@@ -39,6 +39,19 @@ class QuotaGuard {
         Application.Storage.deleteValue(StorageKeys.KEY_BACKOFF_UNTIL);
     }
 
+    // True only when the gate was armed by onQuotaExceeded() (a block until 4 AM),
+    // not by the routine 40-minute advance of updateAfterFetch(). The foreground is
+    // deliberately not subject to the 40-minute gate — a user pressing START should
+    // get a fetch — but it MUST respect the daily block, or it keeps hammering an API
+    // that is already refusing and the limit never clears.
+    static function isDailyBlocked() {
+        var nextAllowed = Application.Storage.getValue(StorageKeys.KEY_NEXT_ALLOWED);
+        if (nextAllowed == null) { return false; }
+        // updateAfterFetch only ever pushes 40 min out; anything far beyond that came
+        // from the daily block.
+        return (nextAllowed - Time.now().value()) > 7200;
+    }
+
     // Call when CarDataClient receives a CU-429 quota-exceeded response.
     // Blocks until 4 AM local time the next day — quota resets at midnight and
     // 4 AM gives BMW's systems time to fully flush the counter.

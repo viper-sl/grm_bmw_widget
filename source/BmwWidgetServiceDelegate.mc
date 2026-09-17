@@ -146,6 +146,7 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
             // "last upd" = fetch time (temporary): stamp at fetch completion so the
             // age resets when the background poll succeeds, not just on field changes.
             state["lastUpdated"] = Time.now().value();
+            TokenManager.confirmGrant();   // real data proves the current grant
             QuotaGuard.updateAfterFetch();
             QuotaGuard.clearBackoff();   // a working link retires any error backoff
             Background.exit(state);

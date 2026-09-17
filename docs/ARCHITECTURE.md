@@ -309,6 +309,23 @@ strike simply re-arms the 40 min base. Five strikes therefore cost roughly `5 ×
 max(poll interval, 40 min)` — about **3–5 h** depending on update mode, not the ~12 h an
 un-gated doubling ladder would give.
 
+### Two-phase rotation: never destroy a working token
+
+A `200` from the token endpoint proves BMW accepted the **old** refresh token. It proves
+nothing about whether the **new** one can read vehicle data. So rotation keeps the
+outgoing token in `KEY_REFRESH_TOKEN_PREV` and flags `KEY_GRANT_UNCONFIRMED`; only a
+successful **telematicData fetch** calls `TokenManager.confirmGrant()` and retires it.
+
+If the rotated-to token is refused (`400`) before anything confirmed it, `_rollBackGrant()`
+restores the previous one, drops the refused access token, and does **not** count a
+strike — a rotation that landed on a bad token is not evidence the grant is dead. It is
+one shot: the restore clears the held copy, so a second refusal falls through to the
+strike ladder and cannot ping-pong between two dead tokens.
+
+`syncClient()` follows the same rule — a client-id change moves the refresh token to
+`_PREV` rather than deleting it, so reverting the setting restores service. Only an
+explicit **sign-out** truly erases credentials.
+
 ### The grant is bound to a client id
 
 BMW rejects a `refresh_token` presented by a client that did not issue it, so **editing
@@ -414,6 +431,14 @@ flowchart TD
 - **CU-429 is the key insight:** BMW returns its **daily limit as HTTP `403` with body
   `exveErrorId == "CU-429"`**, *not* HTTP 429. `isRateLimit` normalizes both → callers arm
   the 24 h block and show a clear message (no false "auth needed").
+- **A `403` with no readable body is treated as the daily limit.** On hardware Connect IQ
+  frequently delivers a non-2xx response as `(code, null)`, so requiring the `CU-429` body
+  meant the limit was **never** detected on the watch: the gate stayed unarmed and the app
+  kept hammering an API already refusing it, which is how a day's budget disappears.
+  Guessing wrong only costs a wait; the old assumption cost the whole quota.
+- **The foreground respects the daily block** (`QuotaGuard.isDailyBlocked()`) though not
+  the routine 40-minute gate — a START press should fetch, but not into an API that is
+  already refusing. One full manual refresh costs **3 data calls** of the ~50/day budget.
 - `KEY_NEXT_ALLOWED` (quota gate) and `KEY_BACKOFF_UNTIL` (error backoff) are **separate**:
   the gate advances on every call; backoff is set on errors and cleared on success. "Cleared
   on success" is `QuotaGuard.clearBackoff()`, called from the background poll and the

@@ -150,6 +150,16 @@ class ForegroundSync {
             _finish(false);
             return;
         }
+        // Respect BMW's daily limit. The foreground is deliberately exempt from the
+        // routine 40-minute gate — a START press should fetch — but not from the daily
+        // block: retrying into an API that is already refusing burns nothing but the
+        // budget and keeps the limit from clearing.
+        if (QuotaGuard.isDailyBlocked()) {
+            _rateLimited = true;
+            _failReason  = FAIL_RATE_LIMIT;
+            _finish(false);
+            return;
+        }
         var now = Time.now().value();
         var lastFull = Application.Storage.getValue(KEY_LAST_FULL);
         var dailyDue = (lastFull == null) || (now - lastFull >= FULL_INTERVAL_SECONDS);
@@ -320,6 +330,9 @@ class ForegroundSync {
             // pipeline stabilizes) — stamp now so the age resets on every fetch.
             state["lastUpdated"] = Time.now().value();
             VehicleCache.write(state);
+            // Vehicle data is in hand — THIS is what proves the current grant works, so
+            // the pre-rotation refresh token held as a fallback can finally be retired.
+            TokenManager.confirmGrant();
             QuotaGuard.updateAfterFetch();
             QuotaGuard.clearBackoff();   // a working link retires any error backoff
             Application.Storage.setValue(KEY_LAST_FG, Time.now().value());

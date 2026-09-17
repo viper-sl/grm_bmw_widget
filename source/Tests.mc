@@ -34,10 +34,8 @@ function testRateLimit_detectsCu429(logger as Test.Logger) as Lang.Boolean {
         "403 + CU-429 body -> rate limited");
     Test.assertMessage(!CarDataClient.isRateLimit(403, {"exveErrorId" => "CU-105"}),
         "403 + other CU code -> not rate limited");
-    // Inverted deliberately: on hardware the body naming CU-429 is usually not
-    // delivered, so requiring it meant the daily limit was never detected on the watch.
-    // An unreadable 403 now defaults to "rate limited" — see isRateLimit.
-    Test.assertMessage(CarDataClient.isRateLimit(403, null), "403 no body -> rate limited");
+    Test.assertMessage(!CarDataClient.isRateLimit(403, null),
+        "403 no body -> not a rate limit on its own (ForegroundSync._stop403 escalates)");
     Test.assertMessage(!CarDataClient.isRateLimit(200, null), "200 -> not rate limited");
     return true;
 }
@@ -1009,13 +1007,14 @@ function testToken_unprovenGrantRollsBackInsteadOfStriking(logger as Test.Logger
     return true;
 }
 
-// BMW signals its daily limit as 403, and on hardware the body that names CU-429 is
-// usually not delivered. Requiring it meant the limit was never detected on the watch:
-// the gate stayed unarmed and the app kept hammering an API already refusing it.
+// 403 semantics on this API, and the daily block vs the routine 40-minute gate.
 (:test)
-function testQuota_bodyless403IsTheDailyLimit(logger as Test.Logger) as Lang.Boolean {
-    Test.assertMessage(CarDataClient.isRateLimit(403, null),
-        "a 403 with no body must be treated as the daily limit");
+function testQuota_403AndDailyBlockSemantics(logger as Test.Logger) as Lang.Boolean {
+    // A bodyless 403 is NOT evidence of a quota block: on this API the likelier cause
+    // is a container the current client cannot use, which one re-discovery fixes.
+    // Calling it a daily limit armed a 24-hour gate over a one-call problem.
+    Test.assertMessage(!CarDataClient.isRateLimit(403, null),
+        "a 403 with no body is not, by itself, the daily limit");
     Test.assertMessage(CarDataClient.isRateLimit(403, { "exveErrorId" => "CU-429" }),
         "and so must an explicit CU-429");
     Test.assertMessage(!CarDataClient.isRateLimit(403, { "exveErrorId" => "CU-124" }),
@@ -1055,6 +1054,41 @@ function testSignOut_leavesNoDeadEnd(logger as Test.Logger) as Lang.Boolean {
             "no page may claim visibility with an empty cache");
     }
     Test.assertMessage(!PageNav.hasVisible(), "and the carousel has nothing to show");
+    _resetStorage();
+    return true;
+}
+
+// Containers belong to the client that created them, so a re-pair alone leaves the
+// cached ids pointing at containers the new grant cannot use — 403 forever, which is
+// why re-pairing did not help but signing out (which drops the ids) did. Pairing must
+// therefore drop them, and a 403 must re-discover before anything is called a limit.
+(:test)
+function testContainer_staleAfterRepairIsRecoverable(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    CarDataClient._storeContainer("C-OLD");
+    CarDataClient._storeBgContainer("B-OLD");
+    Test.assertEqualMessage(CarDataClient.cachedContainerId(), "C-OLD", "cached");
+    Test.assertEqualMessage(CarDataClient.cachedBgContainerId(), "B-OLD", "bg cached");
+
+    CarDataClient.invalidateContainers();
+    Test.assertMessage(CarDataClient.cachedContainerId() == null,
+        "invalidated so the next sync re-lists");
+    Test.assertMessage(CarDataClient.cachedBgContainerId() == null, "bg invalidated too");
+
+    // First 403 re-discovers rather than declaring a limit; only the second escalates.
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+    CarDataClient._storeContainer("C-STALE");
+    var fs = new ForegroundSync();
+    Test.assertMessage(fs._stop403(403), "403 is handled");
+    Test.assertMessage(CarDataClient.cachedContainerId() == null,
+        "the stale container is dropped, not blamed on quota");
+    Test.assertMessage(!fs.isRateLimited(), "and the first 403 is NOT a daily limit");
+
+    Test.assertMessage(fs._stop403(403), "second 403 handled");
+    Test.assertMessage(fs.isRateLimited(),
+        "a 403 with freshly resolved containers IS read as the limit");
+    Test.assertMessage(QuotaGuard.isDailyBlocked(), "and arms the daily block");
     _resetStorage();
     return true;
 }

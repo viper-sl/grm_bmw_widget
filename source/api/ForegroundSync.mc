@@ -30,6 +30,7 @@ class ForegroundSync {
     var _failReason;      // WHY the run failed (FAIL_* below)
     var _lastCode;        // last non-200 response code seen, for the failure text
     var _retried401;      // guard: re-run the chain at most once after a 401
+    var _retried403;      // guard: re-discover containers at most once after a 403
     var _createFailed;    // set if a container create failed with a cap-like error
     var _fullFetch;       // true → fetch the FULL container (About-car etc.); false → just ensure containers
 
@@ -42,6 +43,7 @@ class ForegroundSync {
         _failReason  = FAIL_NONE;
         _lastCode    = 0;
         _retried401  = false;
+        _retried403  = false;
         _createFailed = false;
         _fullFetch   = false;
     }
@@ -125,6 +127,31 @@ class ForegroundSync {
         }
         _retried401 = true;
         _token.ensureValidToken(method(:onToken));
+        return true;
+    }
+
+    // A 403 whose body did not explain itself. On this API that is usually a container
+    // the current client cannot use: containers belong to the client that created them,
+    // and a re-pair leaves the cached ids untouched — which is exactly why re-pairing
+    // alone kept returning 403 while signing out (which DOES drop the ids) fixed it.
+    // Re-discover once, which is what signing out achieved by hand. Only a SECOND 403,
+    // now with freshly resolved containers, is read as BMW's daily limit — reading the
+    // first one that way would arm a 24-hour block over a one-call fix.
+    function _stop403(responseCode) {
+        if (responseCode != 403) { return false; }
+        if (!_retried403) {
+            _retried403    = true;
+            CarDataClient.invalidateContainers();
+            _containerId   = null;
+            _bgContainerId = null;
+            _token.ensureValidToken(method(:onToken));
+            return true;
+        }
+        _rateLimited = true;
+        _failReason  = FAIL_RATE_LIMIT;
+        QuotaGuard.onQuotaExceeded();
+        Application.Storage.setValue(KEY_LAST_FG, Time.now().value());
+        _finish(false);
         return true;
     }
 
@@ -317,6 +344,7 @@ class ForegroundSync {
     function onTelematic(responseCode as Lang.Number, state as Lang.Dictionary or Null) as Void {
         if (responseCode != 200) { _lastCode = responseCode; }
         if (_stop429(responseCode)) { return; }
+        if (_stop403(responseCode)) { return; }
         if (_stop401(responseCode)) { return; }
         if (responseCode == 200 && state != null) {
             // Merge tyre wear km (from separate endpoint) into the telematic state before writing.

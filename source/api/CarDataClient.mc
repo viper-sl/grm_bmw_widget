@@ -115,14 +115,24 @@ class CarDataClient {
             // is NOT a rate limit — isContainerCapError handles it.
             return (id != null && id.equals("CU-429"));
         }
-        // No readable body. On real hardware Connect IQ frequently delivers a non-2xx
-        // response as (code, null), dropping the JSON — so requiring the body meant the
-        // daily limit was NEVER detected on the watch: the quota gate stayed unarmed and
-        // the app kept hammering an API that was already refusing, which is how a day's
-        // budget disappears. CU-429 is far and away the most common 403 on this API, and
-        // the cost of assuming it wrongly is only that we wait instead of retrying —
-        // whereas the cost of the old assumption was burning the entire daily quota.
-        return true;
+        // No readable body — and a bodyless 403 must NOT be read as the daily limit.
+        // The likelier cause on a container-scoped call is a container this client
+        // cannot use (one created under a previous clientId; re-pairing does not touch
+        // the cached ids, which is why re-pairing alone left the widget on 403 while
+        // signing out fixed it). Calling that a quota block would arm a 24-hour gate
+        // over a problem one re-discovery fixes. ForegroundSync._stop403 escalates
+        // instead: re-discover once, and only treat a SECOND 403 as the limit.
+        return false;
+    }
+
+    // Drop the cached container ids so the next sync re-lists (and re-creates if
+    // needed). Containers belong to the client that created them, so a new grant may
+    // not be able to use them at all.
+    static function invalidateContainers() {
+        Application.Storage.deleteValue(StorageKeys.KEY_CONTAINER_ID);
+        Application.Storage.deleteValue(StorageKeys.KEY_CONTAINER_NAME);
+        Application.Storage.deleteValue(StorageKeys.KEY_BG_CONTAINER_ID);
+        Application.Storage.deleteValue(StorageKeys.KEY_BG_CONTAINER_NAME);
     }
 
     // Container-create rejected because the BMW account is at its container cap:

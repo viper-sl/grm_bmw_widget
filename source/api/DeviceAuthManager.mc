@@ -249,6 +249,11 @@ class DeviceAuthManager {
             // Bind the new tokens to the client that issued them, so a later clientId
             // edit is detected as a dead grant instead of looking like a flaky link.
             TokenManager.stampClient();
+            // Containers belong to the client that created them. A new grant may not be
+            // able to use the cached ones at all, and keeping them is what left a
+            // re-pair still returning 403 while a sign-out worked. Re-listing costs one
+            // call and reuses the existing container when it is usable.
+            CarDataClient.invalidateContainers();
 
             _state = SUCCESS;
             _notify();

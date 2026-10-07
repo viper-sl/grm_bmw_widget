@@ -12,11 +12,15 @@ class PageRangeFuel extends WatchUi.View {
     var _sync;
     var _refreshing;
     var _rateLimited;
+    var _failed;        // last refresh failed for a non-credential reason
+    var _failText;      // why, in words (ForegroundSync.failText)
 
     function initialize() {
         View.initialize();
         _refreshing  = false;
         _rateLimited = false;
+        _failed      = false;
+        _failText    = null;
     }
 
     function onSelect() {
@@ -26,7 +30,9 @@ class PageRangeFuel extends WatchUi.View {
             return true;
         }
         _refreshing  = true;
-        _rateLimited = false;   // clear any prior limit note on a fresh attempt
+        _rateLimited = false;   // clear any prior limit/offline note on a fresh attempt
+        _failed      = false;
+        _failText    = null;
         WatchUi.requestUpdate();
         _sync = new ForegroundSync();
         _sync.run(method(:onRefreshDone), true);  // START = manual full refresh
@@ -38,9 +44,21 @@ class PageRangeFuel extends WatchUi.View {
         if (!success && _sync != null && _sync.isRateLimited()) {
             // Daily API limit — show a note on the page; do NOT bounce to auth.
             _rateLimited = true;
-        } else if (!success) {
+        } else if (!success && _sync != null
+                && (_sync.authFailed()
+                    || _sync.failReason() == ForegroundSync.FAIL_STALE_AUTH)) {
+            // Credentials are unusable, or BMW rejected the refresh with a 400 on a
+            // retry the user asked for. Offering pairing is cheap and reversible; the
+            // strike ladder still governs the one-way NEEDS_REBOOTSTRAP latch.
             var auth = new DeviceAuthManager();
             WatchUi.pushView(new AuthView(auth), new AuthDelegate(auth), WatchUi.SLIDE_LEFT);
+        } else if (!success) {
+            // Non-credential failure (no phone, cooldown, container cap, timeout, 5xx):
+            // keep the cached data on screen and say WHICH. Opening the device flow here
+            // was the "asks to re-auth after a while" bug — a BLE dropout is not an
+            // expired grant — and one generic string for all of them was undiagnosable.
+            _failed   = true;
+            _failText = _sync.failText();
         }
         WatchUi.requestUpdate();
     }
@@ -56,7 +74,7 @@ class PageRangeFuel extends WatchUi.View {
         dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
         dc.clear();
         var state = VehicleCache.read();
-        if (state == null) { return; }
+        if (state == null) { PageChrome.drawEmptyState(dc); return; }
         _renderDirect(dc, state);
     }
 
@@ -132,6 +150,7 @@ class PageRangeFuel extends WatchUi.View {
         PageChrome.drawNavDots(dc);
         PageChrome.drawRefreshHint(dc, _refreshing);
         if (_rateLimited) { PageChrome.drawRateLimitNote(dc); }
+        else if (_failed) { PageChrome.drawOfflineNote(dc, _failText); }
     }
 
     // FR-22: instantaneous L/100km from remaining fuel + remaining range.

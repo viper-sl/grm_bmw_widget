@@ -108,11 +108,31 @@ class CarDataClient {
     // (NOT HTTP 429). Normalize both to 429 so callers have one "rate limited" signal.
     static function isRateLimit(rc, data) {
         if (rc == 429) { return true; }
-        if (rc == 403 && data instanceof Lang.Dictionary && data.hasKey("exveErrorId")) {
+        if (rc != 403) { return false; }
+        if (data instanceof Lang.Dictionary && data.hasKey("exveErrorId")) {
             var id = data["exveErrorId"];
+            // A readable body names the cause. CU-124 (container cap) is a 403 too and
+            // is NOT a rate limit — isContainerCapError handles it.
             return (id != null && id.equals("CU-429"));
         }
+        // No readable body — and a bodyless 403 must NOT be read as the daily limit.
+        // The likelier cause on a container-scoped call is a container this client
+        // cannot use (one created under a previous clientId; re-pairing does not touch
+        // the cached ids, which is why re-pairing alone left the widget on 403 while
+        // signing out fixed it). Calling that a quota block would arm a 24-hour gate
+        // over a problem one re-discovery fixes. ForegroundSync._stop403 escalates
+        // instead: re-discover once, and only treat a SECOND 403 as the limit.
         return false;
+    }
+
+    // Drop the cached container ids so the next sync re-lists (and re-creates if
+    // needed). Containers belong to the client that created them, so a new grant may
+    // not be able to use them at all.
+    static function invalidateContainers() {
+        Application.Storage.deleteValue(StorageKeys.KEY_CONTAINER_ID);
+        Application.Storage.deleteValue(StorageKeys.KEY_CONTAINER_NAME);
+        Application.Storage.deleteValue(StorageKeys.KEY_BG_CONTAINER_ID);
+        Application.Storage.deleteValue(StorageKeys.KEY_BG_CONTAINER_NAME);
     }
 
     // Container-create rejected because the BMW account is at its container cap:

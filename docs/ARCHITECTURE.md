@@ -236,7 +236,9 @@ flowchart TD
 **Rate-limit short-circuit (`_stop429`)** is checked at every chain step: a `429`
 (incl. normalized `403+CU-429`) sets `_rateLimited`, calls `QuotaGuard.onQuotaExceeded()`,
 stamps the 60 s cooldown, and `_finish(false)`. The owning view reads `isRateLimited()` to
-show "Daily limit reached" instead of bouncing to auth.
+show "Daily limit reached" instead of bouncing to auth. **`_stop401`** sits beside it:
+a `401` invalidates the cached access-token expiry and re-runs the chain once with a
+freshly refreshed token (`_retried401` caps it at one retry).
 
 ---
 
@@ -250,16 +252,17 @@ stateDiagram-v2
     [*] --> first_run: tokenState == null
     first_run --> NORMAL: refresh 200 (rotate)
     first_run --> UNCONFIGURED: no client id / refresh token
-    first_run --> NEEDS_REBOOTSTRAP: 400 invalid_grant
 
-    NORMAL --> NORMAL: access token still valid
-    NORMAL --> NEEDS_REFRESH: access token expired
+    NORMAL --> NORMAL: access token valid (outside skew)
+    NORMAL --> NEEDS_REFRESH: expired or inside skew window
     NEEDS_REFRESH --> NORMAL: refresh 200 (rotate)
-    NEEDS_REFRESH --> NEEDS_REBOOTSTRAP: 400 invalid_grant
-    NEEDS_REFRESH --> NEEDS_REFRESH: transient 5xx (backoff)
+    NEEDS_REFRESH --> NEEDS_REFRESH: transient 5xx / -104 (backoff)
+    NEEDS_REFRESH --> NEEDS_REFRESH: 400 invalid_grant, below threshold (backoff)
+    NEEDS_REFRESH --> NEEDS_REBOOTSTRAP: 400 invalid_grant, 3rd (manual) / 5th (unattended)
 
     UNCONFIGURED --> [*]: callback(false)
-    NEEDS_REBOOTSTRAP --> pairing: user re-runs device flow
+    NEEDS_REBOOTSTRAP --> NORMAL: silent retry succeeds (AuthView)
+    NEEDS_REBOOTSTRAP --> pairing: silent retry fails
     pairing --> NORMAL: device-flow success
 ```
 
@@ -267,7 +270,112 @@ Pairing (`DeviceAuthManager`, foreground only) is OAuth 2.0 **Device Authorizati
 PKCE**: POST `/device/code` → show user code → poll `/token` until approved → store tokens
 → `NORMAL`. On success the AuthView runs a manual `ForegroundSync`. Token rotation always
 writes the **refresh token before the access token** (so an interrupted rotation is
-recoverable).
+recoverable), and a `200` that omits `refresh_token` leaves the stored one untouched.
+
+### Why the FSM is defensive about `invalid_grant`
+
+BMW rotates the refresh token on **every** refresh, which makes a poor connection
+dangerous: if the POST reaches BMW but the response is lost on the phone bridge, BMW has
+burned the old token and the watch never received the new one. The next attempt then gets
+a perfectly genuine `400 invalid_grant` — indistinguishable from a truly dead grant. Two
+overlapping refreshes produce the same thing: the loser presents an already-rotated token.
+
+`NEEDS_REBOOTSTRAP` is a **one-way door** — `ensureValidToken()` short-circuits on it
+before any network call — so latching it on a single `invalid_grant` turns a BLE dropout
+into a permanent "Re-auth needed". Three guards keep that from happening:
+
+| Guard | Key | Effect |
+|---|---|---|
+| **Corroboration** (`GRANT_STRIKES_MANUAL = 3`, `GRANT_STRIKES_UNATTENDED = 5`) | `KEY_GRANT_STRIKES` | strikes below the threshold behave like any transient failure (backoff, state untouched). Any successful refresh clears the count. The threshold depends on who asked — see below. |
+| **Serialization** (`INFLIGHT_TTL_SECONDS = 90`) | `KEY_REFRESH_INFLIGHT` | best-effort advisory lock, not mutual exclusion — one refresh at a time across views *and* processes (they share Storage), with a caller arriving mid-refresh failing transiently. The TTL self-heals a stamp left by a killed process, which also means a round-trip slower than the TTL can be overtaken; the responder releases only the stamp it wrote, so the overtaking refresh keeps its own lock. A stamp dated in the future counts as live (the clock moved backwards); one further ahead than the TTL is discarded as impossible. |
+| **Silent retry** | — | opening the re-link prompt spends one quota-exempt refresh via `TokenManager.retryAfterRebootstrap()` before showing the device flow; success clears the latch outright. Settings → *Re-pair* opts out (`AuthView.setAllowRecover(false)`) because the user asked for pairing by name. |
+
+**Who asked sets the bar.** `ForegroundSync.run()` passes its `isManual` through to
+`TokenManager.setManual()`, so a **START press latches at 3 strikes** while the
+**background poll and the auto sync on app open latch at 5**. The reasoning is the cost of
+being wrong: after a START press the user is watching, has just seen the refresh fail
+repeatedly, and can act on the prompt immediately; an unattended refresh has nobody to
+judge it and a false latch is a one-way door found hours later. `retryAfterRebootstrap()`
+(the re-link prompt) counts as manual. The counter is shared, so a run started in the
+background can be finished by a START press.
+
+Below the threshold the cost is only a delayed prompt, never lost data: the pages keep
+showing cached values under a "No connection" note, and Settings → *Re-pair* is always
+available. Three START presses latch it at once (the 60 s cooldown does not apply — it is
+stamped on success and rate-limit, not on failure). An unattended watch takes longer, but
+**not** as long as a doubling ladder would suggest: `_incrementBackoff` doubles only while
+a backoff is still *active*, and the poll is gated until it expires, so each background
+strike simply re-arms the 40 min base. Five strikes therefore cost roughly `5 ×
+max(poll interval, 40 min)` — about **3–5 h** depending on update mode, not the ~12 h an
+un-gated doubling ladder would give.
+
+### Two-phase rotation: never destroy a working token
+
+A `200` from the token endpoint proves BMW accepted the **old** refresh token. It proves
+nothing about whether the **new** one can read vehicle data. So rotation keeps the
+outgoing token in `KEY_REFRESH_TOKEN_PREV` and flags `KEY_GRANT_UNCONFIRMED`; only a
+successful **telematicData fetch** calls `TokenManager.confirmGrant()` and retires it.
+
+If the rotated-to token is refused (`400`) before anything confirmed it, `_rollBackGrant()`
+restores the previous one, drops the refused access token, and does **not** count a
+strike — a rotation that landed on a bad token is not evidence the grant is dead. It is
+one shot: the restore clears the held copy, so a second refusal falls through to the
+strike ladder and cannot ping-pong between two dead tokens.
+
+`syncClient()` follows the same rule — a client-id change moves the refresh token to
+`_PREV` rather than deleting it, so reverting the setting restores service. Only an
+explicit **sign-out** truly erases credentials.
+
+### The grant is bound to a client id
+
+BMW rejects a `refresh_token` presented by a client that did not issue it, so **editing
+`clientId` in GCM settings retires the whole grant**. `KEY_TOKEN_CLIENT_ID` records which
+client the stored tokens belong to — stamped by the device flow and by every successful
+rotation — and `TokenManager.syncClient()` compares it to `Config.clientId()`.
+
+On a mismatch the tokens and both ledgers are dropped and the state goes straight to
+`NEEDS_REBOOTSTRAP`, so the user sees "Re-auth needed" the moment they save. The check
+runs in two places: `onSettingsChanged` (immediate, while the widget is open) and at the
+top of `ensureValidToken` (the one funnel every token use passes through, in **both**
+processes — it catches an edit made while the widget was closed).
+
+An **absent** stamp means "unknown", not "mismatch": installs predating the stamp must
+keep working, and the next successful refresh stamps them. Without this the old tokens
+kept working until the access token expired (up to an hour), then failed as
+`invalid_grant` — classified transient, so the pages showed "No connection" and the
+strike ladder took hours (days in manual mode) to reach a prompt the user could act on.
+
+`_isDeadGrant` decides whether a `400` counts toward the latch, and it defaults to
+**yes**. A 400 is a rejection: replaying the identical `refresh_token` cannot start
+working. It deliberately does not require reading `error` out of the body, because
+**on real hardware there is often no body** — Connect IQ commonly delivers a non-2xx
+response as `(code, null)`. An earlier rule that matched on specific `error` codes was
+therefore unreachable on the watch while passing every simulator test (all of which
+hand-build the response dictionary): a dead grant looped on the transient path and no
+number of refreshes ever produced a re-auth prompt. Observed on hardware as
+"Server error 400" surviving 5+ manual refreshes.
+
+The one exception is `invalid_request` **when it can be read**: on this endpoint its
+documented cause here is a malformed POST of our own (a missing url-encoded
+`Content-Type`), and latching on a code regression would demand a re-pair for nothing.
+`DeviceAuthManager._oauthHint` does treat it as actionable — that is the device-code
+endpoint, where the cause is a portal toggle. Over-eagerness is bounded by the strike
+ladder, not by this predicate; `5xx` and negative transport codes are never strikes.
+
+`EXPIRY_SKEW_SECONDS = 300` refreshes early: a token still valid when the request leaves
+the watch can expire in flight, and the data path reads the resulting `401` as a transient
+error. A `401` on a data call therefore also calls `TokenManager.invalidateAccessToken()`
+(drops `KEY_ACCESS_EXPIRY`) — the foreground re-runs the chain once with a fresh token,
+the background poll picks it up on the next tick.
+
+### Failure classification (why a dropout no longer asks for a re-auth)
+
+`ForegroundSync` exposes three failure kinds, and the views branch on all three —
+`isRateLimited()`, `authFailed()`, otherwise transient. **Only `authFailed()`
+(`UNCONFIGURED` / `NEEDS_REBOOTSTRAP`) may open the device flow.** A `-104`, a timeout, a
+`5xx` or a failed container list keeps the cached data on screen under a "No connection"
+note. `run()` also pre-flights `System.getDeviceSettings().phoneConnected`, so an
+unreachable phone never enters the chain at all.
 
 ---
 
@@ -315,7 +423,7 @@ flowchart TD
 
     subgraph gates["Gates (independent Storage keys)"]
         G1["QuotaGuard.canFetch()<br/>KEY_NEXT_ALLOWED: +40 min per fetch,<br/>set to 4 AM on CU-429"]
-        G2["Error backoff<br/>KEY_BACKOFF_UNTIL: doubles to 4 h cap<br/>on transient / -403 errors"]
+        G2["Error backoff<br/>KEY_BACKOFF_UNTIL: doubles to 4 h cap<br/>on transient / -403 errors,<br/>cleared on any success"]
         G3["FG cooldown<br/>KEY_LAST_FG: 60 s between full refreshes"]
     end
 ```
@@ -323,8 +431,22 @@ flowchart TD
 - **CU-429 is the key insight:** BMW returns its **daily limit as HTTP `403` with body
   `exveErrorId == "CU-429"`**, *not* HTTP 429. `isRateLimit` normalizes both → callers arm
   the 24 h block and show a clear message (no false "auth needed").
+- **A `403` with no readable body is treated as the daily limit.** On hardware Connect IQ
+  frequently delivers a non-2xx response as `(code, null)`, so requiring the `CU-429` body
+  meant the limit was **never** detected on the watch: the gate stayed unarmed and the app
+  kept hammering an API already refusing it, which is how a day's budget disappears.
+  Guessing wrong only costs a wait; the old assumption cost the whole quota.
+- **The foreground respects the daily block** (`QuotaGuard.isDailyBlocked()`) though not
+  the routine 40-minute gate — a START press should fetch, but not into an API that is
+  already refusing. One full manual refresh costs **3 data calls** of the ~50/day budget.
 - `KEY_NEXT_ALLOWED` (quota gate) and `KEY_BACKOFF_UNTIL` (error backoff) are **separate**:
-  the gate advances on every call; backoff is set on errors and cleared on success.
+  the gate advances on every call; backoff is set on errors and cleared on success. "Cleared
+  on success" is `QuotaGuard.clearBackoff()`, called from the background poll and the
+  foreground sync on a successful **data fetch** — plus sign-out and re-pair, which retire
+  the old grant's ledgers. Deliberately **not** called on a successful token refresh: that
+  hits `customer.bmwgroup.com`, a different service, and says nothing about whether the data
+  API is healthy. Clearing it there let a single widget open reset a backoff earned by a
+  data-API outage.
 
 ---
 
@@ -334,7 +456,8 @@ flowchart TD
 flowchart TD
     G["Glance: lock · range · fuel bar · age<br/>(Press to set up if no data)"] -->|"START"| V["BmwWidgetView (initial)"]
     V -->|"NORMAL + data"| CAR["Page carousel"]
-    V -->|"NEEDS_REBOOTSTRAP"| RELINK["Re-auth prompt then AuthView"]
+    V -->|"NEEDS_REBOOTSTRAP"| RELINK["Re-auth prompt then AuthView<br/>(silent token retry first)"]
+    V -->|"sync failed on the link"| OFF["No connection - START retries"]
     V -->|"no data"| SETUP["Press START to connect then AuthView"]
 
     CAR -->|"up/down"| CAR
@@ -370,6 +493,7 @@ elsewhere (see §12).
 |---|---|---|
 | `KEY_TOKEN_STATE` | TokenManager, DeviceAuthManager, sign-out | TokenManager, views |
 | `KEY_ACCESS_TOKEN` / `KEY_ACCESS_EXPIRY` / `KEY_REFRESH_TOKEN` | TokenManager (refresh **before** access) | TokenManager |
+| `KEY_TOKEN_CLIENT_ID` | device flow + every successful rotation (`stampClient`); cleared by sign-out and by a detected client change | `syncClient()` mismatch check |
 | `KEY_VIN` | CarDataBootstrap (mappings) | both sync paths |
 | `KEY_CONTAINER_ID` / `_NAME` | `_storeContainer` | `cachedContainerId` (FULL) |
 | `KEY_BG_CONTAINER_ID` / `_NAME` | `_storeBgContainer` | `cachedBgContainerId` (LEAN) |
@@ -377,7 +501,9 @@ elsewhere (see §12).
 | `KEY_GLANCE_STATE` | `_writeGlanceSummary` (every write) | glance (direct) |
 | `KEY_VEHICLE_NAME` / `KEY_BASIC_DATA` / `KEY_DRIVE_TYPE` | basicData | About menu, header |
 | `KEY_NEXT_ALLOWED` | QuotaGuard | QuotaGuard.canFetch |
-| `KEY_BACKOFF_UNTIL` | TokenManager / ServiceDelegate | poll backoff gate |
+| `KEY_BACKOFF_UNTIL` | TokenManager / ServiceDelegate (set on error; cleared by a successful DATA fetch, sign-out and re-pair — never by a token refresh, which proves nothing about the data host) | poll backoff gate |
+| `KEY_REFRESH_INFLIGHT` | TokenManager (stamp on dispatch, cleared on response) | refresh serialization, 90 s TTL |
+| `KEY_GRANT_STRIKES` | TokenManager (on `invalid_grant`; cleared by a successful refresh, sign-out, and a device-flow re-pair — a new grant must start with a clean ledger) | `NEEDS_REBOOTSTRAP` corroboration |
 | `lastForegroundSync` (`KEY_LAST_FG`) | full success, rate-limit | 60 s cooldown |
 | `lastFullFetch` (`KEY_LAST_FULL`) | full success | daily full-fetch gate |
 
@@ -449,7 +575,14 @@ Two traps worth knowing:
 - **The glance must not reference `VehicleCache`** — it reads `KEY_GLANCE_STATE` directly.
 - **Keep the bg container small** — it must fit the ~28 KB heap (a `-403` means it's too
   big; trim `_bgContainerDescriptors`).
-- **Token rotation writes the refresh token before the access token** (atomic-rotation rule).
+- **Token rotation writes the refresh token before the access token** (atomic-rotation rule),
+  and never writes a null over it — a `200` without `refresh_token` leaves the stored one.
+- **`NEEDS_REBOOTSTRAP` is latched only on corroborated evidence** — it is a one-way door;
+  a single `invalid_grant` may be a lost rotation, not a dead grant.
+- **Only `ForegroundSync.authFailed()` may send the user to pairing** — a link-level failure
+  gets a note, never the device flow.
+- **Every success clears the error backoff** (`QuotaGuard.clearBackoff()`) — the gate is
+  only ever doubled otherwise.
 - **Always use `StorageKeys.KEY_*`** — never inline a storage key string.
 - **Every tier annotation needs both halves** (`:mapPage`/`:noMapPage`, `:bgPoll`/`:manualOnly`,
   `:designNew`/`:designClassic`) — a symbol excluded on one tier with no counterpart on the

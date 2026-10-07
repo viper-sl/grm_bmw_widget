@@ -1,7 +1,9 @@
 // On-device auth screen. Drives DeviceAuthManager and renders its FSM state.
 // Opened from the widget when tokenState is NEEDS_REBOOTSTRAP/UNCONFIGURED, or from
 // the glance/setup prompt. Shows the user code to enter on the BMW site, then polls.
+using Toybox.Application;
 using Toybox.Graphics;
+using Toybox.System;
 using Toybox.WatchUi;
 
 class AuthView extends WatchUi.View {
@@ -13,6 +15,12 @@ class AuthView extends WatchUi.View {
     var _deleter;       // keeps the async ContainerDeleter alive during cleanup
     var _cleaning;      // cleanup (delete-all) in progress
     var _cleanupFailed; // the delete-all could not complete
+    var _token;         // keeps the async TokenManager alive during recovery
+    var _recovering;    // silent refresh attempt in progress (pre-device-flow)
+    var _recoverOk;     // the silent refresh worked — no device flow needed
+    var _recoverTried;  // guard: attempt the silent refresh at most once
+    var _allowRecover;  // false when the user explicitly asked to re-pair
+    var _visible;       // this view is the one on top (onShow..onHide)
 
     function initialize(auth) {
         View.initialize();
@@ -21,20 +29,77 @@ class AuthView extends WatchUi.View {
         _rateLimited = false;
         _cleaning = false;
         _cleanupFailed = false;
+        _recovering = false;
+        _recoverOk = false;
+        _recoverTried = false;
+        _allowRecover = true;
+        _visible = false;
     }
+
+    // Called by the Settings "Re-pair" item: the user asked for the device flow by
+    // name, so don't quietly resolve it with a token refresh instead.
+    function setAllowRecover(allow) { _allowRecover = allow; }
 
     function onLayout(dc) {}
 
     function onShow() {
         // Redraw whenever the device-flow state advances.
         _auth.setOnChange(method(:onAuthChange));
-        if (_auth.getState() == DeviceAuthManager.IDLE) {
+        _visible = true;
+        if (_auth.getState() != DeviceAuthManager.IDLE) { return; }
+
+        // A recovery already owns this view. onShow fires again whenever something
+        // pushed on top of us pops (the container-limit Confirmation, for one), and the
+        // auth FSM never leaves IDLE on the recovery path — so without this guard we
+        // would fall through and show a pairing code to a user we just spared.
+        if (_recovering || _recoverOk) { return; }
+
+        // A latched NEEDS_REBOOTSTRAP is not always real: a refresh whose response was
+        // lost in transit leaves the watch holding a rotated-away token and produces
+        // the same 400 as a dead grant. Spend one quota-exempt refresh before making
+        // the user re-pair — if it succeeds the latch clears and the widget carries on.
+        // Skipped with no phone: the request could only fail, and burning the attempt
+        // would forfeit the recovery for the whole life of this view. The device flow
+        // surfaces its own clear "phone not connected" error instead.
+        // A refresh token must exist for the recovery to mean anything — after a
+        // clientId change syncClient() deletes it, and the attempt would just flip the
+        // state to UNCONFIGURED without ever reaching the network.
+        var ts = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);
+        var haveRefresh = Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN) != null;
+        if (_allowRecover && !_recoverTried && haveRefresh
+                && System.getDeviceSettings().phoneConnected
+                && ts != null && ts.equals("NEEDS_REBOOTSTRAP")) {
+            _recoverTried = true;
+            _recovering   = true;
+            _token = new TokenManager();
+            _token.retryAfterRebootstrap(method(:onRecoverDone));
+            WatchUi.requestUpdate();
+            return;
+        }
+        _auth.start();
+    }
+
+    // Silent-refresh outcome: on success the stored grant was fine all along, so fetch
+    // data and drop back to the widget; on failure fall through to the device flow.
+    function onRecoverDone(success) {
+        _recovering = false;
+        _recoverOk  = success;
+        // The refresh can land after the user pressed BACK. Do not start a device flow
+        // or a sync behind their back on a view that is no longer on screen.
+        if (!_visible) { return; }
+        if (success) {
+            _synced = true;
+            _sync = new ForegroundSync();
+            _sync.run(method(:onSyncDone), true);
+        } else {
             _auth.start();
         }
+        WatchUi.requestUpdate();
     }
 
     function onHide() {
         _auth.setOnChange(null);
+        _visible = false;
     }
 
     function onAuthChange() {
@@ -67,6 +132,10 @@ class AuthView extends WatchUi.View {
         }
         // Data is now in VehicleCache (or not). Pop back to the widget either way;
         // the carousel will show pages if the fetch populated the cache.
+        // Only if we are still on top: the fetch can finish after the user pressed BACK
+        // (or while a Confirmation covers us), and popView would tear away whatever view
+        // is there now — up to and including the widget's own root.
+        if (!_visible) { return; }
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
     }
 
@@ -105,7 +174,28 @@ class AuthView extends WatchUi.View {
         var cy = dc.getHeight() / 2;
         var st = _auth.getState();
 
+        if (_recovering) {
+            _center(dc, cx, cy - PageChrome.s(dc, 10), Graphics.FONT_SMALL, Theme.COLOR_TEXT, "Reconnecting…");
+            dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, cy + PageChrome.s(dc, 16), Graphics.FONT_XTINY, "checking saved login",
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            return;
+        }
+
         if (st == DeviceAuthManager.REQUESTING || st == DeviceAuthManager.IDLE) {
+            if (_recoverOk) {
+                // Recovered without re-pairing. The post-recovery fetch has exactly the
+                // same outcomes as a post-pair one, but the auth FSM never leaves IDLE
+                // on this path — so the outcome renderers must be reachable from here
+                // too, or a rate-limited or container-capped fetch strands the user on
+                // "Fetching data…" with nothing to read and nothing to do.
+                if (_drawFetchOutcome(dc, cx, cy, "Reconnected")) { return; }
+                _center(dc, cx, cy - PageChrome.s(dc, 10), Graphics.FONT_SMALL, Theme.COLOR_OK, "Reconnected");
+                dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(cx, cy + PageChrome.s(dc, 16), Graphics.FONT_XTINY, "Fetching data…",
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+                return;
+            }
             _center(dc, cx, cy, Graphics.FONT_SMALL, Theme.COLOR_TEXT, "Connecting…");
             return;
         }
@@ -134,33 +224,7 @@ class AuthView extends WatchUi.View {
         }
 
         if (st == DeviceAuthManager.SUCCESS) {
-            if (_cleaning) {
-                _center(dc, cx, cy - PageChrome.s(dc, 10), Graphics.FONT_SMALL, Theme.COLOR_TEXT, "Cleaning up…");
-                dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(cx, cy + PageChrome.s(dc, 16), Graphics.FONT_XTINY, "deleting containers",
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-                return;
-            }
-            if (_cleanupFailed) {
-                _center(dc, cx, cy - PageChrome.s(dc, 12), Graphics.FONT_SMALL, Theme.COLOR_WARN, "Cleanup failed");
-                dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(cx, cy + PageChrome.s(dc, 14), Graphics.FONT_XTINY, "BACK to exit, then retry",
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-                return;
-            }
-            if (_rateLimited) {
-                // Paired OK, but the daily API limit blocks the first fetch.
-                _center(dc, cx, cy - PageChrome.s(dc, 22), Graphics.FONT_SMALL, Theme.COLOR_OK, "Paired");
-                dc.setColor(Theme.COLOR_WARN, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(cx, cy + PageChrome.s(dc, 2), Graphics.FONT_XTINY, "Daily limit reached",
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-                dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(cx, cy + PageChrome.s(dc, 22), Graphics.FONT_XTINY, "Try again tomorrow",
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-                dc.drawText(cx, cy + PageChrome.s(dc, 42), Graphics.FONT_XTINY, "BACK to exit",
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-                return;
-            }
+            if (_drawFetchOutcome(dc, cx, cy, "Paired")) { return; }
             _center(dc, cx, cy - PageChrome.s(dc, 10), Graphics.FONT_SMALL, Theme.COLOR_OK, "Paired");
             dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
             dc.drawText(cx, cy + PageChrome.s(dc, 16), Graphics.FONT_XTINY, "Fetching data…",
@@ -182,6 +246,40 @@ class AuthView extends WatchUi.View {
             dc.drawText(cx, bottom + lineH, Graphics.FONT_XTINY, "BACK to retry",
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
+    }
+
+    // Outcomes of the post-auth fetch, shared by the post-pair and post-recovery paths
+    // (the two differ only in the headline). Returns true when it drew — the caller then
+    // returns instead of drawing its own "fetching" screen.
+    function _drawFetchOutcome(dc, cx, cy, headline) {
+        if (_cleaning) {
+            _center(dc, cx, cy - PageChrome.s(dc, 10), Graphics.FONT_SMALL, Theme.COLOR_TEXT, "Cleaning up…");
+            dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, cy + PageChrome.s(dc, 16), Graphics.FONT_XTINY, "deleting containers",
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            return true;
+        }
+        if (_cleanupFailed) {
+            _center(dc, cx, cy - PageChrome.s(dc, 12), Graphics.FONT_SMALL, Theme.COLOR_WARN, "Cleanup failed");
+            dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, cy + PageChrome.s(dc, 14), Graphics.FONT_XTINY, "BACK to exit, then retry",
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            return true;
+        }
+        if (_rateLimited) {
+            // Auth is fine, but the daily API limit blocks the fetch.
+            _center(dc, cx, cy - PageChrome.s(dc, 22), Graphics.FONT_SMALL, Theme.COLOR_OK, headline);
+            dc.setColor(Theme.COLOR_WARN, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, cy + PageChrome.s(dc, 2), Graphics.FONT_XTINY, "Daily limit reached",
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, cy + PageChrome.s(dc, 22), Graphics.FONT_XTINY, "Try again tomorrow",
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(cx, cy + PageChrome.s(dc, 42), Graphics.FONT_XTINY, "BACK to exit",
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            return true;
+        }
+        return false;
     }
 
     // Greedy word-wrap. Draws `text` centered at x, top-anchored at y, wrapping

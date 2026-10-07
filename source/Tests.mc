@@ -4,6 +4,7 @@
 using Toybox.Test;
 using Toybox.Lang;
 using Toybox.Application;
+using Toybox.Communications;
 using Toybox.Time;
 
 // ============================================================
@@ -33,7 +34,8 @@ function testRateLimit_detectsCu429(logger as Test.Logger) as Lang.Boolean {
         "403 + CU-429 body -> rate limited");
     Test.assertMessage(!CarDataClient.isRateLimit(403, {"exveErrorId" => "CU-105"}),
         "403 + other CU code -> not rate limited");
-    Test.assertMessage(!CarDataClient.isRateLimit(403, null), "403 no body -> not rate limited");
+    Test.assertMessage(!CarDataClient.isRateLimit(403, null),
+        "403 no body -> not a rate limit on its own (ForegroundSync._stop403 escalates)");
     Test.assertMessage(!CarDataClient.isRateLimit(200, null), "200 -> not rate limited");
     return true;
 }
@@ -396,15 +398,726 @@ function testToken_refreshDefaultExpiryWhenMissing(logger as Test.Logger) as Lan
     return true;
 }
 
+// A single invalid_grant is NOT proof the grant is dead: a refresh whose response was
+// lost in transit (BMW rotated, the watch never saw the new token) produces exactly one,
+// and NEEDS_REBOOTSTRAP is a one-way door. Strike one must behave like any transient
+// failure; only the second latches.
 (:test)
-function testToken_invalidGrantRebootstrap(logger as Test.Logger) as Lang.Boolean {
+function testToken_invalidGrantNeedsCorroboration(logger as Test.Logger) as Lang.Boolean {
     _resetStorage();
     var tm = new TokenManager();
     var cap = new _BoolCapture();
     tm._callback = cap.method(:onResult);
+
     tm.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
     Test.assertMessage(cap.value == false, "invalid_grant -> false");
-    Test.assertEqualMessage(tm.getTokenState(), "NEEDS_REBOOTSTRAP", "permanent failure state");
+    Test.assertMessage(tm.getTokenState() == null, "first strike does NOT latch");
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES), 1, "strike recorded");
+    var until = Application.Storage.getValue(StorageKeys.KEY_BACKOFF_UNTIL);
+    Test.assertMessage(_nearNow(until, 2400), "first strike backs off like a transient error");
+
+    // Every strike up to the threshold behaves the same way. Driven off the constant
+    // so raising it can't leave this test asserting the old rule.
+    for (var i = 2; i < TokenManager.GRANT_STRIKES_UNATTENDED; i++) {
+        tm.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
+        Test.assertMessage(tm.getTokenState() == null, "strike below threshold does NOT latch");
+        Test.assertEqualMessage(
+            Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES), i, "strike counted");
+    }
+
+    tm.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
+    Test.assertEqualMessage(tm.getTokenState(), "NEEDS_REBOOTSTRAP", "threshold strike latches");
+    _resetStorage();
+    return true;
+}
+
+// A refresh driven by a START press latches sooner: the user is watching and can act
+// on the prompt. Same shared counter, lower bar.
+(:test)
+function testToken_manualStrikeThresholdIsLower(logger as Test.Logger) as Lang.Boolean {
+    Test.assertMessage(
+        TokenManager.GRANT_STRIKES_MANUAL < TokenManager.GRANT_STRIKES_UNATTENDED,
+        "manual threshold must be the lower of the two");
+
+    _resetStorage();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    tm.setManual(true);
+
+    for (var i = 1; i < TokenManager.GRANT_STRIKES_MANUAL; i++) {
+        tm.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
+        Test.assertMessage(tm.getTokenState() == null, "below the manual threshold: no latch");
+    }
+    tm.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
+    Test.assertEqualMessage(tm.getTokenState(), "NEEDS_REBOOTSTRAP", "manual threshold latches");
+
+    // The same strike count left by an unattended run must NOT have latched.
+    _resetStorage();
+    var bg = new TokenManager();
+    bg._callback = cap.method(:onResult);
+    for (var j = 0; j < TokenManager.GRANT_STRIKES_MANUAL; j++) {
+        bg.onTokenRefreshResponse(400, { "error" => "invalid_grant" });
+    }
+    Test.assertMessage(bg.getTokenState() == null,
+        "unattended run survives the manual threshold");
+    _resetStorage();
+    return true;
+}
+
+// A successful refresh retires the strike ledger — otherwise an old strike would latch
+// on the next isolated 400. It must NOT clear the error backoff: that gates the DATA
+// API, and a refresh against customer.bmwgroup.com is no evidence that host is healthy.
+// Clearing it here let one widget open reset a backoff earned by a data-API outage.
+(:test)
+function testToken_successClearsStrikesNotBackoff(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    Application.Storage.setValue(StorageKeys.KEY_GRANT_STRIKES, 1);
+    Application.Storage.setValue(StorageKeys.KEY_BACKOFF_UNTIL, Time.now().value() + 14400);
+
+    tm.onTokenRefreshResponse(200, { "access_token" => "A", "refresh_token" => "R" });
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES) == null, "strikes cleared");
+    Test.assertMessage(
+        _nearNow(Application.Storage.getValue(StorageKeys.KEY_BACKOFF_UNTIL), 14400),
+        "data-API backoff survives a token refresh");
+    _resetStorage();
+    return true;
+}
+
+// A 200 that omits refresh_token must leave the stored one alone. Writing null over it
+// strands the widget in UNCONFIGURED on the very next call (DeviceAuthManager already
+// guards this; TokenManager did not).
+(:test)
+function testToken_missingRefreshTokenKeepsStored(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "REF-OLD");
+
+    tm.onTokenRefreshResponse(200, { "access_token" => "ACC-NEW", "expires_in" => 3600 });
+    Test.assertMessage(cap.value == true, "still a success");
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN), "REF-OLD",
+        "existing refresh token preserved");
+    Test.assertEqualMessage(tm.getAccessToken(), "ACC-NEW", "access token still rotated");
+    _resetStorage();
+    return true;
+}
+
+// BMW rotates on every refresh, so two overlapping refreshes race and the loser gets a
+// 400 invalid_grant. A caller arriving mid-refresh must fail transiently instead —
+// no second POST, and above all no change to the token state.
+(:test)
+function testToken_concurrentRefreshIsBlocked(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    // Start from NORMAL, the state a healthy widget is actually in when a sibling
+    // refresh collides with it. Asserting from "NEEDS_REFRESH" proved nothing: that is
+    // the value the refresh path writes anyway, so the assertion held whether or not
+    // the gate worked.
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "REF");
+    // Inside the skew window, so ensureValidToken routes to _refreshToken.
+    Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY,
+        Time.now().value() + TokenManager.EXPIRY_SKEW_SECONDS - 30);
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT, Time.now().value());
+
+    var cap = new _BoolCapture();
+    new TokenManager().ensureValidToken(cap.method(:onResult));
+    Test.assertMessage(cap.called, "callback fired");
+    Test.assertMessage(cap.value == false, "in-flight refresh -> transient false");
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE), "NORMAL",
+        "token state genuinely untouched (not demoted, not an auth failure)");
+    _resetStorage();
+    return true;
+}
+
+// A stamp dated in the future (the clock moved backwards) must still count as live —
+// failing open there reopens the double-refresh race the stamp exists to close.
+(:test)
+function testToken_futureInflightStillBlocks(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "REF");
+    Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY, Time.now().value() - 1);
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT, Time.now().value() + 30);
+
+    var cap = new _BoolCapture();
+    new TokenManager().ensureValidToken(cap.method(:onResult));
+    Test.assertMessage(cap.value == false, "future stamp -> still blocked");
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE), "NORMAL",
+        "state untouched");
+
+    // ...but an impossible stamp is discarded rather than blocking forever.
+    _resetStorage();
+    var prev = _blankCreds();
+    try {
+        var tm = new TokenManager();
+        var cap2 = new _BoolCapture();
+        tm._callback = cap2.method(:onResult);
+        Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT,
+            Time.now().value() + TokenManager.INFLIGHT_TTL_SECONDS + 600);
+        tm._refreshToken();
+        Test.assertEqualMessage(tm.getTokenState(), "UNCONFIGURED",
+            "impossible stamp discarded, gate passed");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
+    return true;
+}
+
+// A refresh that never went out must not advance the token state. Before the fix,
+// ensureValidToken wrote NEEDS_REFRESH up front, so a gated or credential-less attempt
+// demoted a healthy NORMAL watch to a state only a successful refresh clears.
+(:test)
+function testToken_abortedAttemptLeavesStateAlone(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var prev = _blankCreds();
+    try {
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REBOOTSTRAP");
+        Application.Storage.setValue(StorageKeys.KEY_GRANT_STRIKES, 2);
+        var tm = new TokenManager();
+        var cap = new _BoolCapture();
+        // Forced retry with no creds: aborts at the creds check, before dispatch.
+        tm.retryAfterRebootstrap(cap.method(:onResult));
+        Test.assertEqualMessage(
+            Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES), 2,
+            "strike ledger survives an attempt that never sent anything");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
+    return true;
+}
+
+// A stale in-flight stamp (process killed mid-refresh) must not block refreshes forever.
+(:test)
+function testToken_staleInflightExpires(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var prev = _blankCreds();
+    try {
+        var tm = new TokenManager();
+        var cap = new _BoolCapture();
+        tm._callback = cap.method(:onResult);
+        Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT,
+            Time.now().value() - TokenManager.INFLIGHT_TTL_SECONDS - 1);
+        // With the creds blanked, reaching UNCONFIGURED is the proof the call got PAST
+        // the in-flight gate instead of returning at it.
+        tm._refreshToken();
+        Test.assertEqualMessage(tm.getTokenState(), "UNCONFIGURED", "stale stamp ignored");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
+    return true;
+}
+
+// The response handler releases the in-flight lock on every outcome — but only the lock
+// it took. A response that outlived the TTL must leave the stamp a later refresh now
+// owns, or a third caller could dispatch into that live rotation.
+(:test)
+function testToken_responseReleasesOnlyItsOwnInflight(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var stamp = Time.now().value();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    tm._inFlightStamp = stamp;                     // as if _refreshToken had dispatched
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT, stamp);
+    tm.onTokenRefreshResponse(500, null);
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_REFRESH_INFLIGHT) == null,
+        "own lock released on failure too");
+
+    // Overtaken: our response lands after a later refresh re-stamped. Leave it alone.
+    _resetStorage();
+    var later = Time.now().value() + 120;
+    var slow = new TokenManager();
+    slow._callback = cap.method(:onResult);
+    slow._inFlightStamp = stamp;
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_INFLIGHT, later);
+    slow.onTokenRefreshResponse(500, null);
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_REFRESH_INFLIGHT), later,
+        "a stale response must not release someone else's lock");
+    _resetStorage();
+    return true;
+}
+
+// An access token that expires while the request is in the air comes back as a 401 the
+// data path treats as transient. Refresh a skew window early instead.
+(:test)
+function testToken_refreshesBeforeExpiry(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var prev = _blankCreds();
+    try {
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+        // Not expired, but inside the skew window — with the creds blanked, _refreshToken
+        // bails to UNCONFIGURED, the observable proof that a refresh was attempted.
+        Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY,
+            Time.now().value() + TokenManager.EXPIRY_SKEW_SECONDS - 30);
+        var cap = new _BoolCapture();
+        var tm = new TokenManager();
+        tm.ensureValidToken(cap.method(:onResult));
+        Test.assertMessage(cap.value == false, "near-expiry token is not served as valid");
+        Test.assertEqualMessage(tm.getTokenState(), "UNCONFIGURED", "a refresh was attempted");
+
+        // Comfortably outside the skew window -> served as-is, no refresh.
+        _resetStorage();
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+        Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY,
+            Time.now().value() + TokenManager.EXPIRY_SKEW_SECONDS + 600);
+        cap = new _BoolCapture();
+        new TokenManager().ensureValidToken(cap.method(:onResult));
+        Test.assertMessage(cap.value == true, "token outside the skew window is still valid");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
+    return true;
+}
+
+// The re-link prompt's escape hatch: retryAfterRebootstrap ignores the one-way guard
+// and clears the strike count, so a spurious latch is recoverable without re-pairing.
+(:test)
+function testToken_retryAfterRebootstrapBypassesGuard(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var prev = _blankCreds();
+    try {
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REBOOTSTRAP");
+        Application.Storage.setValue(StorageKeys.KEY_GRANT_STRIKES, 2);
+        var tm = new TokenManager();
+        var cap = new _BoolCapture();
+        // Blanked creds -> the forced refresh reaches _refreshToken and bails to UNCONFIGURED;
+        // ensureValidToken would have short-circuited on NEEDS_REBOOTSTRAP without touching it.
+        tm.retryAfterRebootstrap(cap.method(:onResult));
+        Test.assertEqualMessage(tm.getTokenState(), "UNCONFIGURED", "guard bypassed");
+        // The strike reset is deferred to dispatch (see testToken_abortedAttemptLeavesStateAlone),
+        // so a credential-less attempt leaves the ledger where it was.
+        Test.assertEqualMessage(
+            Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES), 2, "ledger untouched");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
+    return true;
+}
+
+// A 401 on a data call must invalidate the cached expiry — nothing else would force a
+// refresh, since ensureValidToken trusts KEY_ACCESS_EXPIRY.
+(:test)
+function testToken_invalidateAccessTokenDropsExpiry(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY, Time.now().value() + 3600);
+    TokenManager.invalidateAccessToken();
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_ACCESS_EXPIRY) == null, "expiry dropped");
+    _resetStorage();
+    return true;
+}
+
+// A clientId change retires the grant outright: BMW rejects a refresh_token presented
+// by a client that did not issue it, so waiting for the strike ladder to work that out
+// means hours (days in manual mode) of a misleading "No connection".
+(:test)
+function testToken_clientChangeRetiresTheGrant(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var prev = _blankCreds();
+    try {
+        Application.Properties.setValue("clientId", "NEW-CLIENT");
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_CLIENT_ID, "OLD-CLIENT");
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE,   "NORMAL");
+        Application.Storage.setValue(StorageKeys.KEY_ACCESS_TOKEN,  "A");
+        Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "R");
+        Application.Storage.setValue(StorageKeys.KEY_ACCESS_EXPIRY, Time.now().value() + 3600);
+        Application.Storage.setValue(StorageKeys.KEY_GRANT_STRIKES, 2);
+        Application.Storage.setValue(StorageKeys.KEY_BACKOFF_UNTIL, Time.now().value() + 14400);
+
+        Test.assertMessage(TokenManager.clientChanged(), "mismatch detected");
+        Test.assertMessage(TokenManager.syncClient(), "syncClient acted");
+
+        Test.assertEqualMessage(
+            Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE), "NEEDS_REBOOTSTRAP",
+            "prompts for a re-pair immediately");
+        Test.assertMessage(
+            Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN) == null, "dead token dropped");
+        Test.assertMessage(
+            Application.Storage.getValue(StorageKeys.KEY_ACCESS_TOKEN) == null, "access token dropped");
+        Test.assertMessage(
+            Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES) == null, "strikes retired");
+        Test.assertMessage(
+            Application.Storage.getValue(StorageKeys.KEY_BACKOFF_UNTIL) == null, "backoff retired");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
+    return true;
+}
+
+// An install predating the stamp has no clientId recorded. That is "unknown", NOT a
+// mismatch — treating it as one would force every upgrading user to re-pair.
+(:test)
+function testToken_missingStampIsNotAMismatch(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var prev = _blankCreds();
+    try {
+        Application.Properties.setValue("clientId", "SOME-CLIENT");
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE,   "NORMAL");
+        Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "R");
+        // No KEY_TOKEN_CLIENT_ID at all.
+        Test.assertMessage(!TokenManager.clientChanged(), "absent stamp is not a mismatch");
+        Test.assertMessage(!TokenManager.syncClient(), "syncClient does nothing");
+        Test.assertEqualMessage(
+            Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE), "NORMAL",
+            "paired install keeps working across the upgrade");
+
+        // A matching stamp is likewise no mismatch.
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_CLIENT_ID, "SOME-CLIENT");
+        Test.assertMessage(!TokenManager.clientChanged(), "matching stamp is not a mismatch");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
+    return true;
+}
+
+// Every OAuth error that means "this grant is finished" must count toward the latch.
+// Only invalid_grant used to, so a mistyped clientId (invalid_client) or a half-enabled
+// portal client (unauthorized_client / invalid_scope) backed off forever and NEVER
+// prompted the user to re-pair.
+(:test)
+function testToken_allTerminalGrantErrorsCount(logger as Test.Logger) as Lang.Boolean {
+    var terminal = ["invalid_grant", "invalid_client", "unauthorized_client", "invalid_scope"];
+    for (var i = 0; i < terminal.size(); i++) {
+        _resetStorage();
+        var tm = new TokenManager();
+        var cap = new _BoolCapture();
+        tm._callback = cap.method(:onResult);
+        tm.setManual(true);   // threshold 3, keeps the loop short
+        for (var j = 0; j < TokenManager.GRANT_STRIKES_MANUAL; j++) {
+            tm.onTokenRefreshResponse(400, { "error" => terminal[i] });
+        }
+        Test.assertEqualMessage(tm.getTokenState(), "NEEDS_REBOOTSTRAP",
+            terminal[i] + " must reach the latch");
+    }
+
+    // invalid_request stays transient: on THIS endpoint its documented cause is a
+    // malformed POST of our own (missing url-encoded Content-Type), and latching on a
+    // code regression would tell users to re-pair for no reason.
+    _resetStorage();
+    var tm2 = new TokenManager();
+    var cap2 = new _BoolCapture();
+    tm2._callback = cap2.method(:onResult);
+    tm2.setManual(true);
+    for (var k = 0; k < TokenManager.GRANT_STRIKES_MANUAL + 2; k++) {
+        tm2.onTokenRefreshResponse(400, { "error" => "invalid_request" });
+    }
+    Test.assertMessage(tm2.getTokenState() == null, "invalid_request never latches");
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES) == null,
+        "invalid_request is not a strike");
+    _resetStorage();
+    return true;
+}
+
+// Every non-credential failure used to render as "No connection — retry", so a phone
+// link that was actually fine, a press inside the cooldown and a container-cap
+// rejection were indistinguishable on the wrist — and undiagnosable in the field.
+(:test)
+function testSync_failureReasonsAreDistinct(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+
+    var reasons = [ForegroundSync.FAIL_NO_PHONE, ForegroundSync.FAIL_COOLDOWN,
+                   ForegroundSync.FAIL_CONTAINER, ForegroundSync.FAIL_RATE_LIMIT];
+    var seen = {};
+    for (var i = 0; i < reasons.size(); i++) {
+        var fs = new ForegroundSync();
+        fs._failReason = reasons[i];
+        fs._finish(false);
+        // _finish must NOT overwrite a reason recorded on the way in.
+        Test.assertEqualMessage(fs.failReason(), reasons[i], "specific reason survives _finish");
+        var t = fs.failText();
+        Test.assertMessage(t != null && !t.equals(""), "reason has text");
+        Test.assertMessage(!seen.hasKey(t), "each reason reads differently: " + t);
+        seen[t] = true;
+    }
+
+    // With nothing specific recorded, a transport code still names itself rather than
+    // collapsing to a generic string.
+    var fs2 = new ForegroundSync();
+    fs2._lastCode = Communications.BLE_CONNECTION_UNAVAILABLE;
+    fs2._finish(false);
+    Test.assertEqualMessage(fs2.failReason(), ForegroundSync.FAIL_NETWORK, "falls back to NETWORK");
+    Test.assertMessage(!seen.hasKey(fs2.failText()), "transport text is distinct too");
+    _resetStorage();
+    return true;
+}
+
+// THE REGRESSION THIS SUITE MISSED. Connect IQ often delivers a non-2xx response as
+// (code, null) on real hardware, dropping the JSON body. Every other 400 test here
+// hand-builds a dictionary, so the latch branch passed in the simulator while being
+// unreachable on the watch: a dead grant looped on the transient path and no number of
+// refreshes ever prompted a re-pair (observed: "Server error 400" after 5+ retries).
+(:test)
+function testToken_bodylessBadRequestStillCounts(logger as Test.Logger) as Lang.Boolean {
+    // 400 with NO body at all.
+    _resetStorage();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    tm.setManual(true);
+    for (var i = 0; i < TokenManager.GRANT_STRIKES_MANUAL; i++) {
+        tm.onTokenRefreshResponse(400, null);
+    }
+    Test.assertEqualMessage(tm.getTokenState(), "NEEDS_REBOOTSTRAP",
+        "a bodyless 400 must reach the latch");
+
+    // 400 with a body that carries no `error` key.
+    _resetStorage();
+    var tm2 = new TokenManager();
+    tm2._callback = cap.method(:onResult);
+    tm2.setManual(true);
+    for (var j = 0; j < TokenManager.GRANT_STRIKES_MANUAL; j++) {
+        tm2.onTokenRefreshResponse(400, { "message" => "Bad Request" });
+    }
+    Test.assertEqualMessage(tm2.getTokenState(), "NEEDS_REBOOTSTRAP",
+        "a 400 with an unrecognised body must reach the latch");
+
+    // 5xx and transport errors stay transient no matter how many arrive — only a 400
+    // is a rejection of the grant.
+    _resetStorage();
+    var tm3 = new TokenManager();
+    tm3._callback = cap.method(:onResult);
+    tm3.setManual(true);
+    for (var k = 0; k < TokenManager.GRANT_STRIKES_MANUAL + 3; k++) {
+        tm3.onTokenRefreshResponse(500, null);
+        tm3.onTokenRefreshResponse(Communications.BLE_CONNECTION_UNAVAILABLE, null);
+    }
+    Test.assertMessage(tm3.getTokenState() == null, "5xx / transport never latch");
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES) == null,
+        "5xx / transport are not strikes");
+    _resetStorage();
+    return true;
+}
+
+// A rejected refresh (400) must be reported as FAIL_STALE_AUTH, which is what routes a
+// user-initiated retry straight to pairing. Earning that screen by pressing START N
+// times is not a safety property — only the one-way NEEDS_REBOOTSTRAP latch is, and
+// that is still governed by the strike ladder.
+(:test)
+function testSync_rejectedRefreshOffersPairing(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REFRESH");
+    var fs = new ForegroundSync();
+    // Stand in for TokenManager having just seen a 400 on the refresh.
+    fs._token._lastCode = 400;
+    fs.onToken(false);
+    Test.assertEqualMessage(fs.failReason(), ForegroundSync.FAIL_STALE_AUTH,
+        "a 400 refresh is a sign-in failure, not a server fault");
+    Test.assertMessage(!fs.authFailed(),
+        "but it must NOT claim the latched auth state it has not earned");
+    Test.assertMessage(!fs.failText().equals("Server error 400"),
+        "and must not read as an opaque server error");
+
+    // A transport failure on the refresh stays a plain network failure.
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NEEDS_REFRESH");
+    var fs2 = new ForegroundSync();
+    fs2._token._lastCode = Communications.BLE_CONNECTION_UNAVAILABLE;
+    fs2.onToken(false);
+    Test.assertEqualMessage(fs2.failReason(), ForegroundSync.FAIL_NETWORK,
+        "a dropped link is not a sign-in problem");
+    _resetStorage();
+    return true;
+}
+
+// A rotation must not destroy the credential it replaces. A 200 from the token endpoint
+// proves BMW accepted the OLD token; only a real data fetch proves the NEW one works.
+(:test)
+function testToken_rotationKeepsPreviousUntilDataConfirms(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "R-OLD");
+
+    tm.onTokenRefreshResponse(200, { "access_token" => "A1", "refresh_token" => "R-NEW" });
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN), "R-NEW", "rotated");
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN_PREV), "R-OLD",
+        "the replaced token is kept, not destroyed");
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_UNCONFIRMED) == true,
+        "and the new grant is marked unproven");
+
+    // Data arrives -> the new grant is proven and the fallback retires.
+    TokenManager.confirmGrant();
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN_PREV) == null,
+        "confirmed by data: fallback retired");
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_UNCONFIRMED) == null, "flag cleared");
+    _resetStorage();
+    return true;
+}
+
+// If the rotated-to token is refused before it ever fetched data, put the old one back
+// rather than counting it against the grant — that is the whole point of holding it.
+(:test)
+function testToken_unprovenGrantRollsBackInsteadOfStriking(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var tm = new TokenManager();
+    var cap = new _BoolCapture();
+    tm._callback = cap.method(:onResult);
+    tm.setManual(true);
+    Application.Storage.setValue(StorageKeys.KEY_REFRESH_TOKEN, "R-OLD");
+    tm.onTokenRefreshResponse(200, { "access_token" => "A1", "refresh_token" => "R-NEW" });
+
+    // R-NEW refused before any fetch confirmed it.
+    tm.onTokenRefreshResponse(400, null);
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_REFRESH_TOKEN), "R-OLD",
+        "the working token is restored");
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES) == null,
+        "a rollback is not a strike against the grant");
+    Test.assertEqualMessage(tm.getTokenState(), "NORMAL",
+        "and must leave the token state exactly as it was");
+    Test.assertMessage(
+        Application.Storage.getValue(StorageKeys.KEY_ACCESS_TOKEN) == null,
+        "the refused grant's access token is dropped so the restored one gets used");
+
+    // One shot: a second refusal has no fallback left and falls through to the ladder.
+    tm.onTokenRefreshResponse(400, null);
+    Test.assertEqualMessage(
+        Application.Storage.getValue(StorageKeys.KEY_GRANT_STRIKES), 1,
+        "second refusal counts normally — no ping-pong between dead tokens");
+    _resetStorage();
+    return true;
+}
+
+// 403 semantics on this API, and the daily block vs the routine 40-minute gate.
+(:test)
+function testQuota_403AndDailyBlockSemantics(logger as Test.Logger) as Lang.Boolean {
+    // A bodyless 403 is NOT evidence of a quota block: on this API the likelier cause
+    // is a container the current client cannot use, which one re-discovery fixes.
+    // Calling it a daily limit armed a 24-hour gate over a one-call problem.
+    Test.assertMessage(!CarDataClient.isRateLimit(403, null),
+        "a 403 with no body is not, by itself, the daily limit");
+    Test.assertMessage(CarDataClient.isRateLimit(403, { "exveErrorId" => "CU-429" }),
+        "and so must an explicit CU-429");
+    Test.assertMessage(!CarDataClient.isRateLimit(403, { "exveErrorId" => "CU-124" }),
+        "but a readable container-cap 403 is NOT a rate limit");
+    Test.assertMessage(!CarDataClient.isRateLimit(500, null), "5xx is not a rate limit");
+
+    // The daily block is distinguishable from the routine 40-minute advance.
+    _resetStorage();
+    QuotaGuard.updateAfterFetch();
+    Test.assertMessage(!QuotaGuard.isDailyBlocked(), "40-min gate is not a daily block");
+    QuotaGuard.onQuotaExceeded();
+    Test.assertMessage(QuotaGuard.isDailyBlocked(), "the 4 AM block is");
+    _resetStorage();
+    return true;
+}
+
+// Sign-out wipes the cache while a data page is still on the view stack under the menu.
+// Every page used to clear the screen and return, painting pure black with no way
+// forward, and START did nothing because the delegate only routed NEEDS_REBOOTSTRAP.
+// Both halves of the trap are asserted here: pages must not claim to be renderable with
+// no data, and the state sign-out leaves behind must route to pairing.
+(:test)
+function testSignOut_leavesNoDeadEnd(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    VehicleCache.replace({ "rangeKm" => 300, "fuelPercent" => 50, "doorsLocked" => true,
+                           "odometerKm" => 1000, "tyrePressureFL" => 2.4 });
+    var pages = [new PageRangeFuel(), new PageLock(), new PageOdometer(), new PageTyres()];
+    for (var i = 0; i < pages.size(); i++) {
+        Test.assertMessage(pages[i].isVisible(), "page is visible with data");
+    }
+
+    // What sign-out does to the cache.
+    VehicleCache.clear();
+    Test.assertMessage(VehicleCache.read() == null, "cache wiped");
+    for (var j = 0; j < pages.size(); j++) {
+        Test.assertMessage(!pages[j].isVisible(),
+            "no page may claim visibility with an empty cache");
+    }
+    Test.assertMessage(!PageNav.hasVisible(), "and the carousel has nothing to show");
+    _resetStorage();
+    return true;
+}
+
+// Containers belong to the client that created them, so a re-pair alone leaves the
+// cached ids pointing at containers the new grant cannot use — 403 forever, which is
+// why re-pairing did not help but signing out (which drops the ids) did. Pairing must
+// therefore drop them, and a 403 must re-discover before anything is called a limit.
+(:test)
+function testContainer_staleAfterRepairIsRecoverable(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    CarDataClient._storeContainer("C-OLD");
+    CarDataClient._storeBgContainer("B-OLD");
+    Test.assertEqualMessage(CarDataClient.cachedContainerId(), "C-OLD", "cached");
+    Test.assertEqualMessage(CarDataClient.cachedBgContainerId(), "B-OLD", "bg cached");
+
+    CarDataClient.invalidateContainers();
+    Test.assertMessage(CarDataClient.cachedContainerId() == null,
+        "invalidated so the next sync re-lists");
+    Test.assertMessage(CarDataClient.cachedBgContainerId() == null, "bg invalidated too");
+
+    // First 403 re-discovers rather than declaring a limit; only the second escalates.
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+    CarDataClient._storeContainer("C-STALE");
+    var fs = new ForegroundSync();
+    Test.assertMessage(fs._stop403(403), "403 is handled");
+    Test.assertMessage(CarDataClient.cachedContainerId() == null,
+        "the stale container is dropped, not blamed on quota");
+    Test.assertMessage(!fs.isRateLimited(), "and the first 403 is NOT a daily limit");
+
+    Test.assertMessage(fs._stop403(403), "second 403 handled");
+    Test.assertMessage(fs.isRateLimited(),
+        "a 403 with freshly resolved containers IS read as the limit");
+    Test.assertMessage(QuotaGuard.isDailyBlocked(), "and arms the daily block");
+    _resetStorage();
+    return true;
+}
+
+// ForegroundSync must tell a credential failure from a link failure: only the former
+// may send the user to pairing. This is the classification the pages branch on.
+(:test)
+function testSync_classifiesFailure(logger as Test.Logger) as Lang.Boolean {
+    var authStates = ["UNCONFIGURED", "NEEDS_REBOOTSTRAP"];
+    for (var i = 0; i < authStates.size(); i++) {
+        _resetStorage();
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, authStates[i]);
+        var fs = new ForegroundSync();
+        fs._finish(false);
+        Test.assertMessage(fs.authFailed(), authStates[i] + " -> auth failure");
+    }
+    // NORMAL / NEEDS_REFRESH / null all mean the credentials are fine and the link isn't.
+    var linkStates = ["NORMAL", "NEEDS_REFRESH"];
+    for (var j = 0; j < linkStates.size(); j++) {
+        _resetStorage();
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, linkStates[j]);
+        var fs2 = new ForegroundSync();
+        fs2._finish(false);
+        Test.assertMessage(!fs2.authFailed(), linkStates[j] + " -> transient, not auth");
+    }
+    _resetStorage();
+    var fs3 = new ForegroundSync();
+    fs3._finish(false);
+    Test.assertMessage(!fs3.authFailed(), "null state (first-run refresh) -> transient");
     _resetStorage();
     return true;
 }
@@ -631,6 +1344,26 @@ class _BoolCapture {
 // as a test case. (:test) is only for the actual test_* functions.
 function _resetStorage() {
     Application.Storage.clearValues();
+}
+
+// Blanks the credential Settings so a TokenManager refresh bails out at its creds
+// check instead of dispatching a real web request from a unit test (the sim's
+// settings store supplies non-empty defaults for both). Returns the previous values.
+function _blankCreds() {
+    var prev = [Application.Properties.getValue("clientId"),
+                Application.Properties.getValue("refreshToken")];
+    Application.Properties.setValue("clientId", "");
+    Application.Properties.setValue("refreshToken", "");
+    return prev;
+}
+
+// MUST be called from a `finally`: an assertion that throws between _blankCreds() and
+// here leaves both Settings blanked for every later test AND every later sim session,
+// and the next _blankCreds() then captures "" as the value to "restore" — the damage
+// becomes permanent.
+function _restoreCreds(prev) {
+    if (prev[0] != null) { Application.Properties.setValue("clientId", prev[0]); }
+    if (prev[1] != null) { Application.Properties.setValue("refreshToken", prev[1]); }
 }
 
 // True if a stored epoch is ~= now + offset (tolerates a few seconds of clock drift).

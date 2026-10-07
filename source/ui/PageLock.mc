@@ -17,11 +17,15 @@ class PageLock extends WatchUi.View {
     var _sync;
     var _refreshing;
     var _rateLimited;
+    var _failed;        // last refresh failed for a non-credential reason
+    var _failText;      // why, in words (ForegroundSync.failText)
 
     function initialize() {
         View.initialize();
         _refreshing  = false;
         _rateLimited = false;
+        _failed      = false;
+        _failText    = null;
         try { _iconClosed = WatchUi.loadResource(Rez.Drawables.ClosedIcon); } catch (e) { _iconClosed = null; }
         try { _iconOpen   = WatchUi.loadResource(Rez.Drawables.OpenIcon);   } catch (e) { _iconOpen   = null; }
     }
@@ -34,6 +38,8 @@ class PageLock extends WatchUi.View {
         }
         _refreshing  = true;
         _rateLimited = false;
+        _failed      = false;
+        _failText    = null;
         WatchUi.requestUpdate();
         _sync = new ForegroundSync();
         _sync.run(method(:onRefreshDone), true);  // START = manual full refresh
@@ -44,9 +50,18 @@ class PageLock extends WatchUi.View {
         _refreshing = false;
         if (!success && _sync != null && _sync.isRateLimited()) {
             _rateLimited = true;   // daily limit — show note, don't bounce to auth
-        } else if (!success) {
+        } else if (!success && _sync != null
+                && (_sync.authFailed()
+                    || _sync.failReason() == ForegroundSync.FAIL_STALE_AUTH)) {
+            // Credentials are unusable, or BMW rejected the refresh with a 400 on a
+            // retry the user asked for. Offering pairing is cheap and reversible; the
+            // strike ladder still governs the one-way NEEDS_REBOOTSTRAP latch.
             var auth = new DeviceAuthManager();
             WatchUi.pushView(new AuthView(auth), new AuthDelegate(auth), WatchUi.SLIDE_LEFT);
+        } else if (!success) {
+            // Non-credential — note only, never the device flow. Say which failure.
+            _failed   = true;
+            _failText = _sync.failText();
         }
         WatchUi.requestUpdate();
     }
@@ -63,7 +78,7 @@ class PageLock extends WatchUi.View {
         dc.setColor(Theme.COLOR_TEXT, Theme.COLOR_BG);
         dc.clear();
         var state = VehicleCache.read();
-        if (state == null) { return; }
+        if (state == null) { PageChrome.drawEmptyState(dc); return; }
         _renderDirect(dc, state);
     }
 
@@ -120,6 +135,7 @@ class PageLock extends WatchUi.View {
         PageChrome.drawNavDots(dc);
         PageChrome.drawRefreshHint(dc, _refreshing);
         if (_rateLimited) { PageChrome.drawRateLimitNote(dc); }
+        else if (_failed) { PageChrome.drawOfflineNote(dc, _failText); }
     }
 
     function _drawWindowBadge(dc, x, y, radius) {

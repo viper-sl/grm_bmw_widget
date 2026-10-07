@@ -26,6 +26,13 @@ class BmwWidgetApp extends Application.AppBase {
     // behaves differently depending on whether the clientId was set before or
     // after the first run. Clearing it here makes both orderings equivalent.
     function onSettingsChanged() {
+        // A changed clientId retires the stored grant outright — BMW rejects a
+        // refresh_token presented by a client that did not issue it. Handle it here so
+        // the prompt appears the moment the user saves, not hours later once the
+        // strike ladder has worked it out (ensureValidToken repeats the check for
+        // edits made while the widget was closed).
+        TokenManager.syncClient();
+
         var clientId = Config.clientId();
         if (clientId != null && !clientId.equals("")) {
             var ts = Application.Storage.getValue(StorageKeys.KEY_TOKEN_STATE);

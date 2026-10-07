@@ -102,10 +102,12 @@ class PageChrome {
     static function drawAge(dc, state) {
         if (state == null || !state.hasKey("lastUpdated")) { return; }
         var ageSec = Time.now().value() - state["lastUpdated"];
+        var text = _ageString(ageSec);
+        var y = dc.getHeight() - s(dc, 22);
         dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
-        dc.drawText(dc.getWidth() / 2, dc.getHeight() - s(dc, 22), Graphics.FONT_XTINY,
-            _ageString(ageSec),
+        dc.drawText(dc.getWidth() / 2, y, Graphics.FONT_XTINY, text,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        drawFailMark(dc, text, y);
     }
 
     // Data Age with staleness emphasis (FR-20) — same position/font as drawAge(),
@@ -115,10 +117,23 @@ class PageChrome {
         if (state == null || !state.hasKey("lastUpdated")) { return; }
         var ageSec = Time.now().value() - state["lastUpdated"];
         var color = (ageSec > 1800) ? Theme.COLOR_WARN : Theme.COLOR_DIM;
+        var text = _ageString(ageSec);
+        var y = dc.getHeight() - s(dc, 22);
         dc.setColor(color, Theme.COLOR_BG);
-        dc.drawText(dc.getWidth() / 2, dc.getHeight() - s(dc, 22), Graphics.FONT_XTINY,
-            _ageString(ageSec),
+        dc.drawText(dc.getWidth() / 2, y, Graphics.FONT_XTINY, text,
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        drawFailMark(dc, text, y);
+    }
+
+    // Warning triangle just left of the centered age `text` at `y`, shown once the
+    // last few fetch attempts failed (QuotaGuard.isFailing). The age alone can't tell
+    // a car that simply hasn't reported from a link that keeps failing.
+    static function drawFailMark(dc, text, y) {
+        if (!QuotaGuard.isFailing()) { return; }
+        var h = (dc.getFontHeight(Graphics.FONT_XTINY) * 2) / 3;
+        var textW = dc.getTextDimensions(text, Graphics.FONT_XTINY)[0];
+        var cx = dc.getWidth() / 2 - textW / 2 - s(dc, 4) - WarnIcon.width(h) / 2;
+        WarnIcon.draw(dc, cx, y, h);
     }
 
     static function _ageString(sec) {

@@ -23,6 +23,14 @@ class StorageKeys {
     // Consecutive invalid_grant responses with no successful refresh in between.
     // Corroboration before NEEDS_REBOOTSTRAP is latched (TokenManager).
     static const KEY_GRANT_STRIKES    = "grantStrikes";
+    // Consecutive data-fetch attempts (background poll or foreground sync) that ended
+    // without data. Cleared by any successful fetch (QuotaGuard.onFetchSucceeded).
+    // At FETCH_FAILS_WARN or more, the glance and every page show a warning triangle
+    // next to the data age — "old" alone can't tell a quiet car from a broken link.
+    // The threshold lives here, not in QuotaGuard, because the glance reads it and
+    // must not pull QuotaGuard into its code image.
+    static const KEY_FETCH_FAILS      = "fetchFails";
+    static const FETCH_FAILS_WARN     = 3;
     static const KEY_VEHICLE_NAME     = "vehicleName";
     static const KEY_DRIVE_TYPE       = "driveType";
     static const KEY_BASIC_DATA       = "basicData";

@@ -6,6 +6,7 @@ using Toybox.Lang;
 using Toybox.Application;
 using Toybox.Communications;
 using Toybox.Time;
+using Toybox.System;
 
 // ============================================================
 //  CarDataClient._parseTelematicData — type conversion
@@ -1211,6 +1212,65 @@ function testQuota_exceededBlocksUntil4Am(logger as Test.Logger) as Lang.Boolean
     var offset = next - Time.today().value();
     Test.assertMessage(offset == 4 * 3600 || offset == 86400 + 4 * 3600,
         "unblocks at next 4 AM local");
+    _resetStorage();
+    return true;
+}
+
+(:test)
+function testQuota_failStreakWarnsAtThreshold(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Test.assertMessage(!QuotaGuard.isFailing(), "no streak -> no warning");
+    for (var i = 1; i < StorageKeys.FETCH_FAILS_WARN; i++) {
+        QuotaGuard.onFetchFailed();
+        Test.assertMessage(!QuotaGuard.isFailing(), "below threshold -> no warning");
+    }
+    QuotaGuard.onFetchFailed();
+    Test.assertMessage(QuotaGuard.isFailing(), "threshold reached -> warning");
+    Test.assertEqualMessage(StorageKeys.FETCH_FAILS_WARN,
+        Application.Storage.getValue(StorageKeys.KEY_FETCH_FAILS), "counts each failure");
+    _resetStorage();
+    return true;
+}
+
+// The foreground sync feeds the streak. Which branch runs depends on the sim's phone
+// connection; neither one dispatches a web request.
+//   no phone  -> every press is a real failed attempt and must count
+//   phone up  -> a press inside the cooldown never tried and must NOT count
+(:test)
+function testSync_failStreakFromForeground(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    var cb = new _SyncDone();
+    if (!System.getDeviceSettings().phoneConnected) {
+        for (var i = 0; i < StorageKeys.FETCH_FAILS_WARN; i++) {
+            new ForegroundSync().run(cb.method(:done), true);
+        }
+        Test.assertMessage(QuotaGuard.isFailing(), "no-phone presses count toward the warning");
+    } else {
+        Application.Storage.setValue(ForegroundSync.KEY_LAST_FG, Time.now().value());
+        for (var i = 0; i < StorageKeys.FETCH_FAILS_WARN; i++) {
+            new ForegroundSync().run(cb.method(:done), true);
+        }
+        Test.assertMessage(!QuotaGuard.isFailing(), "cooldown presses don't count");
+    }
+    Test.assertEqualMessage(StorageKeys.FETCH_FAILS_WARN, cb.calls, "each run finished synchronously");
+    _resetStorage();
+    return true;
+}
+
+(:test)
+class _SyncDone {
+    var calls = 0;
+    function done(success) { calls++; }
+}
+
+(:test)
+function testQuota_successClearsFailStreak(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    for (var i = 0; i < StorageKeys.FETCH_FAILS_WARN + 2; i++) { QuotaGuard.onFetchFailed(); }
+    QuotaGuard.onFetchSucceeded();
+    Test.assertMessage(!QuotaGuard.isFailing(), "one success clears the warning");
+    QuotaGuard.onFetchFailed();
+    Test.assertMessage(!QuotaGuard.isFailing(), "streak restarts from zero");
     _resetStorage();
     return true;
 }

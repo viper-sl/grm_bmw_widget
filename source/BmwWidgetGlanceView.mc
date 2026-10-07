@@ -3,6 +3,7 @@
 //   row 1:  LOCKED            653 km     (white)
 //   row 2:  ▭▭▭▭▭▭▭▭▭▭▭▭▭▭▭▭  fuel bar (red, width = fuel %)
 //   row 3:  70%               1d ago     (fuel orange, age dimmed)
+// A yellow ⚠ sits left of the age once the last few fetches failed (WarnIcon).
 // Low fuel (<50%): fuel cell shows "XX% (+YYL)" instead of just "XX%" — the "+"
 // marks YY as litres still needed to fill the tank, not litres currently in it.
 // YY comes from FuelMath (percent × tank setting), the same source the Range &
@@ -119,10 +120,31 @@ class BmwWidgetGlanceView extends WatchUi.GlanceView {
         dc.drawText(textX, row3Y, font, fuelStr,
             Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
 
+        var ageStr = null;
         if (state.hasKey("lastUpdated")) {
-            var ageSec = Time.now().value() - state["lastUpdated"];
+            ageStr = _ageString(Time.now().value() - state["lastUpdated"]);
+        }
+
+        // Warning triangle left of the age when the last few fetches failed (read
+        // straight from Storage — QuotaGuard.isFailing would pull that class in here).
+        var fails = Application.Storage.getValue(StorageKeys.KEY_FETCH_FAILS);
+        if (fails != null && fails >= StorageKeys.FETCH_FAILS_WARN) {
+            var iconH = (lineH * 2) / 3;
+            var iconW = WarnIcon.width(iconH);
+            // Low fuel makes the left cell long ("35% (+40L)"); if the triangle would
+            // collide with it, drop " ago" — the triangle already says "look here".
+            var fuelW = dc.getTextDimensions(fuelStr, font)[0];
+            if (ageStr != null
+                    && textX + fuelW + 6 + iconW + 3 + dc.getTextDimensions(ageStr, font)[0] > rightX) {
+                ageStr = ageStr.substring(0, ageStr.length() - 4);
+            }
+            var ageW = (ageStr != null) ? dc.getTextDimensions(ageStr, font)[0] + 3 : 0;
+            WarnIcon.draw(dc, rightX - ageW - iconW / 2, row3Y, iconH);
+        }
+
+        if (ageStr != null) {
             dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
-            dc.drawText(rightX, row3Y, font, _ageString(ageSec),
+            dc.drawText(rightX, row3Y, font, ageStr,
                 Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
         }
     }

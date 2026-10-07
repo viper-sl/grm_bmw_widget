@@ -141,8 +141,10 @@ class PageMap extends WatchUi.MapView {
         // Same 30-minute staleness threshold as PageChrome.drawAgeProminent;
         // white rather than DIM because DIM is unreadable over a light map.
         var color = (ageSec > 1800) ? Theme.COLOR_WARN : Theme.COLOR_WHITE;
-        _haloText(dc, dc.getWidth() / 2, dc.getHeight() - PageChrome.s(dc, 22),
-                  Graphics.FONT_XTINY, PageChrome._ageString(ageSec), color);
+        var text = PageChrome._ageString(ageSec);
+        var y = dc.getHeight() - PageChrome.s(dc, 22);
+        _haloText(dc, dc.getWidth() / 2, y, Graphics.FONT_XTINY, text, color);
+        PageChrome.drawFailMark(dc, text, y);
     }
 
     // Text with a 1px dark outline in all 8 directions, then the fill on top.

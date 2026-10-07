@@ -18,6 +18,7 @@ class Theme {
     static const COLOR_DIM    = 0x555555; // --text3 tertiary: headers, age, dots
 
     static const COLOR_WARN   = 0xE07020; // amber: low fuel / tyre low / unlocked
+    static const COLOR_CAUTION = 0xFFCC00; // yellow: data fetch failing (WarnIcon)
 
     (:designNew)     static const COLOR_OK = 0x00C853; // OLED-bright green: all-clear (dots, bars)
     (:designClassic) static const COLOR_OK = 0x4CAF50; // green: all-clear / good (dots, bars)

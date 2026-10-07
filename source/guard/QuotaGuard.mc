@@ -39,6 +39,23 @@ class QuotaGuard {
         Application.Storage.deleteValue(StorageKeys.KEY_BACKOFF_UNTIL);
     }
 
+    // Failure streak behind the warning triangle (see StorageKeys.KEY_FETCH_FAILS).
+    // Count only attempts that were actually made: a tick skipped by the quota gate,
+    // the backoff or the adaptive schedule is not a failure.
+    static function onFetchFailed() {
+        var n = Application.Storage.getValue(StorageKeys.KEY_FETCH_FAILS);
+        Application.Storage.setValue(StorageKeys.KEY_FETCH_FAILS, (n == null) ? 1 : n + 1);
+    }
+
+    static function onFetchSucceeded() {
+        Application.Storage.deleteValue(StorageKeys.KEY_FETCH_FAILS);
+    }
+
+    static function isFailing() {
+        var n = Application.Storage.getValue(StorageKeys.KEY_FETCH_FAILS);
+        return n != null && n >= StorageKeys.FETCH_FAILS_WARN;
+    }
+
     // True only when the gate was armed by onQuotaExceeded() (a block until 4 AM),
     // not by the routine 40-minute advance of updateAfterFetch(). The foreground is
     // deliberately not subject to the 40-minute gate — a user pressing START should

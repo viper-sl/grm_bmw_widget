@@ -363,6 +363,7 @@ class ForegroundSync {
             TokenManager.confirmGrant();
             QuotaGuard.updateAfterFetch();
             QuotaGuard.clearBackoff();   // a working link retires any error backoff
+            QuotaGuard.onFetchSucceeded();
             Application.Storage.setValue(KEY_LAST_FG, Time.now().value());
             Application.Storage.setValue(KEY_LAST_FULL, Time.now().value());
             // Re-assert the background poll schedule. Manual mode's daily 10:00
@@ -410,6 +411,9 @@ class ForegroundSync {
             if (_failReason == FAIL_NONE) {
                 _failReason = _authFailed ? FAIL_AUTH : FAIL_NETWORK;
             }
+            // A press inside the cooldown never tried, so it is not a failure. Every
+            // other reason (no phone link included) left the data un-updated.
+            if (_failReason != FAIL_COOLDOWN) { QuotaGuard.onFetchFailed(); }
         }
         if (_onDone != null) { _onDone.invoke(success); }
     }

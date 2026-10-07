@@ -124,6 +124,7 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
 
     function onTokenReady(success as Lang.Boolean) as Void {
         if (!success) {
+            QuotaGuard.onFetchFailed();
             Background.exit(null);
             return;
         }
@@ -149,9 +150,11 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
             TokenManager.confirmGrant();   // real data proves the current grant
             QuotaGuard.updateAfterFetch();
             QuotaGuard.clearBackoff();   // a working link retires any error backoff
+            QuotaGuard.onFetchSucceeded();
             Background.exit(state);
         } else if (responseCode == 429) {
             QuotaGuard.onQuotaExceeded();
+            QuotaGuard.onFetchFailed();
             Background.exit(null);
         } else if (responseCode == 401) {
             // Token rejected despite a valid-looking stored expiry. Drop the expiry so
@@ -159,11 +162,13 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
             // this the poll fails identically until the token expires on its own.
             TokenManager.invalidateAccessToken();
             QuotaGuard.updateAfterFetch();
+            QuotaGuard.onFetchFailed();
             _incrementBackoff();
             Background.exit(null);
         } else {
             // Transient error: advance quota gate + apply error backoff
             QuotaGuard.updateAfterFetch();
+            QuotaGuard.onFetchFailed();
             _incrementBackoff();
             Background.exit(null);
         }

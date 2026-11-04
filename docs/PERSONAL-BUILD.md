@@ -70,7 +70,8 @@ Two properties, because a persisted empty setting can shadow an XML default
 ./build-personal.sh              # → bin/personal.prg, loaded into the running simulator
 ./build-personal.sh --device     # → bin/BMWWIDGET.PRG for a real watch (auto-copied if mounted)
 ./build-personal.sh --fr255-sim  # → bin/personal-fr255.prg (legacy-tier check)
-./build-personal.sh --iq         # → bin/BMWWIDGET.iq (signed, all devices)
+./build-personal.sh --iq         # → bin/BMWWIDGET.iq (signed, all devices, BETA app ID)
+./build-personal.sh --iqprod     # → bin/BMWWIDGET-prod.iq (signed, all devices, PROD app ID — store upload)
 ```
 
 The two main modes use **different compile targets** — `<device>_sim` for the simulator,
@@ -161,11 +162,14 @@ No VIN or container ID typing required.
 
 | | Store (`iq.jungle`) | Generic (`monkey.jungle`) | Personal (`livetest.jungle`) |
 |---|---|---|---|
-| Manifest | `manifest-iq.xml` (own app ID) | `manifest.xml` | `manifest.xml` |
+| Manifest | `manifest-iq.xml` (app ID injected: beta or prod) | `manifest.xml` | `manifest.xml` |
 | Resources | `resources` + `resources-modes-*` | same | + `resources-livetest` (your clientId) |
 | Credentials | user enters in Garmin Connect | user enters | baked from the override |
-| Output | `bin/BMWWIDGET.iq` | `bin/*.prg` | `bin/personal.prg` / `bin/BMWWIDGET.PRG` |
+| Output | `bin/BMWWIDGET.iq` (beta) / `bin/BMWWIDGET-prod.iq` (prod) | `bin/*.prg` | `bin/personal.prg` / `bin/BMWWIDGET.PRG` |
 
 All three share **all source** — only the manifest and resource paths differ. The store
-app ID is deliberately distinct so a published install and your sideload can coexist on
-one watch.
+app IDs are deliberately distinct so a published install and your sideload can coexist on
+one watch. The beta and prod IDs live at the top of `build-personal.sh` (`IQ_BETA_ID`,
+`IQ_PROD_ID`); the script swaps the one you asked for into a throwaway copy of
+`manifest-iq.xml` and checks the finished `.iq` really carries it. A published app ID can
+never change, and updates must be signed with the same `developer_key` — keep both safe.

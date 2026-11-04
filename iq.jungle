@@ -1,5 +1,8 @@
 # IQ Store / distribution build.
-# Uses manifest-iq.xml (different app ID from manifest.xml).
+# Uses manifest-iq.xml (different app ID from manifest.xml). build-personal.sh
+# --iq/--iqprod build from a generated copy of this file whose project.manifest points at
+# a copy of the manifest with the beta/prod app ID swapped in — so edit THIS file for any
+# jungle change, and keep the project.manifest line as is.
 # Does NOT include resources-livetest — the published widget has no baked-in
 # clientId; users supply their own via the Garmin Connect app settings.
 project.manifest = manifest-iq.xml

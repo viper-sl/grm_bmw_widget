@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <!-- IQ Store / distribution manifest. Different app ID from manifest.xml
      (local/personal sideload) so both can coexist on the same watch.
+     TEMPLATE: this id is the BETA app. build-personal.sh (iqprod mode) swaps in the prod id
+     (IQ_PROD_ID) in a throwaway copy — keep the id attribute on <iq:application>.
      DEVICES: The IQ package builder requires every listed device to have its
      SDK profile installed locally via the Connect IQ SDK Manager.
      21 profiles are installed — the remaining 15 (below, commented) need

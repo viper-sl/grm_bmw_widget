@@ -222,12 +222,14 @@ developer key (`developer_key`).
 monkeyc -f monkey.jungle -d fenix6pro -o bin/BmwStatus.prg -y developer_key
 ```
 
-**Store package** — signed `.iq` for all supported devices, from
-[`iq.jungle`](iq.jungle) → `manifest-iq.xml`, which carries a **different app ID** so
-the published widget and a personal sideload coexist on one watch:
+**Store packages** — signed `.iq` for all supported devices, from
+[`iq.jungle`](iq.jungle) → `manifest-iq.xml`. The app ID is injected at build time, so
+the beta app, the public app and a personal sideload each get their own ID and coexist
+on one watch:
 
 ```sh
-./build-personal.sh --iq       # → bin/BMWWIDGET.iq
+./build-personal.sh -iq        # → bin/BMWWIDGET.iq       (beta app ID, private beta testing)
+./build-personal.sh -iqprod    # → bin/BMWWIDGET-prod.iq  (prod app ID, upload to the store)
 ```
 
 **Personal build** (your client ID baked in, for your own watch) — see

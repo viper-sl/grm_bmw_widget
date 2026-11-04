@@ -130,8 +130,9 @@ class PageMap extends WatchUi.MapView {
     function _drawHeader(dc) {
         var name = Application.Storage.getValue(StorageKeys.KEY_VEHICLE_NAME);
         if (name == null) { name = "BMW"; }
-        _haloText(dc, dc.getWidth() / 2, PageChrome.s(dc, 30),
-                  Graphics.FONT_XTINY, name.toUpper(), Theme.COLOR_WHITE);
+        var y = PageChrome.s(dc, 30);
+        _haloText(dc, dc.getWidth() / 2, y, Graphics.FONT_XTINY,
+                  PageChrome.fitText(dc, name.toUpper(), Graphics.FONT_XTINY, y), Theme.COLOR_WHITE);
     }
 
     function _drawAge(dc) {

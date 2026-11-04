@@ -9,21 +9,22 @@ project.manifest = manifest-iq.xml
 
 # ── Capability tiers (keep in sync with monkey.jungle) ──────────────────────
 # base (API < 6.0 "legacy") — manual-only scheduling; no updateMode setting.
-# The seven API 6.0+ "full" devices keep all update modes.
+# The fifteen API 6.0+ "full" devices keep all update modes.
 # Design refresh rides the same split: legacy excludes (:designNew) (keeps the
-# original look); the seven full-tier devices exclude (:designClassic).
+# original look); the fifteen full-tier devices exclude (:designClassic).
 # NOTE: device-level values REPLACE base values for that key (override, not merge).
 base.sourcePath = source
 base.resourcePath = resources;resources-modes-legacy
 base.excludeAnnotations = bgPoll;designNew;noMapPage
 
 # ── Map page tier (third, orthogonal axis) ───────────────────────────────────
-# WatchUi.MapView needs onboard cartography. 32 of the 36 declared products have
-# it; these four do not, so (:mapPage) is excluded there and (:noMapPage) is
+# WatchUi.MapView needs onboard cartography. 43 of the 48 declared products have
+# it; these five do not, so (:mapPage) is excluded there and (:noMapPage) is
 # excluded everywhere else. Same dual-annotation shape as designNew/designClassic.
 # NOTE: values REPLACE, so each line restates that device's full base list.
-fenix6.excludeAnnotations = bgPoll;designNew;mapPage
 fr255.excludeAnnotations = bgPoll;designNew;mapPage
+fr255m.excludeAnnotations = bgPoll;designNew;mapPage
+fr265.excludeAnnotations = bgPoll;designNew;mapPage
 # TODO(map): fenix6s and fr745 are declared in manifest-iq.xml and are ALSO
 # map-incapable, but their device profiles are not installed locally and a jungle
 # qualifier for an uninstalled device breaks EVERY build. Install them via the
@@ -45,3 +46,19 @@ fenixe.excludeAnnotations = manualOnly;designClassic;noMapPage
 fenixe.resourcePath = resources;resources-modes-full
 fr970.excludeAnnotations = manualOnly;designClassic;noMapPage
 fr970.resourcePath = resources;resources-modes-full
+enduro3.excludeAnnotations = manualOnly;designClassic;noMapPage
+enduro3.resourcePath = resources;resources-modes-full
+enduro4.excludeAnnotations = manualOnly;designClassic;noMapPage
+enduro4.resourcePath = resources;resources-modes-full
+marq3.excludeAnnotations = manualOnly;designClassic;noMapPage
+marq3.resourcePath = resources;resources-modes-full
+fenix947mm.excludeAnnotations = manualOnly;designClassic;noMapPage
+fenix947mm.resourcePath = resources;resources-modes-full
+fenix9pro47mm.excludeAnnotations = manualOnly;designClassic;noMapPage
+fenix9pro47mm.resourcePath = resources;resources-modes-full
+fenix9pro51mm.excludeAnnotations = manualOnly;designClassic;noMapPage
+fenix9pro51mm.resourcePath = resources;resources-modes-full
+fenix9prosolar47mm.excludeAnnotations = manualOnly;designClassic;noMapPage
+fenix9prosolar47mm.resourcePath = resources;resources-modes-full
+fenix9prosolar51mm.excludeAnnotations = manualOnly;designClassic;noMapPage
+fenix9prosolar51mm.resourcePath = resources;resources-modes-full

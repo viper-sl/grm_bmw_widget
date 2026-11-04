@@ -19,8 +19,8 @@ the Connect IQ platform.
 - **Tyres** — per-wheel pressure vs. target, and tyre-wear estimate (START cycles the
   three views).
 - **Car location** — the parked car pinned on the watch's own onboard map; START toggles
-  a browsable zoom view. Only on devices that ship cartography — 32 of the 36 supported
-  products (not base fēnix 6/6s, FR255, FR745).
+  a browsable zoom view. Only on devices that ship cartography — 43 of the 48 supported
+  products (not fēnix 6S, FR255, FR255 Music, FR265, FR745).
 - **About car** — a grouped, read-only dump of static vehicle info plus live telematics
   (12 V battery, coolant, location, teleservice, …).
 - **On-watch settings** — update mode, tank size, service override, consumption toggle,
@@ -28,9 +28,14 @@ the Connect IQ platform.
 
 ## Supported devices
 
-fēnix 6 / 7 / 8 / E families, MARQ, and Forerunner 255 / 745 / 945 / 955 / 965 / 970
-(see [`manifest.xml`](manifest.xml)). Developed and tested against **fēnix 6 Pro**
-(legacy tier) and **fēnix 8 Pro** (API 6.0+ tier).
+fēnix 6 Pro / 6X Pro / 6S Pro, the fēnix 7 / 8 / 9 / E families, epix (Gen 2) and epix Pro,
+Enduro 2 / 3 / 4, MARQ (Gen 1–3), and Forerunner 255 / 255 Music / 265 / 745 / 945 / 955 /
+965 / 970 (see [`manifest.xml`](manifest.xml)). Several profiles also cover quatix,
+tactix and D2 variants. Developed and tested against **fēnix 6 Pro** (legacy tier) and
+**fēnix 8 Pro** (API 6.0+ tier).
+
+**Not supported:** the base fēnix 6 / 6 Solar / 6 Dual Power and the first Enduro. They
+give a widget 64 KB with no code paging, and the widget no longer fits.
 
 ## How it works
 
@@ -192,8 +197,8 @@ catalogue: [`docs/descriptors.md`](docs/descriptors.md).
 - **Once a day at ~10:00** — a full fetch even in manual mode, which also keeps the
   OAuth token pair alive (FR-25).
 - **Update Mode** (*Auto hourly* / *Auto adaptive*) exists only on the **API 6.0+ tier**
-  — fēnix 8, fēnix 8 Pro, fēnix 8 Solar, fēnix E, FR970. Every other device is manual +
-  daily, and the setting is hidden ([`iq.jungle`](iq.jungle)).
+  — fēnix 8, fēnix 8 Pro, fēnix 8 Solar, fēnix 9 (all variants), fēnix E, Enduro 3 / 4,
+  MARQ (Gen 3), FR970. Every other device is manual + daily, and the setting is hidden ([`iq.jungle`](iq.jungle)).
 - BMW allows **~50 data calls / 24 h**. A full fetch spends 3 (basicData + tyre
   diagnosis + telematicData), a background poll spends 1; token refresh is exempt.
 - Freshness is bounded by the **car**, not the widget: a parked BMW may report every few

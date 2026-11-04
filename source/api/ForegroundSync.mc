@@ -33,6 +33,7 @@ class ForegroundSync {
     var _retried403;      // guard: re-discover containers at most once after a 403
     var _createFailed;    // set if a container create failed with a cap-like error
     var _fullFetch;       // true → fetch the FULL container (About-car etc.); false → just ensure containers
+    var _vinFromStorage;  // _vin was auto-discovered (Storage), not typed into Settings
 
     function initialize() {
         _client = new CarDataClient();      // lean (:background) telematic poll
@@ -66,6 +67,10 @@ class ForegroundSync {
     static const FAIL_CONTAINER  = 5;
     static const FAIL_NETWORK    = 6;
     static const FAIL_STALE_AUTH = 7;
+    // Setup mistakes on the BMW side. Each used to surface as a generic "Update failed"
+    // (or worse, as the daily limit), leaving the user nothing to fix.
+    static const FAIL_NO_CAR     = 8;   // the account lists no vehicle at all
+    static const FAIL_CAR_ACCESS = 9;   // a VIN the account/client cannot read (CU-105, 404)
 
     function failReason() { return _failReason; }
 
@@ -77,7 +82,10 @@ class ForegroundSync {
         if (_failReason == FAIL_RATE_LIMIT) { return "Daily limit — try tomorrow"; }
         // A rejected refresh is a sign-in problem, not a server fault. "Server error
         // 400" told the user nothing and hid the fact that re-pairing is the way out.
-        if (_failReason == FAIL_STALE_AUTH) { return "Sign-in expired — retry to re-pair"; }
+        // Kept short: banners sit low on a round screen where the line is narrow.
+        if (_failReason == FAIL_STALE_AUTH) { return "Sign-in expired — re-pair"; }
+        if (_failReason == FAIL_NO_CAR)     { return "No car on this BMW account"; }
+        if (_failReason == FAIL_CAR_ACCESS) { return "Car not readable — check VIN"; }
         // A real transport/server failure: name it. B9 says never show a bare "-104",
         // and _friendlyError is the existing mapping that turns codes into words.
         if (_lastCode != 0) { return DeviceAuthManager._friendlyError(_lastCode); }
@@ -137,14 +145,29 @@ class ForegroundSync {
     // Re-discover once, which is what signing out achieved by hand. Only a SECOND 403,
     // now with freshly resolved containers, is read as BMW's daily limit — reading the
     // first one that way would arm a 24-hour block over a one-call fix.
+    //
+    // CU-105 ("no permission") is the one 403 that names its cause. On the first pass it
+    // also drops an auto-discovered VIN — a car sold or swapped on the account — so the
+    // retry re-reads /mappings. If it is STILL CU-105 with fresh containers, the VIN is
+    // the problem, not the quota: say so, and do not arm the 24-hour block.
     function _stop403(responseCode) {
         if (responseCode != 403) { return false; }
+        var errId = _client.lastErrorId();
+        var noAccess = (errId != null && errId.equals("CU-105"));
         if (!_retried403) {
             _retried403    = true;
             CarDataClient.invalidateContainers();
             _containerId   = null;
             _bgContainerId = null;
+            if (noAccess && _vinFromStorage) {
+                Application.Storage.deleteValue(StorageKeys.KEY_VIN);
+            }
             _token.ensureValidToken(method(:onToken));
+            return true;
+        }
+        if (noAccess) {
+            _failReason = FAIL_CAR_ACCESS;
+            _finish(false);
             return true;
         }
         _rateLimited = true;
@@ -190,7 +213,10 @@ class ForegroundSync {
         var now = Time.now().value();
         var lastFull = Application.Storage.getValue(KEY_LAST_FULL);
         var dailyDue = (lastFull == null) || (now - lastFull >= FULL_INTERVAL_SECONDS);
-        _fullFetch = isManual || dailyDue;
+        // An empty cache always needs the full fetch: the "containers only" shortcut
+        // would report success with nothing to show (sign-out clears the cache but not
+        // the daily stamp), and the widget would sit on "Loading…" indefinitely.
+        _fullFetch = isManual || dailyDue || (VehicleCache.read() == null);
         // 1-minute cooldown guard for full fetches — prevents rapid re-taps hammering the API.
         if (_fullFetch) {
             var lastSync = Application.Storage.getValue(KEY_LAST_FG);
@@ -231,7 +257,13 @@ class ForegroundSync {
         if (responseCode != 200) { _lastCode = responseCode; }
         if (_stop429(responseCode)) { return; }
         if (_stop401(responseCode)) { return; }
-        if (vin == null) { _finish(false); return; }
+        if (vin == null) {
+            // /mappings answered fine but listed no vehicle: the BMW ID has no car, or
+            // the car is mapped to someone else as primary user. Nothing a retry fixes.
+            if (responseCode == 200) { _failReason = FAIL_NO_CAR; }
+            _finish(false);
+            return;
+        }
         _vin = vin;
 
         // Step 2a: FULL container (foreground telematic incl. About-car detail) —
@@ -346,6 +378,13 @@ class ForegroundSync {
         if (_stop429(responseCode)) { return; }
         if (_stop403(responseCode)) { return; }
         if (_stop401(responseCode)) { return; }
+        // 404 on /vehicles/{vin}/telematicData: the VIN itself is unknown to BMW —
+        // typically a typo in the VIN Setting.
+        if (responseCode == 404) {
+            _failReason = FAIL_CAR_ACCESS;
+            _finish(false);
+            return;
+        }
         if (responseCode == 200 && state != null) {
             // Merge tyre wear km (from separate endpoint) into the telematic state before writing.
             if (_tyreKm != null) {
@@ -380,14 +419,17 @@ class ForegroundSync {
     // Storage-first (auto-discovered) values, falling back to manual Settings.
     function _resolveVin() {
         var v = Application.Storage.getValue(StorageKeys.KEY_VIN);
-        if (v == null) { v = Application.Properties.getValue("vin"); }
+        _vinFromStorage = (v != null && !v.equals(""));
+        if (!_vinFromStorage) { v = Config.settingsVin(); }
         if (v != null && v.equals("")) { v = null; }
         return v;
     }
 
     function _resolveFullContainer() {
         var c = CarDataClient.cachedContainerId();
-        if (c == null) { c = Application.Properties.getValue("containerId"); }
+        // After a 403 the Settings value is a suspect, not a fallback: re-reading it is
+        // what turned a mistyped Container ID into a second 403 and a 24-hour block.
+        if (c == null && !_retried403) { c = Config.trim(Application.Properties.getValue("containerId")); }
         if (c != null && c.equals("")) { c = null; }
         return c;
     }

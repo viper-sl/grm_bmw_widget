@@ -389,7 +389,9 @@ class TokenManager {
         if (stamped == null) { return false; }
         var cid = Config.clientId();
         if (cid == null || cid.equals("")) { return false; }
-        return !stamped.equals(cid);
+        // Trim the stamp too: one written before Config.clientId() trimmed may carry the
+        // pasted whitespace, and that alone must not read as a different client.
+        return !Config.trim(stamped).equals(cid);
     }
 
     // Act on a client change: every stored token is dead by definition, so drop them

@@ -97,8 +97,7 @@ class BmwWidgetServiceDelegate extends System.ServiceDelegate {
     // manually-entered value (Properties), so the auto path "wins" once it runs.
     function _resolveVin() {
         var v = Application.Storage.getValue(StorageKeys.KEY_VIN);
-        if (v == null) { v = Application.Properties.getValue("vin"); }
-        if (v != null && v.equals("")) { v = null; }
+        if (v == null || v.equals("")) { v = Config.settingsVin(); }
         return v;
     }
 

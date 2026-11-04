@@ -29,6 +29,7 @@ class CarDataClient {
     static const _BG_CONTAINER_NAME = "grm_bmw_widget_bg_v3";
 
     var _callback;
+    var _errId;      // exveErrorId of the last failed telematic call (e.g. "CU-105"), else null
     var _maxTs;      // parse-time accumulator: max epoch seconds across all fields
     var _tsMemoStr;  // last timestamp string seen this parse (1-entry memo)
     var _tsMemoEpoch;// its epoch — most descriptors in one response share a timestamp
@@ -47,12 +48,20 @@ class CarDataClient {
         );
     }
 
+    // BMW's error id for the last failed call, so the foreground can tell a VIN the
+    // account cannot read (CU-105) from a bodyless 403 it has to guess about.
+    function lastErrorId() { return _errId; }
+
     function onTelematicDataResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
+        _errId = null;
         if (responseCode == 200 && data != null) {
             var state = _parseTelematicData(data);
             data = null;
             _callback.invoke(responseCode, state);
         } else {
+            if (data instanceof Lang.Dictionary && data.hasKey("exveErrorId")) {
+                _errId = data["exveErrorId"];
+            }
             var rc = isRateLimit(responseCode, data) ? 429 : responseCode;
             data = null;
             _callback.invoke(rc, null);

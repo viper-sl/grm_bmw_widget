@@ -838,7 +838,9 @@ function testSync_failureReasonsAreDistinct(logger as Test.Logger) as Lang.Boole
     Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
 
     var reasons = [ForegroundSync.FAIL_NO_PHONE, ForegroundSync.FAIL_COOLDOWN,
-                   ForegroundSync.FAIL_CONTAINER, ForegroundSync.FAIL_RATE_LIMIT];
+                   ForegroundSync.FAIL_CONTAINER, ForegroundSync.FAIL_RATE_LIMIT,
+                   ForegroundSync.FAIL_STALE_AUTH, ForegroundSync.FAIL_NO_CAR,
+                   ForegroundSync.FAIL_CAR_ACCESS];
     var seen = {};
     for (var i = 0; i < reasons.size(); i++) {
         var fs = new ForegroundSync();
@@ -1547,5 +1549,209 @@ function testAuth_errorTextIsActionableAndFits(logger as Test.Logger) as Lang.Bo
     // No body = transport failure -> the friendly HTTP mapping, not an OAuth hint.
     Test.assertEqualMessage(DeviceAuthManager._serverError(429, null),
         "Daily limit reached", "429 without a body");
+    return true;
+}
+
+// ============================================================
+//  Setup mistakes — what a user can get wrong in Settings or the BMW portal, and
+//  what the widget must say (or quietly fix) instead of failing generically.
+// ============================================================
+
+(:test)
+function testSetup_clientIdIsTrimmed(logger as Test.Logger) as Lang.Boolean {
+    Test.assertEqualMessage(Config.trim("  abc\n"), "abc", "spaces and newline trimmed");
+    Test.assertEqualMessage(Config.trim("\tabc"), "abc", "leading tab trimmed");
+    Test.assertEqualMessage(Config.trim("abc"), "abc", "clean value untouched");
+    Test.assertEqualMessage(Config.trim("   "), "", "all-blank becomes empty");
+    Test.assertMessage(Config.trim(null) == null, "null passes through");
+
+    var prev = _blankCreds();
+    try {
+        Application.Properties.setValue("clientId", " 12345678-1234-1234-1234-123456789abc \n");
+        Test.assertEqualMessage(Config.clientId(), "12345678-1234-1234-1234-123456789abc",
+            "a pasted Client ID reaches BMW without its whitespace");
+        // A stamp written before trimming existed must not read as a client change.
+        _resetStorage();
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_CLIENT_ID,
+            "12345678-1234-1234-1234-123456789abc ");
+        Test.assertMessage(!TokenManager.clientChanged(), "whitespace-only stamp difference ignored");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
+    return true;
+}
+
+(:test)
+function testSetup_clientIdShapeHint(logger as Test.Logger) as Lang.Boolean {
+    Test.assertMessage(DeviceAuthManager.looksLikeClientId("12345678-1234-1234-1234-123456789abc"),
+        "UUID form accepted");
+    Test.assertMessage(!DeviceAuthManager.looksLikeClientId("12345678-1234-1234-1234-123456789ab"),
+        "one character short rejected");
+    Test.assertMessage(!DeviceAuthManager.looksLikeClientId("123456781234123412341234567890abcdef"),
+        "hyphens missing rejected");
+    Test.assertMessage(!DeviceAuthManager.looksLikeClientId(null), "null rejected");
+    Test.assertMessage(DeviceAuthManager.MSG_BAD_CLIENT_ID.length() <= DeviceAuthManager._MSG_MAX,
+        "bad-ID hint fits the auth screen");
+    Test.assertMessage(DeviceAuthManager.MSG_NO_CLIENT_ID.length() <= DeviceAuthManager._MSG_MAX,
+        "missing-ID hint fits the auth screen");
+
+    // A refusal for a malformed ID names the ID, not the portal toggles.
+    var prev = _blankCreds();
+    try {
+        Application.Properties.setValue("clientId", "12345678-1234");
+        var auth = new DeviceAuthManager();
+        auth.onDeviceCodeResponse(400, { "error" => "invalid_request" });
+        Test.assertEqualMessage(auth.getState(), DeviceAuthManager.FAILED, "fails");
+        Test.assertEqualMessage(auth.getError(), DeviceAuthManager.MSG_BAD_CLIENT_ID,
+            "half-pasted ID is called out");
+        // A well-formed ID still gets the portal-permission hint.
+        Application.Properties.setValue("clientId", "12345678-1234-1234-1234-123456789abc");
+        var auth2 = new DeviceAuthManager();
+        auth2.onDeviceCodeResponse(400, { "error" => "invalid_request" });
+        Test.assertMessage(auth2.getError().find("CarData API") != null,
+            "well-formed ID keeps the portal hint");
+        // And a transport failure is never blamed on the ID.
+        Application.Properties.setValue("clientId", "short");
+        var auth3 = new DeviceAuthManager();
+        auth3.onDeviceCodeResponse(Communications.BLE_CONNECTION_UNAVAILABLE, null);
+        Test.assertEqualMessage(auth3.getError(), "No phone connection", "transport stays transport");
+    } finally {
+        _restoreCreds(prev);
+    }
+    return true;
+}
+
+// The user approves on their phone while the watch polls — the moment a phone is most
+// likely to background Garmin Connect. A dropped link must not end the pairing, and a
+// tapped "Deny" must not leave the watch waiting until the code expires.
+(:test)
+function testSetup_pollSurvivesLinkDropButNotDenial(logger as Test.Logger) as Lang.Boolean {
+    var auth = new DeviceAuthManager();
+    auth._state = DeviceAuthManager.PENDING;
+    auth._interval = 3600;                     // the scheduled poll must never fire here
+    auth._expiresAt = Time.now().value() + 3600;
+    try {
+        auth.onPollResponse(Communications.BLE_CONNECTION_UNAVAILABLE, null);
+        auth.stop();
+        Test.assertEqualMessage(auth.getState(), DeviceAuthManager.PENDING, "link drop keeps polling");
+        Test.assertMessage(auth.isLinkLost(), "and says the link is lost");
+
+        auth.onPollResponse(503, null);
+        auth.stop();
+        Test.assertEqualMessage(auth.getState(), DeviceAuthManager.PENDING, "5xx keeps polling");
+
+        auth.onPollResponse(403, null);
+        auth.stop();
+        Test.assertEqualMessage(auth.getState(), DeviceAuthManager.PENDING, "bodyless 403 is pending");
+        Test.assertMessage(!auth.isLinkLost(), "a server answer clears the link warning");
+
+        auth.onPollResponse(403, { "error" => "authorization_pending" });
+        auth.stop();
+        Test.assertEqualMessage(auth.getState(), DeviceAuthManager.PENDING, "pending is pending");
+
+        auth.onPollResponse(403, { "error" => "access_denied" });
+        auth.stop();
+        Test.assertEqualMessage(auth.getState(), DeviceAuthManager.FAILED, "denial ends the flow");
+        Test.assertMessage(auth.getError().find("denied") != null, "and says so");
+    } finally {
+        auth.stop();
+    }
+    return true;
+}
+
+(:test)
+function testSetup_settingsVinIsNormalized(logger as Test.Logger) as Lang.Boolean {
+    var prevVin = Application.Properties.getValue("vin");
+    try {
+        Application.Properties.setValue("vin", " wba 12345-6789.0123 4 ");
+        Test.assertEqualMessage(Config.settingsVin(), "WBA12345678901234",
+            "case, spaces, hyphens and dots fixed");
+        Application.Properties.setValue("vin", "WBA1234");
+        Test.assertMessage(Config.settingsVin() == null,
+            "a half-typed VIN is ignored so auto-discovery runs");
+        Application.Properties.setValue("vin", "");
+        Test.assertMessage(Config.settingsVin() == null, "empty is null");
+    } finally {
+        Application.Properties.setValue("vin", (prevVin != null) ? prevVin : "");
+    }
+    return true;
+}
+
+(:test)
+function testSetup_noCarOnAccountIsNamed(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+    var fs = new ForegroundSync();
+    fs.onVin(200, null);   // /mappings answered, listing no vehicle
+    Test.assertEqualMessage(fs.failReason(), ForegroundSync.FAIL_NO_CAR, "no car named");
+    Test.assertMessage(!fs.authFailed(), "and it is not sent to pairing");
+
+    var fs2 = new ForegroundSync();
+    fs2.onVin(Communications.BLE_CONNECTION_UNAVAILABLE, null);
+    Test.assertMessage(fs2.failReason() != ForegroundSync.FAIL_NO_CAR,
+        "a failed /mappings call is NOT 'no car'");
+    _resetStorage();
+    return true;
+}
+
+// A VIN the account cannot read comes back as 403 + CU-105. It used to be retried once
+// and then read as the DAILY LIMIT — a mistyped VIN armed a 24-hour block and told the
+// user to try tomorrow.
+(:test)
+function testSetup_unreadableVinIsNotTheDailyLimit(logger as Test.Logger) as Lang.Boolean {
+    _resetStorage();
+    Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+    var fs = new ForegroundSync();
+    fs._retried403 = true;               // containers were already re-discovered
+    fs._client._errId = "CU-105";
+    Test.assertMessage(fs._stop403(403), "handled");
+    Test.assertEqualMessage(fs.failReason(), ForegroundSync.FAIL_CAR_ACCESS, "VIN problem named");
+    Test.assertMessage(!fs.isRateLimited(), "not reported as the limit");
+    Test.assertMessage(!QuotaGuard.isDailyBlocked(), "and no 24-hour block armed");
+
+    // 404 on the VIN's telematicData: unknown VIN, same verdict.
+    var fs2 = new ForegroundSync();
+    fs2.onTelematic(404, null);
+    Test.assertEqualMessage(fs2.failReason(), ForegroundSync.FAIL_CAR_ACCESS, "404 -> VIN problem");
+
+    // First CU-105 drops an AUTO-DISCOVERED VIN (car swapped on the account) for re-reading,
+    // but never touches anything the user typed.
+    var prev = _blankCreds();   // the retry's token refresh must not reach the network
+    try {
+        _resetStorage();
+        Application.Storage.setValue(StorageKeys.KEY_TOKEN_STATE, "NORMAL");
+        Application.Storage.setValue(StorageKeys.KEY_VIN, "WBAOLDCAR00000001");
+        var fs3 = new ForegroundSync();
+        fs3._resolveVin();
+        fs3._client._errId = "CU-105";
+        fs3._stop403(403);
+        Test.assertMessage(Application.Storage.getValue(StorageKeys.KEY_VIN) == null,
+            "stale auto-discovered VIN dropped for re-discovery");
+    } finally {
+        _restoreCreds(prev);
+        _resetStorage();
+    }
+    return true;
+}
+
+// A wrong Container ID typed into Settings: after the first 403 the widget must stop
+// re-reading it, or the retry hits the same 403 and reads it as the daily limit.
+(:test)
+function testSetup_badSettingsContainerNotReused(logger as Test.Logger) as Lang.Boolean {
+    var prevC = Application.Properties.getValue("containerId");
+    try {
+        _resetStorage();
+        Application.Properties.setValue("containerId", " TYPED-CONTAINER ");
+        var fs = new ForegroundSync();
+        Test.assertEqualMessage(fs._resolveFullContainer(), "TYPED-CONTAINER",
+            "used (trimmed) on the first pass");
+        fs._retried403 = true;
+        Test.assertMessage(fs._resolveFullContainer() == null,
+            "ignored after a 403 so the retry discovers/creates a real one");
+    } finally {
+        Application.Properties.setValue("containerId", (prevC != null) ? prevC : "");
+        _resetStorage();
+    }
     return true;
 }

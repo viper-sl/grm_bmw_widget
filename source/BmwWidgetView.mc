@@ -14,6 +14,7 @@ class BmwWidgetView extends WatchUi.View {
     var _offline;         // auto-sync failed for a non-credential reason
     var _offlineText;     // why, in words (ForegroundSync.failText)
     var _lastWasManual;   // the last run came from a START press, not app open
+    var _noData;          // the sync succeeded but BMW returned nothing a page can show
     var _sync;
 
     function initialize() {
@@ -24,6 +25,7 @@ class BmwWidgetView extends WatchUi.View {
         _offline         = false;
         _offlineText     = null;
         _lastWasManual   = false;
+        _noData          = false;
     }
 
     function retryAutoSync() {
@@ -32,6 +34,7 @@ class BmwWidgetView extends WatchUi.View {
         _rateLimited     = false;
         _offline         = false;
         _offlineText     = null;
+        _noData          = false;
         // Only ever reached from onSelect() — a START press IS a manual refresh. Passing
         // false here judged the user's own retries at the unattended strike threshold
         // and skipped the full fetch they were asking for.
@@ -61,6 +64,11 @@ class BmwWidgetView extends WatchUi.View {
         _offline        = (!success && _sync != null
                             && !_sync.isRateLimited() && !_sync.authFailed());
         _offlineText    = _offline ? _sync.failText() : null;
+        // Success with nothing to show: every field the pages need came back null.
+        // Usually no data fields ticked in the BMW portal, or a car that has not
+        // reported yet. Without this the view stayed on "Loading…" with no way out.
+        PageNav.initialize();
+        _noData         = success && !PageNav.hasVisible();
         WatchUi.requestUpdate();
     }
 
@@ -98,7 +106,9 @@ class BmwWidgetView extends WatchUi.View {
             _sync = new ForegroundSync();
             _sync.run(method(:onAutoSyncDone), false);  // auto: full fetch only once/day
         }
-        if (_autoSyncStarted && !_autoSyncFailed) {
+        if (_noData) {
+            _drawNoData(dc);
+        } else if (_autoSyncStarted && !_autoSyncFailed) {
             _drawLoading(dc);
         } else if (_rateLimited) {
             _drawRateLimited(dc);
@@ -115,7 +125,7 @@ class BmwWidgetView extends WatchUi.View {
         // A known link-level failure is not an auth problem — START retries instead
         // (see onSelect). Checked before NORMAL so it also covers a paired watch left
         // in NEEDS_REFRESH by a refresh that never got an answer.
-        if (_offline)                                     { return false; }
+        if (_offline || _noData)                          { return false; }
         if (ts != null && ts.equals("NORMAL"))            { return false; }
         return !PageNav.hasVisible();
     }
@@ -123,7 +133,7 @@ class BmwWidgetView extends WatchUi.View {
     // START on the offline notice retries the sync (there is no page to hand it to,
     // and needsAuth() is false here, so the press would otherwise do nothing).
     function onSelect() {
-        if (_offline) {
+        if (_offline || _noData) {
             retryAutoSync();
             return true;
         }
@@ -154,7 +164,35 @@ class BmwWidgetView extends WatchUi.View {
         dc.drawText(cx, cy - PageChrome.s(dc, 18), Graphics.FONT_SMALL, "BMW Widget",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
+        var cid = Config.clientId();
+        if (cid == null || cid.equals("")) {
+            // Say what is missing up front. "Press START to connect" sent the user into
+            // a pairing that could only fail with the same instruction one screen later.
+            dc.drawText(cx, cy + PageChrome.s(dc, 8), Graphics.FONT_XTINY, "Add Client ID in the",
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(cx, cy + PageChrome.s(dc, 26), Graphics.FONT_XTINY, "Garmin Connect app",
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            return;
+        }
         dc.drawText(cx, cy + PageChrome.s(dc, 8), Graphics.FONT_TINY, "Press START to connect",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    // Synced fine, but nothing a page can draw came back (see onAutoSyncDone).
+    function _drawNoData(dc) {
+        var cx = dc.getWidth() / 2;
+        var cy = dc.getHeight() / 2;
+        dc.setColor(Theme.COLOR_TEXT, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy - PageChrome.s(dc, 32), Graphics.FONT_SMALL, "No car data yet",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        // Two lines: as one, it ran past the bezel on 416 px AMOLED (large XTINY font).
+        dc.setColor(Theme.COLOR_WARN, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy - PageChrome.s(dc, 8), Graphics.FONT_XTINY, "Check data selection",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, cy + PageChrome.s(dc, 8), Graphics.FONT_XTINY, "in the BMW portal",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy + PageChrome.s(dc, 32), Graphics.FONT_TINY, "Press START to retry",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 

@@ -208,7 +208,12 @@ catalogue: [`docs/descriptors.md`](docs/descriptors.md).
 
 | Symptom | Cause / fix |
 |---|---|
-| `BMW Widget` / `Press START to connect` | No client ID in settings yet — step 3.1. |
+| `BMW Widget` / `Add Client ID in the Garmin Connect app` | No client ID in settings yet — step 3.1. Leading/trailing spaces from a paste are ignored. |
+| `Auth failed` → `Client ID looks incomplete — copy it again…` | BMW refused the pairing and the saved value isn't a full 36-character Client ID — usually half a paste. Copy it again from the portal. |
+| `Phone link lost — retrying…` while pairing | The watch lost Garmin Connect for a moment (common while you approve on the same phone). The code stays valid; finish approving — it carries on by itself. |
+| `No car on this BMW account` | Your BMW ID has no vehicle, or you are not its **primary** user. CarData only serves the primary user. |
+| `Car not readable — check VIN` | The VIN in settings is wrong, or the car is no longer on this account. Clear the VIN setting to let the widget discover it. |
+| `No car data yet` / `Check data selection in BMW portal` | The fetch worked but returned nothing displayable: no data fields ticked (step 1.5), or the car has not reported since. |
 | Pairing fails right after creating the client | The 5–10 min portal activation hasn't completed; retry. |
 | `Re-auth needed` / `Press START to re-pair` | Refresh token expired (unopened > ~2 weeks) → **Manage → Re-pair**. |
 | `Auth failed` → `Check CarData API + streaming are on in the BMW portal` | One of the two portal toggles for your client is off (step 1.4). The widget asks for a single scope covering **both**, so BMW refuses the whole pairing request. Re-enable it, wait **5–10 min** for the portal to apply it, then press START again. |

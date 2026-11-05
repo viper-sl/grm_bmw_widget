@@ -1,5 +1,9 @@
 # BMW Status — Garmin Connect IQ widget
 
+**English** · [Deutsch](docs/i18n/README.de.md) · [Français](docs/i18n/README.fr.md) · [Español](docs/i18n/README.es.md) · [Nederlands](docs/i18n/README.nl.md) · [Italiano](docs/i18n/README.it.md) · [Polski](docs/i18n/README.pl.md) · [Svenska](docs/i18n/README.sv.md) · [Suomi](docs/i18n/README.fi.md) · [Ελληνικά](docs/i18n/README.el.md)
+
+**[Jump to Setup ↓](#setup)**
+
 A Garmin watch **widget** that shows your BMW's live status — range, fuel, lock state,
 doors/windows, tyres, odometer and service info — pulled from the official
 [BMW CarData](https://bmw-cardata.bmwgroup.com/customer/public/api-specification) REST API. Written in **Monkey C** for
@@ -19,8 +23,8 @@ the Connect IQ platform.
 - **Tyres** — per-wheel pressure vs. target, and tyre-wear estimate (START cycles the
   three views).
 - **Car location** — the parked car pinned on the watch's own onboard map; START toggles
-  a browsable zoom view. Only on devices that ship cartography — 32 of the 36 supported
-  products (not base fēnix 6/6s, FR255, FR745).
+  a browsable zoom view. Only on devices that ship cartography — every supported device
+  except the Forerunner 255, 255 Music, 265 and 745.
 - **About car** — a grouped, read-only dump of static vehicle info plus live telematics
   (12 V battery, coolant, location, teleservice, …).
 - **On-watch settings** — update mode, tank size, service override, consumption toggle,
@@ -28,9 +32,21 @@ the Connect IQ platform.
 
 ## Supported devices
 
-fēnix 6 / 7 / 8 / E families, MARQ, and Forerunner 255 / 745 / 945 / 955 / 965 / 970
-(see [`manifest.xml`](manifest.xml)). Developed and tested against **fēnix 6 Pro**
-(legacy tier) and **fēnix 8 Pro** (API 6.0+ tier).
+**Connect IQ store package** ([`manifest-iq.xml`](manifest-iq.xml)): fēnix 6 Pro / 6X Pro,
+the fēnix 7 / 8 / 9 / E families, epix (Gen 2) and epix Pro, Enduro 3 / 4, MARQ Gen 2 / 3,
+and Forerunner 255 / 255 Music / 265 / 955 / 965 / 970. Several profiles also cover
+quatix, tactix and D2 variants.
+
+**Sideload builds** ([`manifest.xml`](manifest.xml)) additionally declare fēnix 6S Pro, the
+other MARQ variants and Forerunner 745 / 945 / 945 LTE. They join the store package once
+their SDK profiles are installed
+([`docs/IQ-STORE-PUBLISH.md`](docs/IQ-STORE-PUBLISH.md#device-coverage-the-gotcha)).
+
+Developed and tested against **fēnix 6 Pro** (legacy tier) and **fēnix 8 Pro** (API 6.0+
+tier).
+
+**Not supported:** the base fēnix 6 / 6 Solar / 6 Dual Power and the first Enduro. They
+give a widget 64 KB with no code paging, and the widget no longer fits.
 
 ## How it works
 
@@ -96,18 +112,31 @@ an example.
    CarData*) and *CarData streaming* (ES *Transmisión de CarData*). The widget's OAuth
    scope is `authenticate_user openid cardata:streaming:read cardata:api:read`, so both
    must be enabled even though only the REST API is used.
+
+   ![BMW CarData portal (Spanish): the client page with the Client ID — blanked out here — and both toggles switched on](docs/images/cardata-client.png)
+
 5. In the streaming section open the **data selection** (ES *Cambiar selección de
    datos*) and tick the [descriptors below](#2-select-the-data-fields). Selecting
    everything works too — the widget never requests anything outside that set.
+
+   ![BMW CarData portal (Spanish): the streaming card with status "ready" and the "Cambiar selección de datos" button](docs/images/cardata-streaming.png)
+
 6. Save and **wait 5–10 minutes**: a freshly created client is not usable immediately.
 
 ### 2. Select the data fields
 
-Exactly the 41 descriptors of the widget's **full container** — verbatim from
-[`CarDataBootstrap._containerDescriptors`](source/api/CarDataBootstrap.mc#L353-L401).
-The lean background container is a 14-field **subset** of the same list (no extra
+The 41 descriptors of the widget's **full container** — the same as
+[`CarDataBootstrap._containerDescriptors`](source/api/CarDataBootstrap.mc#L353-L401)
+except one entry. The lock state the widget reads, `vehicle.cabin.door.lock.status`, is
+REST-only (not streamable), so the portal selection lists `vehicle.cabin.door.status` in
+its place. The portal notes that one is only reported sporadically; the widget doesn't
+read it. The lean background container is a 14-field **subset** of the same list (no extra
 selection needed), and the two extra endpoints the widget calls — `basicData` and
 `smartMaintenanceTyreDiagnosis` — take no descriptors at all.
+
+![BMW CarData portal (Spanish): the vehicle data selection with the 41 fields ticked](docs/images/cardata-data-selection.png)
+
+Tip: switch on the filter that shows only the selected attributes (ES *Mostrar solo atributos seleccionados*) to double-check what is ticked.
 
 ```text
 # Doors, windows, lock  → glance lock state + Lock page
@@ -192,8 +221,8 @@ catalogue: [`docs/descriptors.md`](docs/descriptors.md).
 - **Once a day at ~10:00** — a full fetch even in manual mode, which also keeps the
   OAuth token pair alive (FR-25).
 - **Update Mode** (*Auto hourly* / *Auto adaptive*) exists only on the **API 6.0+ tier**
-  — fēnix 8, fēnix 8 Pro, fēnix 8 Solar, fēnix E, FR970. Every other device is manual +
-  daily, and the setting is hidden ([`iq.jungle`](iq.jungle)).
+  — fēnix 8, fēnix 8 Pro, fēnix 8 Solar, fēnix 9 (all variants), fēnix E, Enduro 3 / 4,
+  MARQ (Gen 3), FR970. Every other device is manual + daily, and the setting is hidden ([`iq.jungle`](iq.jungle)).
 - BMW allows **~50 data calls / 24 h**. A full fetch spends 3 (basicData + tyre
   diagnosis + telematicData), a background poll spends 1; token refresh is exempt.
 - Freshness is bounded by the **car**, not the widget: a parked BMW may report every few
@@ -203,7 +232,12 @@ catalogue: [`docs/descriptors.md`](docs/descriptors.md).
 
 | Symptom | Cause / fix |
 |---|---|
-| `BMW Widget` / `Press START to connect` | No client ID in settings yet — step 3.1. |
+| `BMW Widget` / `Add Client ID in the Garmin Connect app` | No client ID in settings yet — step 3.1. Leading/trailing spaces from a paste are ignored. |
+| `Auth failed` → `Client ID looks incomplete — copy it again…` | BMW refused the pairing and the saved value isn't a full 36-character Client ID — usually half a paste. Copy it again from the portal. |
+| `Phone link lost — retrying…` while pairing | The watch lost Garmin Connect for a moment (common while you approve on the same phone). The code stays valid; finish approving — it carries on by itself. |
+| `No car on this BMW account` | Your BMW ID has no vehicle, or you are not its **primary** user. CarData only serves the primary user. |
+| `Car not readable — check VIN` | The VIN in settings is wrong, or the car is no longer on this account. Clear the VIN setting to let the widget discover it. |
+| `No car data yet` / `Check data selection in BMW portal` | The fetch worked but returned nothing displayable: no data fields ticked (step 1.5), or the car has not reported since. |
 | Pairing fails right after creating the client | The 5–10 min portal activation hasn't completed; retry. |
 | `Re-auth needed` / `Press START to re-pair` | Refresh token expired (unopened > ~2 weeks) → **Manage → Re-pair**. |
 | `Auth failed` → `Check CarData API + streaming are on in the BMW portal` | One of the two portal toggles for your client is off (step 1.4). The widget asks for a single scope covering **both**, so BMW refuses the whole pairing request. Re-enable it, wait **5–10 min** for the portal to apply it, then press START again. |
@@ -222,12 +256,14 @@ developer key (`developer_key`).
 monkeyc -f monkey.jungle -d fenix6pro -o bin/BmwStatus.prg -y developer_key
 ```
 
-**Store package** — signed `.iq` for all supported devices, from
-[`iq.jungle`](iq.jungle) → `manifest-iq.xml`, which carries a **different app ID** so
-the published widget and a personal sideload coexist on one watch:
+**Store packages** — signed `.iq` for all supported devices, from
+[`iq.jungle`](iq.jungle) → `manifest-iq.xml`. The app ID is injected at build time, so
+the beta app, the public app and a personal sideload each get their own ID and coexist
+on one watch:
 
 ```sh
-./build-personal.sh --iq       # → bin/BMWWIDGET.iq
+./build-personal.sh -iq        # → bin/BMWWIDGET.iq       (beta app ID, private beta testing)
+./build-personal.sh -iqprod    # → bin/BMWWIDGET-prod.iq  (prod app ID, upload to the store)
 ```
 
 **Personal build** (your client ID baked in, for your own watch) — see

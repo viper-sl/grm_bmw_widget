@@ -81,3 +81,7 @@ docs/garmin-connect-iq-api.md
 
 # Simulator/watch screenshots — screen_6 shows the car's real parked location
 screen_*.png
+
+# Generated per-build by build-personal.sh --iq/--iqprod (removed on exit)
+*.generated.jungle
+*.generated.xml

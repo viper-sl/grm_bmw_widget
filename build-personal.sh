@@ -10,7 +10,8 @@
 #   ./build-personal.sh --device   # build a sideload-ready .prg for a real fenix 8 Pro
 #   ./build-personal.sh --fr255-sim  # build + load into simulator as Forerunner 255
 #   ./build-personal.sh --fr255    # build a sideload-ready .prg for a real Forerunner 255
-#   ./build-personal.sh --iq       # build a signed .iq package (all installed devices)
+#   ./build-personal.sh --iq       # signed .iq, BETA app ID (private beta testing)
+#   ./build-personal.sh --iqprod   # signed .iq, PROD app ID (upload to the store, public)
 #
 # Override the default target via CIQ_DEVICE (e.g. CIQ_DEVICE=fenix6pro ./build-personal.sh).
 # Explicit device flags (--fr255, --fr255-sim) always win over CIQ_DEVICE.
@@ -18,13 +19,20 @@
 # Output:
 #   bin/personal.prg               (simulator)
 #   bin/BMWWIDGET.PRG              (real watch — copy to GARMIN/APPS/)
-#   bin/BMWWIDGET.iq               (signed IQ package — sideload via Connect IQ phone app)
+#   bin/BMWWIDGET.iq               (beta IQ package — sideload via Connect IQ phone app)
+#   bin/BMWWIDGET-prod.iq          (prod IQ package — upload to the Connect IQ store)
 set -euo pipefail
 
 SDK="${CIQ_SDK:-$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/connectiq-sdk-mac-9.2.0-2026-06-09-92a1605b2}"
 KEY="${DEVELOPER_KEY:-developer_key}"
 JUNGLE="livetest.jungle"
 DEVICE="${CIQ_DEVICE:-fenix8pro47mm}"
+
+# Connect IQ app IDs. An ID identifies the app in the store and on the watch, and a
+# published ID can never change — the prod one is permanent once uploaded.
+# manifest-iq.xml is the template for both; the ID is swapped in at build time.
+IQ_BETA_ID="0a54403f6fef458a96fca6f8a147f299"
+IQ_PROD_ID="cdbc0197661143ecbc4478161b71d125"
 
 if [ ! -f "resources-livetest/properties/properties.xml" ]; then
   echo "Missing resources-livetest/properties/properties.xml (your clientId)." >&2
@@ -42,6 +50,7 @@ mkdir -p bin
 ARG="${1:-}"
 case "$ARG" in
   -iq)        ARG="--iq"        ;;
+  -iqprod)    ARG="--iqprod"    ;;
   -device)    ARG="--device"    ;;
   -fr255)     ARG="--fr255"     ;;
   -fr255-sim) ARG="--fr255-sim" ;;
@@ -148,17 +157,66 @@ if [ "$ARG" == "--device" ]; then
   exit 0
 fi
 
-# ── --iq: signed distribution package (separate app ID, no personal resources) ──
-if [ "$ARG" == "--iq" ]; then
-  OUT="bin/BMWWIDGET.iq"
-  echo "Building IQ distribution package → $OUT"
-  echo "  App ID : 0a54403f6fef458a96fca6f8a147f299  (manifest-iq.xml)"
+# ── --iq / --iqprod: signed distribution packages (no personal resources) ───
+# Both build from iq.jungle + manifest-iq.xml; only the application id differs.
+# The id is injected into a generated copy of the manifest, and a generated copy of
+# iq.jungle points project.manifest at it (a second jungle can't override that
+# property, and the copy must sit in the project root so source/resources still
+# resolve). Both are removed on exit; iq.jungle / manifest-iq.xml stay the single
+# templates. The built .iq is then opened to prove it carries the intended id.
+build_iq() {
+  local label="$1" app_id="$2" out="$3"
+  local manifest="manifest-iq-$label.generated.xml" jungle="iq-$label.generated.jungle"
+  trap "rm -f '$manifest' '$jungle'" EXIT   # expand now: the locals are gone by EXIT
+
+  echo "Building IQ $label package → $out"
+  echo "  App ID : $app_id"
   echo "  Local  : 7f673698b206464a8e918654edcfeb6c  (manifest.xml / livetest)"
+
+  APP_ID="$app_id" perl -0pe \
+    's/(<iq:application\b[^>]*?\bid=")[0-9a-f]{32}(")/$1$ENV{APP_ID}$2/' \
+    manifest-iq.xml > "$manifest"
+  if ! grep -q "id=\"$app_id\"" "$manifest"; then
+    echo "✗ Could not set the app id in $manifest — is manifest-iq.xml's <iq:application id=…> intact?" >&2
+    exit 1
+  fi
+  sed "s|^project.manifest *=.*|project.manifest = $manifest|" iq.jungle > "$jungle"
+  if ! grep -q "^project.manifest = $manifest\$" "$jungle"; then
+    echo "✗ Could not point $jungle at $manifest — is iq.jungle's project.manifest line intact?" >&2
+    exit 1
+  fi
+
+  rm -f "$out"
   java -jar "$SDK/bin/monkeybrains.jar" \
-    -o "$OUT" -f "iq.jungle" -y "$KEY" -e -r 2>&1 \
-    | grep -v "^WARNING:"
-  echo "✓ Built $OUT  — can coexist on watch with the personal sideload build"
+    -o "$out" -f "$jungle" -y "$KEY" -e -r 2>&1 \
+    | grep -v "^WARNING:" || true
+  if [ ! -f "$out" ]; then
+    echo "✗ Build failed — see the errors above." >&2
+    exit 1
+  fi
+
+  # Never ship a package under the wrong id: read it back out of the archive.
+  # (Captured first: `grep -q` closing the pipe early would SIGPIPE tar under pipefail.)
+  local packaged
+  packaged="$(tar -xOf "$out" manifest.xml)"
+  if ! grep -q "id=\"$app_id\"" <<<"$packaged"; then
+    echo "✗ $out does not contain app id $app_id — refusing to hand it over." >&2
+    rm -f "$out"
+    exit 1
+  fi
+  echo "✓ Built $out  (app id verified inside the package)"
+}
+
+if [ "$ARG" == "--iq" ]; then
+  build_iq beta "$IQ_BETA_ID" "bin/BMWWIDGET.iq"
+  echo "  Can coexist on the watch with the personal sideload build."
   echo "  Sideload via the Connect IQ phone app → My Device Apps → Sideload Widget."
+  exit 0
+fi
+
+if [ "$ARG" == "--iqprod" ]; then
+  build_iq prod "$IQ_PROD_ID" "bin/BMWWIDGET-prod.iq"
+  echo "  Upload this file to the Connect IQ store dashboard (public listing)."
   exit 0
 fi
 

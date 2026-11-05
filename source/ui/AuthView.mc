@@ -216,9 +216,12 @@ class AuthView extends WatchUi.View {
             dc.setColor(Theme.COLOR_ACCENT, Graphics.COLOR_TRANSPARENT);
             dc.drawText(cx, cy - PageChrome.s(dc, 6), Graphics.FONT_LARGE, _auth.getUserCode(),
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            // Hint
-            dc.setColor(Theme.COLOR_MUTED, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy + PageChrome.s(dc, 42), Graphics.FONT_XTINY, "Waiting for approval…",
+            // Hint — or, while polls cannot reach BMW, say so: the code is still valid
+            // and polling continues, so the user should finish approving, not restart.
+            dc.setColor(_auth.isLinkLost() ? Theme.COLOR_WARN : Theme.COLOR_MUTED,
+                Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, cy + PageChrome.s(dc, 42), Graphics.FONT_XTINY,
+                _auth.isLinkLost() ? "Phone link lost — retrying…" : "Waiting for approval…",
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             return;
         }

@@ -1,5 +1,6 @@
 using Toybox.Application;
 using Toybox.Graphics;
+using Toybox.Math;
 using Toybox.Time;
 using Toybox.WatchUi;
 
@@ -43,9 +44,48 @@ class PageChrome {
         var name = Application.Storage.getValue(StorageKeys.KEY_VEHICLE_NAME);
         if (name == null) { name = "BMW"; }
         if (suffix != null) { name = name + suffix; }
+        var y = s(dc, 30);
         dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
-        dc.drawText(dc.getWidth() / 2, s(dc, 30), Graphics.FONT_XTINY, name.toUpper(),
+        dc.drawText(dc.getWidth() / 2, y, Graphics.FONT_XTINY,
+            fitText(dc, name.toUpper(), Graphics.FONT_XTINY, y),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    // Usable text width of a line centered at `y` on the ROUND screen: the circle's
+    // chord at the line's outer edge (the half of the text box nearer the bezel), less
+    // a small margin. Lines near the top/bottom get far less than getWidth().
+    static function chordWidth(dc, y, font) {
+        var r = dc.getWidth() / 2;
+        var half = (dc.getFontHeight(font) * 35) / 100;   // ink half-height
+        var dy = (y - dc.getHeight() / 2).abs() + half;
+        if (dy >= r) { return 0; }
+        return (2 * Math.sqrt(r * r - dy * dy)).toNumber() - s(dc, 8);
+    }
+
+    // `text` as drawn at `y`: unchanged if it fits the chord there, else shortened —
+    // whole trailing words first (a model name reads fine as "BMW M440I XDRIVE"),
+    // then characters with an ellipsis. Vehicle names come from BMW and can be long.
+    static function fitText(dc, text, font, y) {
+        var maxW = chordWidth(dc, y, font);
+        if (dc.getTextWidthInPixels(text, font) <= maxW) { return text; }
+        var t = text;
+        var sp = _lastSpace(t);
+        while (sp > 0) {
+            t = t.substring(0, sp);
+            if (dc.getTextWidthInPixels(t, font) <= maxW) { return t; }
+            sp = _lastSpace(t);
+        }
+        var n = t.length();
+        while (n > 1 && dc.getTextWidthInPixels(t.substring(0, n) + "…", font) > maxW) { n--; }
+        return t.substring(0, n) + "…";
+    }
+
+    static function _lastSpace(t) {
+        var a = t.toCharArray();
+        for (var i = a.size() - 1; i > 0; i--) {
+            if (a[i] == ' ') { return i; }
+        }
+        return -1;
     }
 
     static function drawLabel(dc, label, y) {
@@ -189,9 +229,13 @@ class PageChrome {
     // Drawn over the page's cached data so the user keeps seeing last-known values.
     static function drawRateLimitNote(dc) {
         var cx = dc.getWidth() / 2;
-        var y  = (dc.getHeight() * 3) / 4 + s(dc, 20);
+        // cy + 86 on the 260 grid = the Range & Fuel consumption row (which yields to the
+        // banner). Same line as the old 3h/4 + 20 from 260 px up; on 240 px that formula
+        // landed on the litres line, because s() keeps 260-grid offsets there.
+        var y  = dc.getHeight() / 2 + s(dc, 86);
         dc.setColor(Theme.COLOR_WARN, Theme.COLOR_BG);
-        dc.drawText(cx, y, Graphics.FONT_XTINY, "Daily limit — try tomorrow",
+        dc.drawText(cx, y, Graphics.FONT_XTINY,
+            fitText(dc, "Daily limit — try tomorrow", Graphics.FONT_XTINY, y),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
@@ -201,10 +245,13 @@ class PageChrome {
     // none of them may read as "you need to sign in again".
     static function drawOfflineNote(dc, text) {
         var cx = dc.getWidth() / 2;
-        var y  = (dc.getHeight() * 3) / 4 + s(dc, 20);
+        // cy + 86 on the 260 grid = the Range & Fuel consumption row (which yields to the
+        // banner). Same line as the old 3h/4 + 20 from 260 px up; on 240 px that formula
+        // landed on the litres line, because s() keeps 260-grid offsets there.
+        var y  = dc.getHeight() / 2 + s(dc, 86);
         dc.setColor(Theme.COLOR_MUTED, Theme.COLOR_BG);
         dc.drawText(cx, y, Graphics.FONT_XTINY,
-            (text != null) ? text : "Update failed — retry",
+            fitText(dc, (text != null) ? text : "Update failed — retry", Graphics.FONT_XTINY, y),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 

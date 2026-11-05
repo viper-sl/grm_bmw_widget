@@ -138,8 +138,10 @@ class PageRangeFuel extends WatchUi.View {
         // Uses the derived litres for the same reason as the line above: fed the raw
         // "fuelLitres" it reported the litres-at-last-refuel over the current range,
         // which inflated the estimate more and more as the tank drained.
+        // A failure/limit banner lands on this row's line (3h/4 + 20 ≈ cy + 86): the
+        // banner is transient and actionable, the estimate is neither, so it yields.
         var consumption = consumptionPer100Km(inTank, rangeKm);
-        if (consumption != null && showConsumption()) {
+        if (consumption != null && showConsumption() && !_rateLimited && !_failed) {
             dc.setColor(Theme.COLOR_DIM, Theme.COLOR_BG);
             dc.drawText(cx, cy + PageChrome.s(dc, 86), Graphics.FONT_XTINY,
                 "~" + PageChrome.oneDecimal(consumption) + " L/100KM (EST)",

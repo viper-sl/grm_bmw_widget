@@ -47,6 +47,7 @@ class DeviceAuthManager {
     var _expiresAt;         // epoch when the device code dies
     var _pollTimer;
     var _errMsg;
+    var _linkLost;          // the last poll could not reach BMW (phone link / timeout)
     var _onChange;          // callback the View registers to trigger a redraw
 
     function initialize() {
@@ -54,12 +55,42 @@ class DeviceAuthManager {
         _userCode = null;
         _verificationUri = null;
         _errMsg = null;
+        _linkLost = false;
     }
 
     function getState()       { return _state; }
     function getUserCode()    { return _userCode; }
     function getVerifyUri()   { return _verificationUri; }
     function getError()       { return _errMsg; }
+    function isLinkLost()     { return _linkLost == true; }
+
+    // Shown when BMW refuses the pairing request and the configured value does not even
+    // have the shape of a CarData Client ID. Checked only AFTER a refusal, never as a
+    // gate: if BMW ever changes the ID format, a format check up front would lock every
+    // new user out, while this one merely picks the more likely explanation.
+    static const MSG_BAD_CLIENT_ID = "Client ID looks incomplete — copy it again from the BMW portal";
+    static const MSG_NO_CLIENT_ID  = "Add your Client ID in the Garmin Connect app settings";
+
+    // True for the 8-4-4-4-12 UUID form every CarData Client ID has had so far.
+    static function looksLikeClientId(s) {
+        if (!(s instanceof Lang.String) || s.length() != 36) { return false; }
+        var a = s.toCharArray();
+        for (var i = 0; i < 36; i++) {
+            var hyphen = (i == 8 || i == 13 || i == 18 || i == 23);
+            if ((a[i] == '-') != hyphen) { return false; }
+        }
+        return true;
+    }
+
+    // The two RFC 8628 outcomes no server uses to mean "still pending": the user said
+    // no, or the code died. Deliberately narrow — BMW signals pending with a 403 whose
+    // body has not been pinned down (the reference probe treats every 403 as pending),
+    // so widening this to invalid_request/invalid_grant could end a pairing mid-way.
+    // Every other error code still fails the flow through the generic branch when it
+    // does NOT arrive as a 403.
+    static function _isTerminalPollError(err) {
+        return err.equals("access_denied") || err.equals("expired_token");
+    }
 
     // The View passes a method() here; we invoke it whenever state changes so it can requestUpdate.
     function setOnChange(cb)  { _onChange = cb; }
@@ -135,7 +166,7 @@ class DeviceAuthManager {
         var clientId = Config.clientId();
         if (clientId == null || clientId.equals("")) {
             _state = FAILED;
-            _errMsg = "No client ID in settings";
+            _errMsg = MSG_NO_CLIENT_ID;
             _notify();
             return;
         }
@@ -176,7 +207,12 @@ class DeviceAuthManager {
     function onDeviceCodeResponse(responseCode as Lang.Number, data as Lang.Dictionary or Null) as Void {
         if (responseCode != 200 || data == null || !data.hasKey("device_code")) {
             _state = FAILED;
-            _errMsg = _serverError(responseCode, data);
+            // BMW answered and refused: a mangled Client ID (half a paste, a stray
+            // character) is the likelier cause than whatever generic error it sent.
+            _errMsg = (responseCode >= 400 && responseCode < 500
+                        && !looksLikeClientId(Config.clientId()))
+                ? MSG_BAD_CLIENT_ID
+                : _serverError(responseCode, data);
             _notify();
             return;
         }
@@ -261,8 +297,20 @@ class DeviceAuthManager {
         }
 
         // RFC 8628: authorization_pending (keep polling), slow_down (back off), else fail.
-        var err = (data != null && data.hasKey("error")) ? data["error"] : "";
-        if (err.equals("authorization_pending") || responseCode == 403) {
+        var err = (data != null && data.hasKey("error") && data["error"] != null) ? data["error"] : "";
+        // The user is approving on their phone while this polls, which is exactly when
+        // a phone backgrounds Garmin Connect and the BLE link drops for a few seconds.
+        // A transport error (< 0) or a 5xx mid-approval is not a verdict on the pairing:
+        // keep polling until the code expires, and tell the user why it is slow.
+        var transient = (responseCode < 0 || responseCode >= 500) && !_isTerminalPollError(err);
+        var wasLost = _linkLost;
+        _linkLost = transient;
+        if (err.equals("authorization_pending") || transient
+                // BMW signals "pending" with a 403. A 403 that names a terminal error
+                // (access_denied when the user taps Deny) must end the flow, or the
+                // watch would sit on "Waiting for approval…" until the code expired.
+                || (responseCode == 403 && !_isTerminalPollError(err))) {
+            if (wasLost != _linkLost) { _notify(); }
             _schedulePoll();
         } else if (err.equals("slow_down")) {
             _interval += 5;

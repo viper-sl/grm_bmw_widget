@@ -2,6 +2,8 @@
 
 [English](../../README.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Nederlands](README.nl.md) · [Italiano](README.it.md) · [Polski](README.pl.md) · [Svenska](README.sv.md) · [Suomi](README.fi.md) · **Ελληνικά**
 
+**[Μετάβαση στη ρύθμιση ↓](#ρύθμιση)**
+
 > Μετάφραση των τμημάτων του README που απευθύνονται στους χρήστες — σε περίπτωση αμφιβολίας ισχύει το [αγγλικό README](../../README.md). Η τεκμηρίωση για build, αρχιτεκτονική και δοκιμές υπάρχει μόνο στα αγγλικά. Τα στιγμιότυπα οθόνης προέρχονται από την ισπανική πύλη της BMW· οι ονομασίες και η διάταξη στη χώρα σας μπορεί να διαφέρουν. Η διεπαφή στο ρολόι είναι στα αγγλικά.
 
 Ένα **widget** Garmin που εμφανίζει στο ρολόι σας την τρέχουσα κατάσταση της BMW σας — αυτονομία, καύσιμο, κλείδωμα, πόρτες/παράθυρα, ελαστικά, οδόμετρο και πληροφορίες σέρβις — απευθείας από το επίσημο REST API [BMW CarData](https://bmw-cardata.bmwgroup.com/customer/public/api-specification).

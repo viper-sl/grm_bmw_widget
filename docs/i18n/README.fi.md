@@ -2,6 +2,8 @@
 
 [English](../../README.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Nederlands](README.nl.md) · [Italiano](README.it.md) · [Polski](README.pl.md) · [Svenska](README.sv.md) · **Suomi** · [Ελληνικά](README.el.md)
 
+**[Siirry käyttöönottoon ↓](#käyttöönotto)**
+
 > Käännös README:n käyttäjille tarkoitetuista osista — epäselvissä tapauksissa ratkaisee [englanninkielinen README](../../README.md). Rakentamisen, arkkitehtuurin ja testauksen dokumentaatio on vain englanniksi. Kuvakaappaukset ovat BMW:n espanjankielisestä portaalista; nimet ja ulkoasu omassa maassasi voivat poiketa. Kellon käyttöliittymä on englanniksi.
 
 Garmin-**widget**, joka näyttää BMW:si reaaliaikaisen tilan kellossasi — toimintamatka, polttoaine, lukitus, ovet/ikkunat, renkaat, matkamittari ja huoltotiedot — suoraan virallisesta [BMW CarData](https://bmw-cardata.bmwgroup.com/customer/public/api-specification) REST API:sta.

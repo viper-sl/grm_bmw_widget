@@ -2,6 +2,8 @@
 
 [English](../../README.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · **Nederlands** · [Italiano](README.it.md) · [Polski](README.pl.md) · [Svenska](README.sv.md) · [Suomi](README.fi.md) · [Ελληνικά](README.el.md)
 
+**[Naar de installatie ↓](#installatie)**
+
 > Vertaling van de voor gebruikers bedoelde delen van de [Engelse README](../../README.md) — bij twijfel geldt het Engelse origineel. Documentatie over bouwen, architectuur en testen is alleen in het Engels beschikbaar. De screenshots komen uit het Spaanse BMW-portaal; de benamingen en de lay-out in jouw land kunnen afwijken. De weergave op het horloge is in het Engels.
 
 Een Garmin-**widget** die de live status van je BMW op je horloge toont — actieradius, brandstof, vergrendeling, portieren/ramen, banden, kilometerstand en onderhoudsinformatie — rechtstreeks uit de officiële [BMW CarData](https://bmw-cardata.bmwgroup.com/customer/public/api-specification) REST-API.

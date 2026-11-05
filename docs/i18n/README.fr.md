@@ -2,6 +2,8 @@
 
 [English](../../README.md) · [Deutsch](README.de.md) · **Français** · [Español](README.es.md) · [Nederlands](README.nl.md) · [Italiano](README.it.md) · [Polski](README.pl.md) · [Svenska](README.sv.md) · [Suomi](README.fi.md) · [Ελληνικά](README.el.md)
 
+**[Aller à la mise en service ↓](#mise-en-service)**
+
 > Traduction des parties du README destinées aux utilisateurs — en cas de doute, le [README en anglais](../../README.md) fait foi. La documentation de build, d'architecture et de tests n'existe qu'en anglais. Les captures d'écran proviennent du portail BMW espagnol ; les libellés et la mise en page dans votre pays peuvent différer. L'interface de la montre est en anglais.
 
 Un **widget** Garmin qui affiche sur votre montre l'état en direct de votre BMW — autonomie, carburant, verrouillage, portières/vitres, pneus, compteur kilométrique et informations d'entretien — directement depuis l'API REST officielle [BMW CarData](https://bmw-cardata.bmwgroup.com/customer/public/api-specification).

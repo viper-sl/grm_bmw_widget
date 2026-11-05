@@ -2,6 +2,8 @@
 
 [English](../../README.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Nederlands](README.nl.md) · [Italiano](README.it.md) · [Polski](README.pl.md) · **Svenska** · [Suomi](README.fi.md) · [Ελληνικά](README.el.md)
 
+**[Hoppa till Kom igång ↓](#kom-igång)**
+
 > Översättning av de delar av README som riktar sig till användare — vid tveksamhet gäller den [engelska README](../../README.md). Dokumentation om bygge, arkitektur och tester finns bara på engelska. Skärmbilderna kommer från BMW:s spanska portal; benämningar och layout i ditt land kan skilja sig. Gränssnittet på klockan är på engelska.
 
 En Garmin-**widget** som visar live-status för din BMW på klockan — räckvidd, bränsle, lås, dörrar/fönster, däck, vägmätare och serviceinformation — direkt från det officiella REST-API:et [BMW CarData](https://bmw-cardata.bmwgroup.com/customer/public/api-specification).

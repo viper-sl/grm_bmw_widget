@@ -2,6 +2,8 @@
 
 [English](../../README.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · **Español** · [Nederlands](README.nl.md) · [Italiano](README.it.md) · [Polski](README.pl.md) · [Svenska](README.sv.md) · [Suomi](README.fi.md) · [Ελληνικά](README.el.md)
 
+**[Ir a la configuración ↓](#configuración)**
+
 > Traducción de las partes del README pensadas para usuarios — si hay dudas, manda el [README en inglés](../../README.md). La documentación de compilación, arquitectura y pruebas solo existe en inglés. Las capturas son del portal de BMW en español; los textos y la disposición en tu país pueden variar. La interfaz del reloj está en inglés.
 
 Un **widget** de Garmin que muestra en tu reloj el estado en tiempo real de tu BMW — autonomía, combustible, cierre, puertas/ventanillas, neumáticos, cuentakilómetros e información de mantenimiento — directamente desde la API REST oficial de [BMW CarData](https://bmw-cardata.bmwgroup.com/customer/public/api-specification).

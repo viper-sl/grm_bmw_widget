@@ -2,6 +2,8 @@
 
 **English** · [Deutsch](docs/i18n/README.de.md) · [Français](docs/i18n/README.fr.md) · [Español](docs/i18n/README.es.md) · [Nederlands](docs/i18n/README.nl.md) · [Italiano](docs/i18n/README.it.md) · [Polski](docs/i18n/README.pl.md) · [Svenska](docs/i18n/README.sv.md) · [Suomi](docs/i18n/README.fi.md) · [Ελληνικά](docs/i18n/README.el.md)
 
+**[Jump to Setup ↓](#setup)**
+
 A Garmin watch **widget** that shows your BMW's live status — range, fuel, lock state,
 doors/windows, tyres, odometer and service info — pulled from the official
 [BMW CarData](https://bmw-cardata.bmwgroup.com/customer/public/api-specification) REST API. Written in **Monkey C** for

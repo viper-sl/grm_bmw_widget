@@ -2,6 +2,8 @@
 
 [English](../../README.md) · **Deutsch** · [Français](README.fr.md) · [Español](README.es.md) · [Nederlands](README.nl.md) · [Italiano](README.it.md) · [Polski](README.pl.md) · [Svenska](README.sv.md) · [Suomi](README.fi.md) · [Ελληνικά](README.el.md)
 
+**[Direkt zur Einrichtung ↓](#einrichtung)**
+
 > Übersetzung der für Nutzer relevanten Teile des [englischen README](../../README.md) — im Zweifel gilt das englische Original. Build-, Architektur- und Testdokumentation gibt es nur auf Englisch. Die Screenshots stammen aus dem spanischen BMW-Portal; Bezeichnungen und Layout in Ihrem Land können abweichen. Die Anzeigen auf der Uhr sind englisch.
 
 Ein Garmin-**Widget**, das den Live-Status Ihres BMW auf der Uhr anzeigt — Reichweite, Kraftstoff, Verriegelung, Türen/Fenster, Reifen, Kilometerstand und Service-Infos — direkt aus der offiziellen [BMW CarData](https://bmw-cardata.bmwgroup.com/customer/public/api-specification) REST-API.

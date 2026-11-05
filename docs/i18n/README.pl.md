@@ -2,6 +2,8 @@
 
 [English](../../README.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Nederlands](README.nl.md) · [Italiano](README.it.md) · **Polski** · [Svenska](README.sv.md) · [Suomi](README.fi.md) · [Ελληνικά](README.el.md)
 
+**[Przejdź do konfiguracji ↓](#konfiguracja)**
+
 > Tłumaczenie tych części README, które są przeznaczone dla użytkowników — w razie wątpliwości obowiązuje [angielski README](../../README.md). Dokumentacja budowania, architektury i testów jest tylko po angielsku. Zrzuty ekranu pochodzą z hiszpańskiego portalu BMW; nazwy i układ w Twoim kraju mogą się różnić. Interfejs na zegarku jest po angielsku.
 
 **Widżet** Garmin, który pokazuje na zegarku bieżący stan Twojego BMW — zasięg, paliwo, zamknięcie, drzwi/okna, opony, przebieg i informacje serwisowe — prosto z oficjalnego API REST [BMW CarData](https://bmw-cardata.bmwgroup.com/customer/public/api-specification).

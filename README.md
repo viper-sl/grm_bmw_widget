@@ -1,5 +1,7 @@
 # BMW Status — Garmin Connect IQ widget
 
+**English** · [Deutsch](docs/i18n/README.de.md) · [Français](docs/i18n/README.fr.md) · [Español](docs/i18n/README.es.md) · [Nederlands](docs/i18n/README.nl.md) · [Italiano](docs/i18n/README.it.md) · [Polski](docs/i18n/README.pl.md) · [Svenska](docs/i18n/README.sv.md) · [Suomi](docs/i18n/README.fi.md) · [Ελληνικά](docs/i18n/README.el.md)
+
 A Garmin watch **widget** that shows your BMW's live status — range, fuel, lock state,
 doors/windows, tyres, odometer and service info — pulled from the official
 [BMW CarData](https://bmw-cardata.bmwgroup.com/customer/public/api-specification) REST API. Written in **Monkey C** for
@@ -19,8 +21,8 @@ the Connect IQ platform.
 - **Tyres** — per-wheel pressure vs. target, and tyre-wear estimate (START cycles the
   three views).
 - **Car location** — the parked car pinned on the watch's own onboard map; START toggles
-  a browsable zoom view. Only on devices that ship cartography — 43 of the 48 supported
-  products (not fēnix 6S, FR255, FR255 Music, FR265, FR745).
+  a browsable zoom view. Only on devices that ship cartography — every supported device
+  except the Forerunner 255, 255 Music, 265 and 745.
 - **About car** — a grouped, read-only dump of static vehicle info plus live telematics
   (12 V battery, coolant, location, teleservice, …).
 - **On-watch settings** — update mode, tank size, service override, consumption toggle,
@@ -28,11 +30,18 @@ the Connect IQ platform.
 
 ## Supported devices
 
-fēnix 6 Pro / 6X Pro / 6S Pro, the fēnix 7 / 8 / 9 / E families, epix (Gen 2) and epix Pro,
-Enduro 2 / 3 / 4, MARQ (Gen 1–3), and Forerunner 255 / 255 Music / 265 / 745 / 945 / 955 /
-965 / 970 (see [`manifest.xml`](manifest.xml)). Several profiles also cover quatix,
-tactix and D2 variants. Developed and tested against **fēnix 6 Pro** (legacy tier) and
-**fēnix 8 Pro** (API 6.0+ tier).
+**Connect IQ store package** ([`manifest-iq.xml`](manifest-iq.xml)): fēnix 6 Pro / 6X Pro,
+the fēnix 7 / 8 / 9 / E families, epix (Gen 2) and epix Pro, Enduro 3 / 4, MARQ Gen 2 / 3,
+and Forerunner 255 / 255 Music / 265 / 955 / 965 / 970. Several profiles also cover
+quatix, tactix and D2 variants.
+
+**Sideload builds** ([`manifest.xml`](manifest.xml)) additionally declare fēnix 6S Pro, the
+other MARQ variants and Forerunner 745 / 945 / 945 LTE. They join the store package once
+their SDK profiles are installed
+([`docs/IQ-STORE-PUBLISH.md`](docs/IQ-STORE-PUBLISH.md#device-coverage-the-gotcha)).
+
+Developed and tested against **fēnix 6 Pro** (legacy tier) and **fēnix 8 Pro** (API 6.0+
+tier).
 
 **Not supported:** the base fēnix 6 / 6 Solar / 6 Dual Power and the first Enduro. They
 give a widget 64 KB with no code paging, and the widget no longer fits.
@@ -101,18 +110,31 @@ an example.
    CarData*) and *CarData streaming* (ES *Transmisión de CarData*). The widget's OAuth
    scope is `authenticate_user openid cardata:streaming:read cardata:api:read`, so both
    must be enabled even though only the REST API is used.
+
+   ![BMW CarData portal (Spanish): the client page with the Client ID — blanked out here — and both toggles switched on](docs/images/cardata-client.png)
+
 5. In the streaming section open the **data selection** (ES *Cambiar selección de
    datos*) and tick the [descriptors below](#2-select-the-data-fields). Selecting
    everything works too — the widget never requests anything outside that set.
+
+   ![BMW CarData portal (Spanish): the streaming card with status "ready" and the "Cambiar selección de datos" button](docs/images/cardata-streaming.png)
+
 6. Save and **wait 5–10 minutes**: a freshly created client is not usable immediately.
 
 ### 2. Select the data fields
 
-Exactly the 41 descriptors of the widget's **full container** — verbatim from
-[`CarDataBootstrap._containerDescriptors`](source/api/CarDataBootstrap.mc#L353-L401).
-The lean background container is a 14-field **subset** of the same list (no extra
+The 41 descriptors of the widget's **full container** — the same as
+[`CarDataBootstrap._containerDescriptors`](source/api/CarDataBootstrap.mc#L353-L401)
+except one entry. The lock state the widget reads, `vehicle.cabin.door.lock.status`, is
+REST-only (not streamable), so the portal selection lists `vehicle.cabin.door.status` in
+its place. The portal notes that one is only reported sporadically; the widget doesn't
+read it. The lean background container is a 14-field **subset** of the same list (no extra
 selection needed), and the two extra endpoints the widget calls — `basicData` and
 `smartMaintenanceTyreDiagnosis` — take no descriptors at all.
+
+![BMW CarData portal (Spanish): the vehicle data selection with the 41 fields ticked](docs/images/cardata-data-selection.png)
+
+Tip: switch on the filter that shows only the selected attributes (ES *Mostrar solo atributos seleccionados*) to double-check what is ticked.
 
 ```text
 # Doors, windows, lock  → glance lock state + Lock page

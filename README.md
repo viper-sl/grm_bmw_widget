@@ -203,12 +203,24 @@ catalogue: [`docs/descriptors.md`](docs/descriptors.md).
 
 ### 3. Pair the watch
 
-1. **Garmin Connect** → your device → *Connect IQ Apps* → **BMW Status** → *Settings* →
+1. **Garmin Connect** → your device → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* →
    paste the **Client ID**. Leave VIN and Container ID empty.
+
+   <img src="docs/images/settings-1-app-page.png" height="130" alt="Garmin Connect: the app page with the Settings button"> <img src="docs/images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="docs/images/settings-3-client-id.png" height="130" alt="The BMW Client ID field (value hidden)"><br>
+   <sub>Left to right: the app in Garmin Connect with its Settings button, the settings groups, and the BMW Client ID field.</sub>
+
 2. Open the widget → **START to connect**. A pairing code and a link appear.
+
+   <img src="docs/images/pairing-1-glance.png" width="32%" alt="Glance: Press to set up"> <img src="docs/images/pairing-2-start.png" width="32%" alt="Widget: Press START to connect"> <img src="docs/images/pairing-3-code.png" width="32%" alt="Pairing screen with the code, the link and “Waiting for approval…”"><br>
+   <sub>Left to right: the glance in the widget carousel, the widget's first screen, and the pairing code with its link.</sub>
+
 3. Approve it at the link the watch shows — BMW returns it alongside the code, falling
    back to `customer.bmwgroup.com/oneid/#/link` — on a phone or computer, signing in
    with your BMW account.
+
+   <img src="docs/images/pairing-4-link-page.png" width="32%" alt="BMW's page for entering the code, with the Code field empty"> <img src="docs/images/pairing-5-code-entered.png" width="32%" alt="The code typed in; the Link BMW ID button is now active"> <img src="docs/images/pairing-6-success.png" width="32%" alt="Login successful (“LOGIN SUCCESSFUL”)"><br>
+   <sub>Left to right: BMW's page for entering the code (shown in English), the code typed in, and the confirmation.</sub>
+
 4. The watch discovers your VIN, creates both containers and fetches your car. No
    VIN/container typing. The refresh token is ~2-week sliding, renewed on every use — a
    widget you open regularly stays paired.

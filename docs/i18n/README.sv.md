@@ -56,9 +56,21 @@ Tips: slå på filtret som bara visar valda attribut (ES *Mostrar solo atributos
 
 ### 3. Parkoppla klockan
 
-1. **Garmin Connect** → din enhet → *Connect IQ Apps* → **BMW Status** → *Settings* → klistra in **Client ID**. Lämna VIN och Container ID tomma.
+1. **Garmin Connect** → din enhet → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* → klistra in **Client ID**. Lämna VIN och Container ID tomma.
+
+   <img src="../images/settings-1-app-page.png" height="130" alt="Garmin Connect: appens sida med knappen ”Settings”"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Fältet ”BMW Client ID” (värdet dolt)"><br>
+   <sub>Från vänster till höger: appen i Garmin Connect med knappen ”Settings”, inställningsgrupperna och fältet ”BMW Client ID”.</sub>
+
 2. Öppna widgeten → **START to connect**. En parkopplingskod och en länk visas.
+
+   <img src="../images/pairing-1-glance.png" width="32%" alt="Glance: Press to set up"> <img src="../images/pairing-2-start.png" width="32%" alt="Widget: Press START to connect"> <img src="../images/pairing-3-code.png" width="32%" alt="Parkopplingsskärm med koden, länken och ”Waiting for approval…”"><br>
+   <sub>Från vänster till höger: glancen i widgetkarusellen, widgetens startskärm och parkopplingskoden med länk.</sub>
+
 3. Godkänn koden på länken som klockan visar (BMW skickar den tillsammans med koden; annars `customer.bmwgroup.com/oneid/#/link`), på en telefon eller dator, och logga in med ditt BMW-konto.
+
+   <img src="../images/pairing-4-link-page.png" width="32%" alt="BMW:s sida för att ange koden, fältet ”Code” är tomt"> <img src="../images/pairing-5-code-entered.png" width="32%" alt="Koden angiven; knappen ”Link BMW ID” är aktiv"> <img src="../images/pairing-6-success.png" width="32%" alt="Inloggningen lyckades (”LOGIN SUCCESSFUL”)"><br>
+   <sub>Från vänster till höger: BMW:s sida för att ange koden (här på engelska), den angivna koden och bekräftelsen.</sub>
+
 4. Klockan hittar ditt VIN, skapar båda containrarna och hämtar din bils data. Du behöver inte skriva in VIN eller containrar. Refresh token gäller i cirka 2 veckor och förnyas vid varje användning — en widget du öppnar regelbundet förblir parkopplad.
 
 ### Uppdatering

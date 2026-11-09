@@ -56,9 +56,21 @@ Astuce : activez le filtre qui n'affiche que les attributs sélectionnés (ES *M
 
 ### 3. Appairer la montre
 
-1. **Garmin Connect** → votre appareil → *Connect IQ Apps* → **BMW Status** → *Settings* → collez le **Client ID**. Laissez VIN et Container ID vides.
+1. **Garmin Connect** → votre appareil → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* → collez le **Client ID**. Laissez VIN et Container ID vides.
+
+   <img src="../images/settings-1-app-page.png" height="130" alt="Garmin Connect : page de l'application avec le bouton « Settings »"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Champ « BMW Client ID » (valeur masquée)"><br>
+   <sub>De gauche à droite : l'application dans Garmin Connect avec son bouton « Settings », les groupes de réglages, puis le champ « BMW Client ID ».</sub>
+
 2. Ouvrez le widget → **START to connect**. Un code d'appairage et un lien s'affichent.
+
+   <img src="../images/pairing-1-glance.png" width="32%" alt="Glance: Press to set up"> <img src="../images/pairing-2-start.png" width="32%" alt="Widget: Press START to connect"> <img src="../images/pairing-3-code.png" width="32%" alt="Écran d'appairage avec le code, le lien et « Waiting for approval… »"><br>
+   <sub>De gauche à droite : le glance dans le carrousel de widgets, l'écran d'accueil du widget, le code d'appairage avec son lien.</sub>
+
 3. Validez le code au lien indiqué par la montre (BMW le fournit avec le code ; à défaut `customer.bmwgroup.com/oneid/#/link`), sur un téléphone ou un ordinateur, en vous connectant avec votre compte BMW.
+
+   <img src="../images/pairing-4-link-page.png" width="32%" alt="Page BMW de saisie du code, champ « Code » vide"> <img src="../images/pairing-5-code-entered.png" width="32%" alt="Code saisi ; le bouton « Link BMW ID » est actif"> <img src="../images/pairing-6-success.png" width="32%" alt="Connexion réussie (« LOGIN SUCCESSFUL »)"><br>
+   <sub>De gauche à droite : la page BMW de saisie du code (ici en anglais), le code saisi, la confirmation.</sub>
+
 4. La montre découvre votre VIN, crée les deux conteneurs et récupère les données de votre voiture. Aucune saisie de VIN ni de conteneur. Le refresh token dure environ 2 semaines et est renouvelé à chaque utilisation — un widget ouvert régulièrement reste appairé.
 
 ### Actualisation

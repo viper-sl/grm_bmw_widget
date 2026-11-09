@@ -56,9 +56,21 @@ Tipp: Schalten Sie den Filter ein, der nur die ausgewählten Attribute zeigt (ES
 
 ### 3. Uhr koppeln
 
-1. **Garmin Connect** → Ihr Gerät → *Connect IQ Apps* → **BMW Status** → *Settings* → die **Client ID** einfügen. VIN und Container ID bleiben leer.
+1. **Garmin Connect** → Ihr Gerät → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* → die **Client ID** einfügen. VIN und Container ID bleiben leer.
+
+   <img src="../images/settings-1-app-page.png" height="130" alt="Garmin Connect: App-Seite mit der Schaltfläche „Settings“"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Feld „BMW Client ID“ (Wert verdeckt)"><br>
+   <sub>Von links nach rechts: die App in Garmin Connect mit der Schaltfläche „Settings“, die Einstellungsgruppen und das Feld „BMW Client ID“.</sub>
+
 2. Öffnen Sie das Widget → **START to connect**. Ein Koppelungscode und ein Link erscheinen.
+
+   <img src="../images/pairing-1-glance.png" width="32%" alt="Glance: Press to set up"> <img src="../images/pairing-2-start.png" width="32%" alt="Widget: Press START to connect"> <img src="../images/pairing-3-code.png" width="32%" alt="Koppelungsbildschirm mit Code, Link und „Waiting for approval…“"><br>
+   <sub>Von links nach rechts: der Glance im Widget-Karussell, der Startbildschirm des Widgets, der Koppelungscode mit Link.</sub>
+
 3. Bestätigen Sie den Code am Link, den die Uhr anzeigt (BMW liefert ihn zusammen mit dem Code; ersatzweise `customer.bmwgroup.com/oneid/#/link`), auf einem Smartphone oder Computer und melden Sie sich mit Ihrem BMW-Konto an.
+
+   <img src="../images/pairing-4-link-page.png" width="32%" alt="BMW-Seite zur Code-Eingabe mit leerem Feld „Code“"> <img src="../images/pairing-5-code-entered.png" width="32%" alt="Eingegebener Code; die Schaltfläche „Link BMW ID“ ist aktiv"> <img src="../images/pairing-6-success.png" width="32%" alt="Anmeldung erfolgreich („LOGIN SUCCESSFUL“)"><br>
+   <sub>Von links nach rechts: die BMW-Seite zur Code-Eingabe (hier auf Englisch), der eingegebene Code, die Bestätigung.</sub>
+
 4. Die Uhr ermittelt Ihre FIN, legt beide Container an und lädt die Daten Ihres Autos. VIN und Container müssen nicht eingetippt werden. Das Refresh-Token gilt ca. 2 Wochen und wird bei jeder Nutzung verlängert — ein Widget, das Sie regelmäßig öffnen, bleibt gekoppelt.
 
 ### Aktualisierung

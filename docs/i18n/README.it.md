@@ -56,9 +56,21 @@ Suggerimento: attiva il filtro che mostra solo gli attributi selezionati (ES *Mo
 
 ### 3. Associare l'orologio
 
-1. **Garmin Connect** → il tuo dispositivo → *Connect IQ Apps* → **BMW Status** → *Settings* → incolla il **Client ID**. Lascia vuoti VIN e Container ID.
+1. **Garmin Connect** → il tuo dispositivo → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* → incolla il **Client ID**. Lascia vuoti VIN e Container ID.
+
+   <img src="../images/settings-1-app-page.png" height="130" alt="Garmin Connect: pagina dell'app con il pulsante «Settings»"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Campo «BMW Client ID» (valore nascosto)"><br>
+   <sub>Da sinistra a destra: l'app in Garmin Connect con il pulsante «Settings», i gruppi di impostazioni e il campo «BMW Client ID».</sub>
+
 2. Apri il widget → **START to connect**. Compaiono un codice di associazione e un link.
+
+   <img src="../images/pairing-1-glance.png" width="32%" alt="Glance: Press to set up"> <img src="../images/pairing-2-start.png" width="32%" alt="Widget: Press START to connect"> <img src="../images/pairing-3-code.png" width="32%" alt="Schermata di associazione con codice, link e «Waiting for approval…»"><br>
+   <sub>Da sinistra a destra: il glance nel carosello dei widget, la schermata iniziale del widget e il codice di associazione con il suo link.</sub>
+
 3. Approva il codice al link mostrato dall'orologio (BMW lo fornisce insieme al codice; in alternativa `customer.bmwgroup.com/oneid/#/link`), da uno smartphone o da un computer, accedendo con il tuo account BMW.
+
+   <img src="../images/pairing-4-link-page.png" width="32%" alt="Pagina BMW per inserire il codice, con il campo «Code» vuoto"> <img src="../images/pairing-5-code-entered.png" width="32%" alt="Codice inserito; il pulsante «Link BMW ID» è attivo"> <img src="../images/pairing-6-success.png" width="32%" alt="Accesso riuscito («LOGIN SUCCESSFUL»)"><br>
+   <sub>Da sinistra a destra: la pagina BMW per inserire il codice (qui in inglese), il codice inserito e la conferma.</sub>
+
 4. L'orologio trova il tuo VIN, crea i due container e recupera i dati della tua auto. Non serve digitare VIN o container. Il refresh token dura circa 2 settimane e si rinnova a ogni utilizzo — un widget che apri regolarmente resta associato.
 
 ### Aggiornamento

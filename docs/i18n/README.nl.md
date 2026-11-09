@@ -56,9 +56,21 @@ Tip: zet het filter aan dat alleen de geselecteerde attributen toont (ES *Mostra
 
 ### 3. Het horloge koppelen
 
-1. **Garmin Connect** → je apparaat → *Connect IQ Apps* → **BMW Status** → *Settings* → plak de **Client ID**. Laat VIN en Container ID leeg.
+1. **Garmin Connect** → je apparaat → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* → plak de **Client ID**. Laat VIN en Container ID leeg.
+
+   <img src="../images/settings-1-app-page.png" height="130" alt="Garmin Connect: de app-pagina met de knop „Settings”"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Veld „BMW Client ID” (waarde verborgen)"><br>
+   <sub>Van links naar rechts: de app in Garmin Connect met de knop „Settings”, de instellingengroepen en het veld „BMW Client ID”.</sub>
+
 2. Open de widget → **START to connect**. Er verschijnen een koppelcode en een link.
+
+   <img src="../images/pairing-1-glance.png" width="32%" alt="Glance: Press to set up"> <img src="../images/pairing-2-start.png" width="32%" alt="Widget: Press START to connect"> <img src="../images/pairing-3-code.png" width="32%" alt="Koppelscherm met de code, de link en „Waiting for approval…”"><br>
+   <sub>Van links naar rechts: de glance in de widgetcarrousel, het startscherm van de widget en de koppelcode met link.</sub>
+
 3. Keur de code goed via de link die het horloge toont (BMW levert die samen met de code; anders `customer.bmwgroup.com/oneid/#/link`), op een telefoon of computer, en log in met je BMW-account.
+
+   <img src="../images/pairing-4-link-page.png" width="32%" alt="BMW-pagina voor het invoeren van de code, met leeg veld „Code”"> <img src="../images/pairing-5-code-entered.png" width="32%" alt="Ingevoerde code; de knop „Link BMW ID” is actief"> <img src="../images/pairing-6-success.png" width="32%" alt="Inloggen gelukt („LOGIN SUCCESSFUL”)"><br>
+   <sub>Van links naar rechts: de BMW-pagina voor het invoeren van de code (hier in het Engels), de ingevoerde code en de bevestiging.</sub>
+
 4. Het horloge vindt je VIN, maakt beide containers aan en haalt de gegevens van je auto op. VIN en containers hoef je niet in te typen. Het refresh token is ca. 2 weken geldig en wordt bij elk gebruik verlengd — een widget die je regelmatig opent, blijft gekoppeld.
 
 ### Vernieuwen

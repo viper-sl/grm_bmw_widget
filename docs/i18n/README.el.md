@@ -56,9 +56,21 @@
 
 ### 3. Σύζευξη του ρολογιού
 
-1. **Garmin Connect** → η συσκευή σας → *Connect IQ Apps* → **BMW Status** → *Settings* → επικολλήστε το **Client ID**. Αφήστε κενά τα VIN και Container ID.
+1. **Garmin Connect** → η συσκευή σας → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* → επικολλήστε το **Client ID**. Αφήστε κενά τα VIN και Container ID.
+
+   <img src="../images/settings-1-app-page.png" height="130" alt="Garmin Connect: η σελίδα της εφαρμογής με το κουμπί «Settings»"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Πεδίο «BMW Client ID» (η τιμή είναι κρυμμένη)"><br>
+   <sub>Από αριστερά προς τα δεξιά: η εφαρμογή στο Garmin Connect με το κουμπί «Settings», οι ομάδες ρυθμίσεων και το πεδίο «BMW Client ID».</sub>
+
 2. Ανοίξτε το widget → **START to connect**. Εμφανίζονται ένας κωδικός σύζευξης και ένας σύνδεσμος.
+
+   <img src="../images/pairing-1-glance.png" width="32%" alt="Glance: Press to set up"> <img src="../images/pairing-2-start.png" width="32%" alt="Widget: Press START to connect"> <img src="../images/pairing-3-code.png" width="32%" alt="Οθόνη σύζευξης με τον κωδικό, τον σύνδεσμο και «Waiting for approval…»"><br>
+   <sub>Από αριστερά προς τα δεξιά: το glance στο καρουζέλ των widgets, η αρχική οθόνη του widget και ο κωδικός σύζευξης με τον σύνδεσμό του.</sub>
+
 3. Εγκρίνετε τον κωδικό στον σύνδεσμο που εμφανίζει το ρολόι (η BMW τον στέλνει μαζί με τον κωδικό· εναλλακτικά `customer.bmwgroup.com/oneid/#/link`), από κινητό ή υπολογιστή, συνδεόμενοι με τον λογαριασμό σας στη BMW.
+
+   <img src="../images/pairing-4-link-page.png" width="32%" alt="Σελίδα της BMW για την εισαγωγή του κωδικού, με κενό το πεδίο «Code»"> <img src="../images/pairing-5-code-entered.png" width="32%" alt="Ο κωδικός έχει πληκτρολογηθεί· το κουμπί «Link BMW ID» είναι ενεργό"> <img src="../images/pairing-6-success.png" width="32%" alt="Επιτυχής σύνδεση («LOGIN SUCCESSFUL»)"><br>
+   <sub>Από αριστερά προς τα δεξιά: η σελίδα της BMW για την εισαγωγή του κωδικού (εδώ στα αγγλικά), ο κωδικός που έχει πληκτρολογηθεί και η επιβεβαίωση.</sub>
+
 4. Το ρολόι βρίσκει το VIN σας, δημιουργεί και τα δύο containers και κατεβάζει τα δεδομένα του αυτοκινήτου σας. Δεν χρειάζεται να πληκτρολογήσετε VIN ή containers. Το refresh token ισχύει περίπου 2 εβδομάδες και ανανεώνεται σε κάθε χρήση — ένα widget που ανοίγετε τακτικά παραμένει συζευγμένο.
 
 ### Ανανέωση

@@ -56,9 +56,21 @@ Wskazówka: włącz filtr pokazujący tylko wybrane atrybuty (ES *Mostrar solo a
 
 ### 3. Parowanie zegarka
 
-1. **Garmin Connect** → Twoje urządzenie → *Connect IQ Apps* → **BMW Status** → *Settings* → wklej **Client ID**. VIN i Container ID zostaw puste.
+1. **Garmin Connect** → Twoje urządzenie → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* → wklej **Client ID**. VIN i Container ID zostaw puste.
+
+   <img src="../images/settings-1-app-page.png" height="130" alt="Garmin Connect: strona aplikacji z przyciskiem „Settings”"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Pole „BMW Client ID” (wartość ukryta)"><br>
+   <sub>Od lewej do prawej: aplikacja w Garmin Connect z przyciskiem „Settings”, grupy ustawień i pole „BMW Client ID”.</sub>
+
 2. Otwórz widżet → **START to connect**. Pojawią się kod parowania i link.
+
+   <img src="../images/pairing-1-glance.png" width="32%" alt="Glance: Press to set up"> <img src="../images/pairing-2-start.png" width="32%" alt="Widget: Press START to connect"> <img src="../images/pairing-3-code.png" width="32%" alt="Ekran parowania z kodem, linkiem i „Waiting for approval…”"><br>
+   <sub>Od lewej do prawej: glance w karuzeli widżetów, ekran startowy widżetu oraz kod parowania z linkiem.</sub>
+
 3. Zatwierdź kod pod linkiem wyświetlonym na zegarku (BMW podaje go razem z kodem; awaryjnie `customer.bmwgroup.com/oneid/#/link`), na telefonie lub komputerze, logując się kontem BMW.
+
+   <img src="../images/pairing-4-link-page.png" width="32%" alt="Strona BMW do wpisania kodu, puste pole „Code”"> <img src="../images/pairing-5-code-entered.png" width="32%" alt="Wpisany kod; przycisk „Link BMW ID” jest aktywny"> <img src="../images/pairing-6-success.png" width="32%" alt="Logowanie zakończone powodzeniem („LOGIN SUCCESSFUL”)"><br>
+   <sub>Od lewej do prawej: strona BMW do wpisania kodu (tu po angielsku), wpisany kod i potwierdzenie.</sub>
+
 4. Zegarek wykrywa VIN, tworzy oba kontenery i pobiera dane Twojego auta. Nie trzeba wpisywać VIN-u ani kontenerów. Refresh token działa ok. 2 tygodnie i odnawia się przy każdym użyciu — widżet otwierany regularnie pozostaje sparowany.
 
 ### Odświeżanie

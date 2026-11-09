@@ -56,9 +56,21 @@ Vinkki: kytke päälle suodatin, joka näyttää vain valitut attribuutit (ES *M
 
 ### 3. Kellon pariutus
 
-1. **Garmin Connect** → laitteesi → *Connect IQ Apps* → **BMW Status** → *Settings* → liitä **Client ID**. Jätä VIN ja Container ID tyhjiksi.
+1. **Garmin Connect** → laitteesi → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* → liitä **Client ID**. Jätä VIN ja Container ID tyhjiksi.
+
+   <img src="../images/settings-1-app-page.png" height="130" alt="Garmin Connect: sovelluksen sivu ja ”Settings”-painike"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="”BMW Client ID” -kenttä (arvo piilotettu)"><br>
+   <sub>Vasemmalta oikealle: sovellus Garmin Connectissa ja sen ”Settings”-painike, asetusryhmät ja ”BMW Client ID” -kenttä.</sub>
+
 2. Avaa widget → **START to connect**. Näkyviin tulee pariutuskoodi ja linkki.
+
+   <img src="../images/pairing-1-glance.png" width="32%" alt="Glance: Press to set up"> <img src="../images/pairing-2-start.png" width="32%" alt="Widget: Press START to connect"> <img src="../images/pairing-3-code.png" width="32%" alt="Pariutusnäyttö, jossa koodi, linkki ja ”Waiting for approval…”"><br>
+   <sub>Vasemmalta oikealle: glance widget-karusellissa, widgetin aloitusnäyttö ja pariutuskoodi linkkeineen.</sub>
+
 3. Hyväksy koodi kellon näyttämässä linkissä (BMW antaa sen koodin mukana; muuten `customer.bmwgroup.com/oneid/#/link`) puhelimella tai tietokoneella ja kirjaudu BMW-tililläsi.
+
+   <img src="../images/pairing-4-link-page.png" width="32%" alt="BMW:n sivu koodin syöttämiseen, ”Code”-kenttä tyhjä"> <img src="../images/pairing-5-code-entered.png" width="32%" alt="Koodi syötetty; ”Link BMW ID” -painike on aktiivinen"> <img src="../images/pairing-6-success.png" width="32%" alt="Kirjautuminen onnistui (”LOGIN SUCCESSFUL”)"><br>
+   <sub>Vasemmalta oikealle: BMW:n sivu koodin syöttämiseen (tässä englanniksi), syötetty koodi ja vahvistus.</sub>
+
 4. Kello löytää VIN-tunnuksesi, luo molemmat säiliöt ja hakee autosi tiedot. VIN-tunnusta tai säiliöitä ei tarvitse kirjoittaa. Refresh token on voimassa noin 2 viikkoa ja uusiutuu jokaisella käytöllä — säännöllisesti avaamasi widget pysyy pariutettuna.
 
 ### Päivitys

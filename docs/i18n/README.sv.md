@@ -56,10 +56,10 @@ Tips: slå på filtret som bara visar valda attribut (ES *Mostrar solo atributos
 
 ### 3. Parkoppla klockan
 
-1. **Garmin Connect** → din enhet → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* → klistra in **Client ID**. Lämna VIN och Container ID tomma.
+1. I appen **Connect IQ** på telefonen: ikonen för din enhet → *My device apps* → **BMW Status** → *Settings* → *Required* → klistra in **Client ID**. Lämna VIN och Container ID tomma. Client ID är **inte** din BMW-inloggning eller e-postadress, utan den 36 tecken långa koden (som `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) som du kopierade i steg 1.3.
 
-   <img src="../images/settings-1-app-page.png" height="130" alt="Garmin Connect: appens sida med knappen ”Settings”"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Fältet ”BMW Client ID” (värdet dolt)"><br>
-   <sub>Från vänster till höger: appen i Garmin Connect med knappen ”Settings”, inställningsgrupperna och fältet ”BMW Client ID”.</sub>
+   <img src="../images/settings-1-app-page.png" height="130" alt="Connect IQ: appens sida med knappen ”Settings”"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Fältet ”BMW Client ID” (värdet dolt)"><br>
+   <sub>Från vänster till höger: appen i Connect IQ med knappen ”Settings”, inställningsgrupperna och fältet ”BMW Client ID”.</sub>
 
 2. Öppna widgeten → **START to connect**. En parkopplingskod och en länk visas.
 
@@ -86,7 +86,7 @@ Tips: slå på filtret som bara visar valda attribut (ES *Mostrar solo atributos
 | Visning / symptom | Orsak / lösning |
 |---|---|
 | `BMW Widget` / `Add Client ID in the Garmin Connect app` | Inget Client ID i inställningarna än — steg 3.1. Mellanslag i början eller slutet vid inklistring ignoreras. |
-| `Auth failed` → `Client ID looks incomplete — copy it again…` | BMW avvisade parkopplingen och det sparade värdet är inte ett fullständigt Client ID på 36 tecken — oftast har bara halva klistrats in. Kopiera det igen från portalen. |
+| `Auth failed` → `Client ID looks incomplete — copy it again…` | BMW avvisade parkopplingen och det sparade värdet är inte ett fullständigt Client ID på 36 tecken — oftast har bara halva klistrats in, eller så har e-postadressen eller BMW-inloggningen skrivits in av misstag. Kopiera Client ID igen från portalen (steg 1.3). |
 | `Phone link lost — retrying…` vid parkoppling | Klockan tappade kontakten med Garmin Connect en stund (vanligt när du godkänner på samma telefon). Koden gäller fortfarande; godkänn färdigt så fortsätter klockan av sig själv. |
 | `No car on this BMW account` | Ditt BMW ID har inget fordon, eller så är du inte dess **huvudanvändare**. CarData betjänar bara huvudanvändaren. |
 | `Car not readable — check VIN` | VIN i inställningarna är fel, eller bilen finns inte längre på kontot. Töm VIN-fältet så att widgeten hittar det själv. |

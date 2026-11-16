@@ -203,11 +203,12 @@ catalogue: [`docs/descriptors.md`](docs/descriptors.md).
 
 ### 3. Pair the watch
 
-1. **Garmin Connect** → your device → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* →
-   paste the **Client ID**. Leave VIN and Container ID empty.
+1. In the **Connect IQ** app on your phone: your device icon → *My device apps* → **BMW Status** → *Settings* → *Required* →
+   paste the **Client ID**. Leave VIN and Container ID empty. The Client ID is **not** your BMW login or e-mail: it is the
+   36-character code (like `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) you copied in step 1.3.
 
-   <img src="docs/images/settings-1-app-page.png" height="130" alt="Garmin Connect: the app page with the Settings button"> <img src="docs/images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="docs/images/settings-3-client-id.png" height="130" alt="The BMW Client ID field (value hidden)"><br>
-   <sub>Left to right: the app in Garmin Connect with its Settings button, the settings groups, and the BMW Client ID field.</sub>
+   <img src="docs/images/settings-1-app-page.png" height="130" alt="Connect IQ: the app page with the Settings button"> <img src="docs/images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="docs/images/settings-3-client-id.png" height="130" alt="The BMW Client ID field (value hidden)"><br>
+   <sub>Left to right: the app in Connect IQ with its Settings button, the settings groups, and the BMW Client ID field.</sub>
 
 2. Open the widget → **START to connect**. A pairing code and a link appear.
 
@@ -245,7 +246,7 @@ catalogue: [`docs/descriptors.md`](docs/descriptors.md).
 | Symptom | Cause / fix |
 |---|---|
 | `BMW Widget` / `Add Client ID in the Garmin Connect app` | No client ID in settings yet — step 3.1. Leading/trailing spaces from a paste are ignored. |
-| `Auth failed` → `Client ID looks incomplete — copy it again…` | BMW refused the pairing and the saved value isn't a full 36-character Client ID — usually half a paste. Copy it again from the portal. |
+| `Auth failed` → `Client ID looks incomplete — copy it again…` | BMW refused the pairing and the saved value isn't a full 36-character Client ID — usually half a paste, or an e-mail / BMW login typed in by mistake. Copy the Client ID again from the portal (step 1.3). |
 | `Phone link lost — retrying…` while pairing | The watch lost Garmin Connect for a moment (common while you approve on the same phone). The code stays valid; finish approving — it carries on by itself. |
 | `No car on this BMW account` | Your BMW ID has no vehicle, or you are not its **primary** user. CarData only serves the primary user. |
 | `Car not readable — check VIN` | The VIN in settings is wrong, or the car is no longer on this account. Clear the VIN setting to let the widget discover it. |

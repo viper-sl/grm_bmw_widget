@@ -56,10 +56,10 @@ Vinkki: kytke päälle suodatin, joka näyttää vain valitut attribuutit (ES *M
 
 ### 3. Kellon pariutus
 
-1. **Garmin Connect** → laitteesi → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* → liitä **Client ID**. Jätä VIN ja Container ID tyhjiksi.
+1. Puhelimen **Connect IQ** -sovelluksessa: laitteesi kuvake → *My device apps* → **BMW Status** → *Settings* → *Required* → liitä **Client ID**. Jätä VIN ja Container ID tyhjiksi. Client ID **ei** ole BMW-tunnuksesi eikä sähköpostiosoitteesi, vaan 36 merkin koodi (muotoa `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`), jonka kopioit vaiheessa 1.3.
 
-   <img src="../images/settings-1-app-page.png" height="130" alt="Garmin Connect: sovelluksen sivu ja ”Settings”-painike"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="”BMW Client ID” -kenttä (arvo piilotettu)"><br>
-   <sub>Vasemmalta oikealle: sovellus Garmin Connectissa ja sen ”Settings”-painike, asetusryhmät ja ”BMW Client ID” -kenttä.</sub>
+   <img src="../images/settings-1-app-page.png" height="130" alt="Connect IQ: sovelluksen sivu ja ”Settings”-painike"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="”BMW Client ID” -kenttä (arvo piilotettu)"><br>
+   <sub>Vasemmalta oikealle: sovellus Connect IQ:ssa ja sen ”Settings”-painike, asetusryhmät ja ”BMW Client ID” -kenttä.</sub>
 
 2. Avaa widget → **START to connect**. Näkyviin tulee pariutuskoodi ja linkki.
 
@@ -86,7 +86,7 @@ Vinkki: kytke päälle suodatin, joka näyttää vain valitut attribuutit (ES *M
 | Näkymä / oire | Syy / ratkaisu |
 |---|---|
 | `BMW Widget` / `Add Client ID in the Garmin Connect app` | Asetuksissa ei ole vielä Client ID:tä — vaihe 3.1. Liitetyn arvon alussa ja lopussa olevat välilyönnit ohitetaan. |
-| `Auth failed` → `Client ID looks incomplete — copy it again…` | BMW hylkäsi pariutuksen, eikä tallennettu arvo ole täydellinen 36 merkin Client ID — yleensä liitettiin vain puolet. Kopioi se uudelleen portaalista. |
+| `Auth failed` → `Client ID looks incomplete — copy it again…` | BMW hylkäsi pariutuksen, eikä tallennettu arvo ole täydellinen 36 merkin Client ID — yleensä liitettiin vain puolet tai kenttään kirjoitettiin vahingossa sähköpostiosoite tai BMW-tunnus. Kopioi Client ID uudelleen portaalista (vaihe 1.3). |
 | `Phone link lost — retrying…` pariutuksen aikana | Kello menetti hetkeksi yhteyden Garmin Connectiin (yleistä, jos hyväksyt samalla puhelimella). Koodi on yhä voimassa; viimeistele hyväksyntä — kello jatkaa itsestään. |
 | `No car on this BMW account` | BMW ID:llesi ei ole ajoneuvoa, tai et ole sen **ensisijainen** käyttäjä. CarData palvelee vain ensisijaista käyttäjää. |
 | `Car not readable — check VIN` | Asetuksissa oleva VIN on väärä, tai auto ei ole enää tällä tilillä. Tyhjennä VIN-kenttä, jotta widget löytää sen itse. |

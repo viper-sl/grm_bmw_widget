@@ -56,10 +56,10 @@ Astuce : activez le filtre qui n'affiche que les attributs sélectionnés (ES *M
 
 ### 3. Appairer la montre
 
-1. **Garmin Connect** → votre appareil → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* → collez le **Client ID**. Laissez VIN et Container ID vides.
+1. Dans l'application **Connect IQ** sur votre téléphone : icône de votre appareil → *My device apps* → **BMW Status** → *Settings* → *Required* → collez le **Client ID**. Laissez VIN et Container ID vides. Le Client ID n'est **pas** votre identifiant BMW ni votre adresse e-mail : c'est le code de 36 caractères (du type `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) copié à l'étape 1.3.
 
-   <img src="../images/settings-1-app-page.png" height="130" alt="Garmin Connect : page de l'application avec le bouton « Settings »"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Champ « BMW Client ID » (valeur masquée)"><br>
-   <sub>De gauche à droite : l'application dans Garmin Connect avec son bouton « Settings », les groupes de réglages, puis le champ « BMW Client ID ».</sub>
+   <img src="../images/settings-1-app-page.png" height="130" alt="Connect IQ : page de l'application avec le bouton « Settings »"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Champ « BMW Client ID » (valeur masquée)"><br>
+   <sub>De gauche à droite : l'application dans Connect IQ avec son bouton « Settings », les groupes de réglages, puis le champ « BMW Client ID ».</sub>
 
 2. Ouvrez le widget → **START to connect**. Un code d'appairage et un lien s'affichent.
 
@@ -86,7 +86,7 @@ Astuce : activez le filtre qui n'affiche que les attributs sélectionnés (ES *M
 | Affichage / symptôme | Cause / solution |
 |---|---|
 | `BMW Widget` / `Add Client ID in the Garmin Connect app` | Aucun Client ID dans les réglages — étape 3.1. Les espaces en début ou fin de saisie sont ignorés. |
-| `Auth failed` → `Client ID looks incomplete — copy it again…` | BMW a refusé l'appairage et la valeur enregistrée n'est pas un Client ID complet de 36 caractères — souvent un copier-coller partiel. Recopiez-le depuis le portail. |
+| `Auth failed` → `Client ID looks incomplete — copy it again…` | BMW a refusé l'appairage et la valeur enregistrée n'est pas un Client ID complet de 36 caractères — souvent un copier-coller partiel, ou une adresse e-mail / un identifiant BMW saisi par erreur. Recopiez le Client ID depuis le portail (étape 1.3). |
 | `Phone link lost — retrying…` pendant l'appairage | La montre a brièvement perdu Garmin Connect (fréquent quand vous validez sur le même téléphone). Le code reste valide ; terminez la validation — la montre reprend toute seule. |
 | `No car on this BMW account` | Votre BMW ID n'a pas de véhicule, ou vous n'en êtes pas l'utilisateur **principal**. CarData ne sert que l'utilisateur principal. |
 | `Car not readable — check VIN` | Le VIN saisi dans les réglages est erroné, ou la voiture n'est plus sur ce compte. Videz le champ VIN pour laisser le widget le découvrir. |

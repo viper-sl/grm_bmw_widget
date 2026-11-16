@@ -56,10 +56,10 @@
 
 ### 3. Σύζευξη του ρολογιού
 
-1. **Garmin Connect** → η συσκευή σας → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* → επικολλήστε το **Client ID**. Αφήστε κενά τα VIN και Container ID.
+1. Στην εφαρμογή **Connect IQ** στο κινητό: εικονίδιο της συσκευής σας → *My device apps* → **BMW Status** → *Settings* → *Required* → επικολλήστε το **Client ID**. Αφήστε κενά τα VIN και Container ID. Το Client ID **δεν** είναι το login σας στη BMW ούτε το e-mail σας· είναι ο κωδικός 36 χαρακτήρων (όπως `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) που αντιγράψατε στο βήμα 1.3.
 
-   <img src="../images/settings-1-app-page.png" height="130" alt="Garmin Connect: η σελίδα της εφαρμογής με το κουμπί «Settings»"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Πεδίο «BMW Client ID» (η τιμή είναι κρυμμένη)"><br>
-   <sub>Από αριστερά προς τα δεξιά: η εφαρμογή στο Garmin Connect με το κουμπί «Settings», οι ομάδες ρυθμίσεων και το πεδίο «BMW Client ID».</sub>
+   <img src="../images/settings-1-app-page.png" height="130" alt="Connect IQ: η σελίδα της εφαρμογής με το κουμπί «Settings»"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Πεδίο «BMW Client ID» (η τιμή είναι κρυμμένη)"><br>
+   <sub>Από αριστερά προς τα δεξιά: η εφαρμογή στο Connect IQ με το κουμπί «Settings», οι ομάδες ρυθμίσεων και το πεδίο «BMW Client ID».</sub>
 
 2. Ανοίξτε το widget → **START to connect**. Εμφανίζονται ένας κωδικός σύζευξης και ένας σύνδεσμος.
 
@@ -86,7 +86,7 @@
 | Ένδειξη / σύμπτωμα | Αιτία / λύση |
 |---|---|
 | `BMW Widget` / `Add Client ID in the Garmin Connect app` | Δεν υπάρχει ακόμη Client ID στις ρυθμίσεις — βήμα 3.1. Τα κενά στην αρχή ή στο τέλος της επικολλημένης τιμής αγνοούνται. |
-| `Auth failed` → `Client ID looks incomplete — copy it again…` | Η BMW απέρριψε τη σύζευξη και η αποθηκευμένη τιμή δεν είναι πλήρες Client ID 36 χαρακτήρων — συνήθως επικολλήθηκε μόνο το μισό. Αντιγράψτε το ξανά από την πύλη. |
+| `Auth failed` → `Client ID looks incomplete — copy it again…` | Η BMW απέρριψε τη σύζευξη και η αποθηκευμένη τιμή δεν είναι πλήρες Client ID 36 χαρακτήρων — συνήθως επικολλήθηκε μόνο το μισό ή καταχωρίστηκε κατά λάθος το e-mail/login της BMW. Αντιγράψτε το Client ID ξανά από την πύλη (βήμα 1.3). |
 | `Phone link lost — retrying…` κατά τη σύζευξη | Το ρολόι έχασε για λίγο τη σύνδεση με το Garmin Connect (συχνό όταν εγκρίνετε από το ίδιο κινητό). Ο κωδικός παραμένει έγκυρος· ολοκληρώστε την έγκριση — το ρολόι συνεχίζει μόνο του. |
 | `No car on this BMW account` | Το BMW ID σας δεν έχει όχημα ή δεν είστε ο **κύριος** χρήστης του. Το CarData εξυπηρετεί μόνο τον κύριο χρήστη. |
 | `Car not readable — check VIN` | Το VIN στις ρυθμίσεις είναι λάθος ή το αυτοκίνητο δεν βρίσκεται πια σε αυτόν τον λογαριασμό. Αδειάστε το πεδίο VIN για να το βρει μόνο του το widget. |

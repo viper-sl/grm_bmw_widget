@@ -56,10 +56,10 @@ Tip: zet het filter aan dat alleen de geselecteerde attributen toont (ES *Mostra
 
 ### 3. Het horloge koppelen
 
-1. **Garmin Connect** → je apparaat → *Connect IQ Apps* → **BMW Status** → *Settings* → *Required* → plak de **Client ID**. Laat VIN en Container ID leeg.
+1. In de **Connect IQ**-app op je telefoon: icoon van je apparaat → *My device apps* → **BMW Status** → *Settings* → *Required* → plak de **Client ID**. Laat VIN en Container ID leeg. De Client ID is **niet** je BMW-login of e-mailadres, maar de code van 36 tekens (zoals `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) die je in stap 1.3 hebt gekopieerd.
 
-   <img src="../images/settings-1-app-page.png" height="130" alt="Garmin Connect: de app-pagina met de knop „Settings”"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Veld „BMW Client ID” (waarde verborgen)"><br>
-   <sub>Van links naar rechts: de app in Garmin Connect met de knop „Settings”, de instellingengroepen en het veld „BMW Client ID”.</sub>
+   <img src="../images/settings-1-app-page.png" height="130" alt="Connect IQ: de app-pagina met de knop „Settings”"> <img src="../images/settings-2-groups.png" height="130" alt="Settings: Required, Optional"> <img src="../images/settings-3-client-id.png" height="130" alt="Veld „BMW Client ID” (waarde verborgen)"><br>
+   <sub>Van links naar rechts: de app in Connect IQ met de knop „Settings”, de instellingengroepen en het veld „BMW Client ID”.</sub>
 
 2. Open de widget → **START to connect**. Er verschijnen een koppelcode en een link.
 
@@ -86,7 +86,7 @@ Tip: zet het filter aan dat alleen de geselecteerde attributen toont (ES *Mostra
 | Melding / verschijnsel | Oorzaak / oplossing |
 |---|---|
 | `BMW Widget` / `Add Client ID in the Garmin Connect app` | Er staat nog geen Client ID in de instellingen — stap 3.1. Spaties aan het begin of einde bij het plakken worden genegeerd. |
-| `Auth failed` → `Client ID looks incomplete — copy it again…` | BMW weigerde de koppeling en de opgeslagen waarde is geen volledige Client ID van 36 tekens — meestal is maar de helft geplakt. Kopieer hem opnieuw uit het portaal. |
+| `Auth failed` → `Client ID looks incomplete — copy it again…` | BMW weigerde de koppeling en de opgeslagen waarde is geen volledige Client ID van 36 tekens — meestal is maar de helft geplakt, of is per ongeluk het e-mailadres of de BMW-login ingevuld. Kopieer de Client ID opnieuw uit het portaal (stap 1.3). |
 | `Phone link lost — retrying…` tijdens het koppelen | Het horloge was even de verbinding met Garmin Connect kwijt (komt vaak voor als je op dezelfde telefoon goedkeurt). De code blijft geldig; rond het goedkeuren af — het horloge gaat vanzelf verder. |
 | `No car on this BMW account` | Je BMW ID heeft geen voertuig, of je bent niet de **hoofdgebruiker**. CarData bedient alleen de hoofdgebruiker. |
 | `Car not readable — check VIN` | De VIN in de instellingen klopt niet, of de auto staat niet meer op dit account. Maak het VIN-veld leeg zodat de widget de VIN zelf vindt. |
